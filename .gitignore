@@ -1,0 +1,8 @@
+# ignore reference files dir
+reference_files
+
+# general ignored
+.DS_Store
+__pycache__
+.ipynb_checkpoints
+
