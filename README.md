@@ -1,6 +1,6 @@
 # EMBED Open Data V2 Agent Context
 
-This repository will contain a small, agent-facing knowledge bundle for the
+This repository contains a small, agent-facing knowledge bundle for the
 Emory Breast Imaging Dataset (EMBED) Open Data version 2. The bundle is intended
 to help an agent understand the released clinical data: first the meanings of
 individual fields, then the relationships between tables, and finally the
@@ -13,8 +13,8 @@ an application, database, or general-purpose data-processing framework.
 
 ## Repository layout
 
-- `bundle/` — the agent-facing context bundle. It is currently empty while the
-  source material is being reviewed.
+- [`bundle/`](bundle/README.md) — the agent-facing context bundle, with a
+  standalone entry point and feature references grouped by conceptual level.
 - `docs/` — project documentation for maintainers and agents.
 - `reference_files/` — local EMBED V2 source artifacts used to build and verify
   the bundle. This directory is intentionally ignored by Git.
@@ -27,7 +27,27 @@ The question-driven, minimal-access plan for the feature layer is in
 
 ## Current status
 
-The feature investigation is planned and initialized. Its scope, evidence
-labels, targeted-access gates, and completion checks are defined, but no dataset
-field definitions, table relationships, or clinical interpretations have yet
-been added to the context bundle.
+The feature layer is implemented. It accounts for all 243 physical column
+occurrences across the eight released tables and records representations,
+released legend meanings, observed bounded domains, missing/sentinel evidence,
+and unresolved interpretation questions at the appropriate evidence level.
+
+The targeted access ledger and aggregate findings are in
+[docs/feature-context-investigation-results.md](docs/feature-context-investigation-results.md).
+Full table-linkage and clinical/procedural-context phases remain future work;
+the current bundle includes only the key and timing cautions needed to interpret
+features safely.
+
+## Maintainer verification
+
+The narrow bundle verifier reads Parquet footer schemas from the explicit
+eight-file manifest. It checks that every physical table-column occurrence is
+named in a Markdown table cell, local links and heading fragments resolve
+inside the bundle, and every document is reachable from the entry point:
+
+```bash
+uv run --locked python scripts/validate_bundle.py
+```
+
+It does not open clinical data pages, inspect value statistics, or read report
+text.

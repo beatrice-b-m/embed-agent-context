@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This project will build a concise context bundle for agents working with the
+This project builds a concise context bundle for agents working with the
 EMBED Open Data version 2 clinical data. The bundle should make the data easier
 to interpret without hiding uncertainty or importing outdated assumptions from
 EMBED V1.
@@ -60,6 +60,34 @@ background from EMBED-specific conventions.
 Later phases may refine earlier documents as relationships or clinical
 workflows expose a more accurate interpretation. Such revisions should retain
 useful compatibility notes rather than silently replacing prior assumptions.
+
+## Implemented bundle structure
+
+As of July 28, 2026, the feature layer is implemented in five portable
+documents:
+
+- `bundle/README.md` — standalone entry point, evidence labels, table map, and
+  cross-cutting interpretation rules;
+- `bundle/patient-exam-side-risk.md` — patient, exam, side-level, and risk
+  features;
+- `bundle/imaging-findings.md` — imaging-finding features and coded
+  vocabularies;
+- `bundle/pathology-reports-and-wide-table.md` — pathology and report features
+  plus a complete `combined_anon` occurrence crosswalk; and
+- `bundle/pathology-vocabularies.md` — complete applicable pathology,
+  procedure, and location code-to-meaning maps from the release legend.
+
+The documents account for all 243 physical table-column occurrences. They use
+the released legend plus the aggregate-only probes registered in
+[feature-context-investigation-results.md](feature-context-investigation-results.md).
+No report text, clinical table row, identifier value, anonymized date value, or
+exam description is copied into the bundle. Applicable release-legend code
+maps are intentionally included as feature context.
+
+Phase 2 and Phase 3 are not complete. The feature layer includes only
+release-specific grain, relationship, and timing cautions needed to prevent
+feature misinterpretation; it does not yet provide a full linkage specification
+or clinical workflow guide.
 
 ## Evidence and source priority
 

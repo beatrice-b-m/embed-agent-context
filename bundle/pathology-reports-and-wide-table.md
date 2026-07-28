@@ -2,7 +2,8 @@
 
 [Bundle entry point](README.md) ·
 [Patient, exam, side, and risk](patient-exam-side-risk.md) ·
-[Imaging findings](imaging-findings.md)
+[Imaging findings](imaging-findings.md) ·
+[Complete pathology vocabularies](pathology-vocabularies.md)
 
 This page describes every physical feature in `pathology_findings_anon` and
 `reports_anon`, then accounts for all 101 physical columns in `combined_anon`.
@@ -62,17 +63,17 @@ clinical one-to-one equivalence.
 
 | Physical column | Type | Feature context |
 | --- | --- | --- |
-| `acc_anon` | `int64` | Anonymous exam/accession identifier. It is complete but repeated. The legend describes base header `acc` as the unique site record identifier for an exam; the suffixed physical field is a derived-name match. **Release schema; Release legend; Cross-table check** |
-| `side` | `string` | Finding side. Legend codes are `L` left, `R` right, and `B` both. Observed: `B` 71,957; `L` 46,059; `R` 45,151; null 7,466. **Release legend; Observed V2 values** |
-| `numfind` | `int8` | Finding number. Observed: null 11,042; `-9` 21,407; `0` 1; `1` 120,782; `2` 13,492; `3` 2,940; `4` 695; `5` 181; `6` 61; `7` 22; `8` 8; `9` 2. The legend defines no codes, so the meaning of `-9` and the exceptional zero is **Unresolved**. |
-| `path_severity` | `int8` | Finding-level pathology severity. Observed: null 163,057; `0` 1,909; `1` 751; `2` 1,076; `3` 64; `4` 3,634; `5` 142. There is no matching legend header, and ordinality or meanings must not be inferred from the integers. **Observed V2 values; Unresolved** |
-| `procdate_anon` | `timestamp[ns]` | Anonymized procedure date. The base legend header `procdate` says “Procedure Date”; the physical suffix is a derived-name match. Null in 163,033 rows. Date-shift and interval-preservation behavior is **Unresolved**. |
-| `pdate_anon` | `timestamp[ns]` | Anonymized pathology-report date. The base legend header `pdate` says “Pathology report date”; the physical suffix is a derived-name match. Null in 163,033 rows. Date-shift and interval-preservation behavior is **Unresolved**. |
-| `__index_level_0__` | `int64` | Complete, unique retained index; not row position and not documented as a clinical key. **Release schema; Cross-table check** |
+| `pathology_findings_anon.acc_anon` | `int64` | Anonymous exam/accession identifier. It is complete but repeated. The legend describes base header `acc` as the unique site record identifier for an exam; applying that meaning to the suffixed physical field is **Inference**. **Release schema; Release legend for base header; Cross-table check** |
+| `pathology_findings_anon.side` | `string` | Finding side. Legend codes are `L` left, `R` right, and `B` both. Observed: `B` 71,957; `L` 46,059; `R` 45,151; null 7,466. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.numfind` | `int8` | Finding number. Observed: null 11,042; `-9` 21,407; `0` 1; `1` 120,782; `2` 13,492; `3` 2,940; `4` 695; `5` 181; `6` 61; `7` 22; `8` 8; `9` 2. The legend defines no codes, so the meaning of `-9` and the exceptional zero is **Unresolved**. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.path_severity` | `int8` | Finding-level pathology severity. Observed: null 163,057; `0` 1,909; `1` 751; `2` 1,076; `3` 64; `4` 3,634; `5` 142. There is no matching legend header, and ordinality or meanings must not be inferred from the integers. **Observed V2 values; Unresolved** |
+| `pathology_findings_anon.procdate_anon` | `timestamp[ns]` | Anonymized procedure date. The base legend header `procdate` says “Procedure Date”; applying it to the suffixed field is **Inference**. Footer metadata reports 163,033 nulls. Date-shift and interval-preservation behavior is **Unresolved**. **Release schema; Release legend for base header** |
+| `pathology_findings_anon.pdate_anon` | `timestamp[ns]` | Anonymized pathology-report date. The base legend header `pdate` says “Pathology report date”; applying it to the suffixed field is **Inference**. Footer metadata reports 163,033 nulls. Date-shift and interval-preservation behavior is **Unresolved**. **Release schema; Release legend for base header** |
+| `pathology_findings_anon.__index_level_0__` | `int64` | Complete, unique retained index; not row position and not documented as a clinical key. **Release schema; Cross-table check** |
 
 The two date columns are simultaneously complete in only 7,600 rows.
-Procedure, surgery, pathology, and report-date fields can represent information
-available after the imaging exam. Do not use them as contemporaneous predictors
+Procedure, surgery, pathology, and report-date fields may represent information
+recorded after the imaging exam. Do not use them as contemporaneous predictors
 unless a prediction anchor and information-availability policy explicitly
 permit them.
 
@@ -80,15 +81,18 @@ permit them.
 
 All string columns projected by Q010 had zero empty or whitespace-only values.
 Null is common, but the legend does not assign null a clinical meaning.
+The [pathology vocabulary appendix](pathology-vocabularies.md) contains every
+applicable legend code and meaning, including codes not observed in this
+release.
 
 | Physical column | Type | Observed domain and release meaning |
 | --- | --- | --- |
-| `type` | `string` | Biopsy type: `B` needle-biopsy pathology 6,381; `S` surgical pathology 1,219; null 163,033. The observed domain is a subset of the legend. **Release legend; Observed V2 values** |
-| `technique` | `string` | Biopsy technique: `CA` 22, `CB` 7, `EB` 51, `FNA` 18, `MA` 5, `MR` 71, `MRX` 234, `SA` 27, `SB` 1,850, `TB` 55, `UA` 9, `UB` 3,926; null 164,358. All observed codes are legend-listed. **Release legend; Observed V2 values** |
-| `bside` | `string` | Biopsy side: `B` both 37, `L` left 3,857, `R` right 3,699; null 163,040. **Release legend; Observed V2 values** |
-| `bcomp` | `string` | Biopsy complication. Only `H` hematoma requiring surgery (1) and `I` infection requiring antibiotics (3) occur; null 170,629. The legend also lists unobserved `L`, `N`, `P`, and `X`. **Release legend; Observed V2 values** |
-| `surgery` | `string` | Surgery type: `A` 2, `E` 185, `L` 256, `M` 747, `O` 9, `RE` 5, `SE` 12; null 169,417. All observed codes are legend-listed; the legend contains additional unobserved surgery codes. **Release legend; Observed V2 values** |
-| `lymphsurg` | `string` | Lymph-node surgery type: `AN` 37, `HAN` 2, `NS` 85, `O` 1, `S` 517; null 169,991. All observed codes are legend-listed; `IMN` and `LAN` are listed but unobserved. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.type` | `string` | Biopsy type: `B` needle-biopsy pathology 6,381; `S` surgical pathology 1,219; null 163,033. The observed domain is a subset of the legend. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.technique` | `string` | Biopsy technique: `CA` 22, `CB` 7, `EB` 51, `FNA` 18, `MA` 5, `MR` 71, `MRX` 234, `SA` 27, `SB` 1,850, `TB` 55, `UA` 9, `UB` 3,926; null 164,358. All observed codes are legend-listed. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.bside` | `string` | Biopsy side: `B` both 37, `L` left 3,857, `R` right 3,699; null 163,040. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.bcomp` | `string` | Biopsy complication. Only `H` hematoma requiring surgery (1) and `I` infection requiring antibiotics (3) occur; null 170,629. The legend also lists unobserved `L`, `N`, `P`, and `X`. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.surgery` | `string` | Surgery type: `A` 2, `E` 185, `L` 256, `M` 747, `O` 9, `RE` 5, `SE` 12; null 169,417. All observed codes are legend-listed; the legend contains additional unobserved surgery codes. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.lymphsurg` | `string` | Lymph-node surgery type: `AN` 37, `HAN` 2, `NS` 85, `O` 1, `S` 517; null 169,991. All observed codes are legend-listed; `IMN` and `LAN` are listed but unobserved. **Release legend; Observed V2 values** |
 
 The legend meanings for the observed surgery codes are:
 
@@ -99,8 +103,9 @@ The legend meanings for the observed surgery codes are:
   dissection; `NS` lymph nodes not sampled; `O` other; `S` sentinel-node
   biopsy.
 
-These are post-exam procedure/outcome features unless a documented task anchor
-establishes otherwise.
+These are potentially post-index procedure/outcome features. Their timing
+relative to an imaging exam is not established here; a documented task anchor
+must determine whether they are eligible.
 
 ### Pathology-code slots
 
@@ -112,16 +117,16 @@ legend**
 
 | Column | Null rows | Distinct non-null codes |
 | --- | ---: | ---: |
-| `path1` | 163,046 | 117 |
-| `path2` | 166,288 | 82 |
-| `path3` | 168,553 | 59 |
-| `path4` | 169,700 | 44 |
-| `path5` | 170,251 | 31 |
-| `path6` | 170,496 | 22 |
-| `path7` | 170,580 | 16 |
-| `path8` | 170,621 | 3 |
-| `path9` | 170,632 | 1 |
-| `path10` | 170,633 | 0 |
+| `pathology_findings_anon.path1` | 163,046 | 117 |
+| `pathology_findings_anon.path2` | 166,288 | 82 |
+| `pathology_findings_anon.path3` | 168,553 | 59 |
+| `pathology_findings_anon.path4` | 169,700 | 44 |
+| `pathology_findings_anon.path5` | 170,251 | 31 |
+| `pathology_findings_anon.path6` | 170,496 | 22 |
+| `pathology_findings_anon.path7` | 170,580 | 16 |
+| `pathology_findings_anon.path8` | 170,621 | 3 |
+| `pathology_findings_anon.path9` | 170,632 | 1 |
+| `pathology_findings_anon.path10` | 170,633 | 0 |
 
 Across `path1` through `path9`, 131 codes occur. The shared legend lists 182
 codes: 115 are observed and 67 are unobserved. Sixteen observed codes have no
@@ -135,32 +140,38 @@ codes, and do not assume the legend list is exhaustive. The slot ordering,
 whether codes may repeat across slots, and whether later slots are secondary
 findings are **Unresolved**.
 
+See the [complete shared pathology-code map](pathology-vocabularies.md#shared-path-1-10-map)
+for all 182 legend-listed code meanings.
+
 ### Biopsy location and distance
 
 | Physical column | Type | Feature context |
 | --- | --- | --- |
-| `loc` | `string` | Biopsy location. Null 167,122; 3,511 non-null values across 53 serialized forms. Legend atoms cover clock positions `1`–`12`, quadrants and regions, but observed values also contain comma-delimited combinations and trailing empty components. The delimiter, component ordering, and whether the list is compositional are **Unresolved**. |
-| `bdepth` | `string` | Depth. Observed: `A` 294, `M` 573, `P` 447, `5` 1, `8` 2; null 169,316. The legend defines `A/M/P` as anterior/middle/posterior and numeric `1`–`9` as a 3×3 location grid, including `5 = 2B` and `8 = 3B`. **Release legend; Observed V2 values** |
-| `bdistance` | `double` | Distance in centimeters according to the legend. Null 163,033; 7,600 finite; range −2 to 54; quartiles 0/0/0; 9 negative, 6,091 zero, and 6,100 nonpositive. No nonfinite values. The meaning of −2 and whether zero is a sentinel or a measured distance are **Unresolved**. |
+| `pathology_findings_anon.loc` | `string` | Biopsy location. Null 167,122; 3,511 non-null values across 53 serialized forms. Legend atoms cover clock positions `1`–`12`, quadrants and regions, but observed values also contain comma-delimited combinations and trailing empty components. The delimiter, component ordering, and whether the list is compositional are **Unresolved**. **Release legend; Observed V2 values; Inference for splitting** |
+| `pathology_findings_anon.bdepth` | `string` | Depth. Observed: `A` 294, `M` 573, `P` 447, `5` 1, `8` 2; null 169,316. The legend defines `A/M/P` as anterior/middle/posterior and numeric `1`–`9` as a 3×3 location grid, including `5 = 2B` and `8 = 3B`. **Release legend; Observed V2 values** |
+| `pathology_findings_anon.bdistance` | `double` | Distance in centimeters according to the legend. Null 163,033; 7,600 finite; range −2 to 54; quartiles 0/0/0; 9 negative, 6,091 zero, and 6,100 nonpositive. No nonfinite values. The meaning of −2 and whether zero is a sentinel or a measured distance are **Unresolved**. **Release legend; Observed V2 values** |
 
 For `loc`, every observed nonempty comma-separated atom is legend-listed, but
 the serialized combinations themselves are not. Preserve the raw string until
 maintainers confirm a parsing rule.
+The [location and depth maps](pathology-vocabularies.md#location-maps) list all
+legend-defined atomic codes.
 
 ## Reports
 
 `reports_anon` has 125,959 rows and six all-optional schema fields. The five
-non-text columns inspected by Q012 contained no nulls. `report_anon` values,
-including their nullness and content, were deliberately not accessed.
+non-text columns inspected by Q012 contained no nulls. No `report_anon`
+data-page value or content was accessed; its zero null count comes only from
+footer metadata.
 
 | Physical column | Type | Feature context |
 | --- | --- | --- |
-| `empi_anon` | `int64` | Anonymous patient identifier. The legend calls it the unique patient identifier. There are 22,938 distinct values in the report table. **Release schema; Release legend; Observed V2 values** |
-| `acc_anon` | `int64` | Anonymous exam/accession identifier. There are 114,292 distinct values. The base legend header `acc` is a derived-name match. **Release schema; Release legend; Observed V2 values** |
-| `studydate_anon` | `timestamp[ns]` | Anonymized exam date. The legend calls it “Exam date.” Preservation of time intervals and ordering after anonymization is **Unresolved**. |
-| `rseq` | `int8` | Report sequence number by field-name inference; no legend definition was found. Observed domain: `0` 95, `1` 114,494, `2` 10,555, `3` 616, `4` 170, `5` 16, `6` 13. The meaning of zero and whether the sequence is chronological are **Unresolved**. |
-| `report_anon` | `string` | Report representation is physically a string. No content, value, length, vocabulary, blank, or null check was performed, and no exact legend definition was found. **Release schema only** |
-| `__index_level_0__` | `int64` | Complete and unique in the five-column key projection, but never equal to row position. It is an export index, not a documented report identifier. **Observed V2 values** |
+| `reports_anon.empi_anon` | `int64` | Anonymous patient identifier. The legend calls it the unique patient identifier. There are 22,938 distinct values in the report table. **Release schema; Release legend; Observed V2 values** |
+| `reports_anon.acc_anon` | `int64` | Anonymous exam/accession identifier. There are 114,292 distinct values. Applying the base legend header `acc` to this suffixed field is **Inference**. **Release schema; Release legend for base header; Observed V2 values** |
+| `reports_anon.studydate_anon` | `timestamp[ns]` | Anonymized exam date. The legend calls it “Exam date”; Q012 and footer metadata show no nulls. Preservation of time intervals and ordering after anonymization is **Unresolved**. **Release schema; Release legend; Observed V2 values** |
+| `reports_anon.rseq` | `int8` | “Report sequence number” is **Inference** from the name; no legend definition was found. Observed domain: `0` 95, `1` 114,494, `2` 10,555, `3` 616, `4` 170, `5` 16, `6` 13. The meaning of zero and whether the sequence is chronological are **Unresolved**. **Release schema; Observed V2 values** |
+| `reports_anon.report_anon` | `string` | Report representation is physically a string, and footer metadata reports no nulls. No content, value, length, vocabulary, or blank check was performed, and no exact legend definition was found. **Release schema only** |
+| `reports_anon.__index_level_0__` | `int64` | Complete and unique in the five-column key projection, but never equal to row position. Parquet metadata declares it a pandas index; it is not a documented report identifier. **Release schema; Observed V2 values** |
 
 ### Report grain
 
@@ -244,24 +255,29 @@ relationships and selected linked-accession/date representations only; it did
 not compare every non-key value. Therefore “canonical owner” does not assert
 that every wide value is an authoritative copy.
 
+For all 100 routed, non-index occurrences below, `combined_anon`-specific
+missing, sentinel, and value-domain behavior is **not documented; not
+value-probed**. Canonical links transfer feature context only, not source-table
+counts or value equality.
+
 #### Patient-owned occurrences — 7
 
 | Qualified combined occurrences | Type | Canonical owner |
 | --- | --- | --- |
-| `combined_anon.empi_anon` | `int64` | [Patient features](patient-exam-side-risk.md) |
-| `combined_anon.GENDER_DESC`, `combined_anon.race`, `combined_anon.ethnicity`, `combined_anon.patient_language` | `string` | [Patient features](patient-exam-side-risk.md) |
-| `combined_anon.PATIENT_BIRTH_DT_anon` | `timestamp[ns]` | [Patient features](patient-exam-side-risk.md) |
-| `combined_anon.cohort_num` | `int8` | [Patient features](patient-exam-side-risk.md) |
+| `combined_anon.empi_anon` | `int64` | [Patient features](patient-exam-side-risk.md#patient-features) |
+| `combined_anon.GENDER_DESC`, `combined_anon.race`, `combined_anon.ethnicity`, `combined_anon.patient_language` | `string` | [Patient features](patient-exam-side-risk.md#patient-features) |
+| `combined_anon.PATIENT_BIRTH_DT_anon` | `timestamp[ns]` | [Patient features](patient-exam-side-risk.md#patient-features) |
+| `combined_anon.cohort_num` | `int8` | [Patient features](patient-exam-side-risk.md#patient-features) |
 
 #### Exam-owned occurrences — 17
 
 | Qualified combined occurrences | Type | Canonical owner |
 | --- | --- | --- |
-| `combined_anon.studydate_anon` | `timestamp[ns]` | [Exam features](patient-exam-side-risk.md) |
-| `combined_anon.acc_anon` | `int64` | [Exam features](patient-exam-side-risk.md); also the finding/report relationship key |
-| `combined_anon.desc`, `combined_anon.modality_desc`, `combined_anon.loc_num_anon`, `combined_anon.mg_exam_type`, `combined_anon.ASHKENAZI`, `combined_anon.proc_flag`, `combined_anon.biopsy_flag`, `combined_anon.extract_flag`, `combined_anon.vtype` | `string` | [Exam features](patient-exam-side-risk.md) |
-| `combined_anon.tissueden`, `combined_anon.version` | `int8` | [Exam features](patient-exam-side-risk.md) |
-| `combined_anon.age_at_study_anon`, `combined_anon.menopauseage_anon`, `combined_anon.pregnancyage_anon`, `combined_anon.menarcheage_anon` | `int16` | [Exam features](patient-exam-side-risk.md) |
+| `combined_anon.studydate_anon` | `timestamp[ns]` | [Exam features](patient-exam-side-risk.md#exam-features) |
+| `combined_anon.acc_anon` | `int64` | [Exam features](patient-exam-side-risk.md#exam-features); also the finding/report relationship key |
+| `combined_anon.desc`, `combined_anon.modality_desc`, `combined_anon.loc_num_anon`, `combined_anon.mg_exam_type`, `combined_anon.ASHKENAZI`, `combined_anon.proc_flag`, `combined_anon.biopsy_flag`, `combined_anon.extract_flag`, `combined_anon.vtype` | `string` | [Exam features](patient-exam-side-risk.md#exam-features) |
+| `combined_anon.tissueden`, `combined_anon.version` | `int8` | [Exam features](patient-exam-side-risk.md#exam-features) |
+| `combined_anon.age_at_study_anon`, `combined_anon.menopauseage_anon`, `combined_anon.pregnancyage_anon`, `combined_anon.menarcheage_anon` | `int16` | [Exam features](patient-exam-side-risk.md#exam-features) |
 
 The five suffixed exam-level aggregate fields in `exam_level_anon` are not
 present in combined.
@@ -270,8 +286,8 @@ present in combined.
 
 | Qualified combined occurrences | Type | Canonical owner |
 | --- | --- | --- |
-| `combined_anon.side` | `string` | [Side features](patient-exam-side-risk.md); also part of both finding-table keys |
-| `combined_anon.total_L_find`, `combined_anon.total_R_find` | `int8` | [Side features](patient-exam-side-risk.md) |
+| `combined_anon.side` | `string` | [Side features](patient-exam-side-risk.md#side-features); also part of both finding-table keys |
+| `combined_anon.total_L_find`, `combined_anon.total_R_find` | `int8` | [Side features](patient-exam-side-risk.md#side-features) |
 
 The five suffixed side-level aggregate fields in `side_level_anon` are not
 present in combined.

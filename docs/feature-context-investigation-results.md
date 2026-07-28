@@ -44,7 +44,9 @@ PyArrow 20.0.0.
   have a case-only candidate. The remaining gaps include anonymized
   identifiers/dates, risk outputs, aggregate-level suffixes, pathology
   `path1`–`path10`, `combined_anon` export fields, report sequence/text, and the
-  serialized index column.
+  serialized index column. Of all 1,345 legend rows, 731 fall under the 78
+  accepted exact/case/alias/shared headers and 614 fall under 60 headers
+  orphaned from the released schemas.
 - **Interpretation:** The legend is a large, partly legacy or broader data
   dictionary, not a complete one-to-one V2 schema contract. Header aliases and
   base-to-aggregate mappings require explicit evidence labels.
@@ -378,8 +380,8 @@ accession surface and four do not. The same four distinct links are unresolved.
 - `path_severity` is null on 163,057 and otherwise 0–5, but has no legend
   definition.
 - Biopsy type, technique, side, complication, surgery, and lymph-surgery values
-  are subsets of their legend lists. `bdepth` is principally A/M/P but also has
-  three undocumented numeric-like values, `5` and `8`.
+  are subsets of their legend lists. `bdepth` is principally A/M/P and also has
+  three occurrences of the legend-listed grid codes `5` and `8`.
 - `path1`–`path9` collectively use 131 codes; `path10` is entirely null. The
   shared `path (1-10)` legend lists 182 codes. Of those, 115 occur and 67 are
   unobserved, while 16 observed codes are undocumented:
@@ -448,7 +450,7 @@ joins unless maintainers document the wide table.
 
 ## Crosswalk outcome
 
-The schema/legend mapping has five evidence classes:
+The schema/legend mapping has six evidence classes:
 
 | Mapping class | Unique names | Physical occurrences | Treatment |
 | --- | ---: | ---: | --- |
