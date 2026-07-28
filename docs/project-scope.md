@@ -86,16 +86,19 @@ conflicts, assumptions, and inferences plainly.
 
 As of July 28, 2026, `reference_files/` contains:
 
-- `EMBEDv2-open-data-clinical.zip`, with eight Parquet tables under `magview/`:
+- Eight extracted Parquet tables under `clinical_tables/`:
   `combined_anon`, `exam_level_anon`, `imaging_findings_anon`,
   `pathology_findings_anon`, `patients_anon`, `reports_anon`, `risk_anon`, and
   `side_level_anon`.
 - `EMBEDv2-open-data-clinical-legend.csv`, a code legend with the columns
   `Header in export`, `Discription`, `Code`, and `Meaning`.
 
-This inventory records filenames and archive contents only. It does not assert
-table grain, keys, feature definitions, record counts, or clinical meaning;
-those require phased inspection and verification.
+This inventory records filenames plus format metadata verified without reading
+clinical data pages. The source files, footer-level row and column counts, and
+the question-driven inspection gates are recorded in
+[feature-context-investigation-plan.md](feature-context-investigation-plan.md).
+The inventory does not assert table grain, keys, feature definitions, or
+clinical meaning; those require phased inspection and verification.
 
 The reference directory is ignored by Git so local source data are not
 accidentally committed. Bundle documents should refer to the source artifacts

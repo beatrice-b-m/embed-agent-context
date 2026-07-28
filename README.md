@@ -22,9 +22,12 @@ an application, database, or general-purpose data-processing framework.
 
 The current reference inventory and the rules for developing the bundle are in
 [docs/project-scope.md](docs/project-scope.md).
+The question-driven, minimal-access plan for the feature layer is in
+[docs/feature-context-investigation-plan.md](docs/feature-context-investigation-plan.md).
 
 ## Current status
 
-The repository is in its documentation and source-inventory stage. No dataset
-field definitions, table relationships, or clinical interpretations have yet
-been added to the context bundle.
+The repository is in its feature-investigation stage. The feature-context scope,
+evidence labels, targeted-access gates, and completion checks are defined, but
+no dataset field definitions, table relationships, or clinical interpretations
+have yet been added to the context bundle.
