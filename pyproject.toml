@@ -1,0 +1,14 @@
+[project]
+name = "embedv2-agent-context"
+version = "0.0.0"
+description = "Investigation environment for the EMBED V2 agent context bundle"
+requires-python = ">=3.12,<3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pyarrow==20.0.0",
+]
+
+[tool.uv]
+package = false
