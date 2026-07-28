@@ -27,7 +27,7 @@ or expand into a general data-processing framework.
 
 Footer-only inspection confirms that the planned Phase 1 source set is present:
 
-| Table | Rows | Columns | Immediate feature-context role |
+| File under `reference_files/clinical_tables/` | Rows | Columns | Provisional feature-context role |
 | --- | ---: | ---: | --- |
 | `patients_anon` | 22,936 | 8 | Patient identity and demographics |
 | `exam_level_anon` | 131,052 | 23 | Exam identity, descriptors, and exam aggregates |
@@ -37,6 +37,9 @@ Footer-only inspection confirms that the planned Phase 1 source set is present:
 | `imaging_findings_anon` | 171,378 | 54 | Finding-level imaging attributes |
 | `side_level_anon` | 159,939 | 9 | Breast-side aggregates |
 | `pathology_findings_anon` | 170,633 | 26 | Procedure and pathology attributes |
+
+The roles in the last column are hypotheses from filenames and schema field
+names, not verified table-grain or clinical claims.
 
 The four-column legend
 `EMBEDv2-open-data-clinical-legend.csv` is also present. Its source header uses
@@ -70,52 +73,61 @@ representations. In particular:
    differently between tables?
 4. Can every physical column be accounted for as a documented feature, an
    identifier, or a verified export artifact?
+5. Is each legend code list exhaustive, illustrative, or compositional?
 
 ### Representation and values
 
-5. Is each feature binary, nominal, ordinal, continuous, text, date/time, or an
+6. Is each feature binary, nominal, ordinal, continuous, text, date/time, or an
    identifier in this release?
-6. Which values mean missing, unknown, not applicable, not assessed, or another
+7. Which values mean missing, unknown, not applicable, not assessed, or another
    non-clinical state?
-7. Do observed bounded categorical domains agree with the legend?
-8. What units, scales, and rounding conventions apply to numeric fields where
+8. Do observed bounded categorical domains agree with the legend?
+9. What units, scales, and rounding conventions apply to numeric fields where
    those facts can be verified?
 
 ### Meaning and conceptual level
 
-9. At what patient, exam, side, imaging-finding, pathology-finding, report, or
+10. At what patient, exam, side, imaging-finding, pathology-finding, report, or
    risk-assessment level should each feature be interpreted?
-10. Are similarly named aggregate fields at finding, side, and exam levels
+11. Are similarly named aggregate fields at finding, side, and exam levels
     distinct, derived, or equivalent?
-11. Are fields repeated in `combined_anon` authoritative copies, transformations,
+12. Are fields repeated in `combined_anon` authoritative copies, transformations,
     or products of a multiplicative join?
-12. Which fields are direct source values versus derived summaries or model
+13. Which fields are direct source values versus derived summaries or model
     outputs?
 
 ### Identity, time, and safe interpretation
 
-13. What minimal key facts are necessary to state a feature's grain correctly?
-14. Do identifiers and anonymized dates remain stable across the tables where
+14. What minimal key facts are necessary to state a feature's grain correctly?
+15. Do identifiers and anonymized dates remain stable across the tables where
     they recur?
-15. What ordering or interval properties are actually preserved by anonymized
+16. What ordering or interval properties are actually preserved by anonymized
     dates?
-16. Which report, recommendation, linked-study, procedure, biopsy, and pathology
+17. Which report, recommendation, linked-study, procedure, biopsy, and pathology
     fields could represent post-exam information and therefore require a
     temporal-leakage caveat?
 
 ### Evidence and escalation
 
-17. Which claims are directly supported by release metadata, legend entries,
+18. Which claims are directly supported by release metadata, legend entries,
     or targeted value checks?
-18. Which interpretations remain inferred, conflict with the V2 representation,
+19. Which interpretations remain inferred, conflict with the V2 representation,
     or require maintainer confirmation?
-19. What concise maintainer questions would resolve the highest-impact
+20. What concise maintainer questions would resolve the highest-impact
     uncertainties without substituting V1 documentation for V2 evidence?
+
+Phase 1 stops after answering key, time, or provenance questions strictly
+needed to describe a feature accurately. A complete join/cardinality matrix,
+prediction-eligibility policy, clinical workflow guide, or general modeling
+advice belongs to a later phase even when the current investigation identifies
+it as needed.
 
 ## Evidence labels
 
 Feature entries will distinguish:
 
+- **Maintainer confirmed** — supplied or explicitly confirmed by an EMBED V2
+  maintainer.
 - **Release schema** — verified from a Parquet schema or file metadata.
 - **Release legend** — stated by the V2 legend, with source spelling or
   ambiguity noted where material.
@@ -124,30 +136,44 @@ Feature entries will distinguish:
   feature-specific comparison.
 - **Inference** — plausible interpretation not established by a higher-priority
   source.
+- **Internal background** — supporting context from the Cortex vault that is
+  not independently established as V2 behavior.
+- **External background** — general clinical or public documentation, not
+  evidence of dataset-specific behavior.
 - **Unresolved** — insufficient or conflicting evidence; maintainer input is
   needed.
 
-An evidence label describes support, not clinical importance. Inferences and
-unresolved items will remain visible rather than being silently promoted to
-facts.
+Labels apply to individual claims or feature aspects, because a physical type,
+legend meaning, and interpretation caveat may have different evidence. A label
+describes support, not clinical importance. Inferences and unresolved items
+will remain visible rather than being silently promoted to facts.
 
 ## Minimal, targeted data-access protocol
 
-The investigation will use a project-local `.venv` managed by `uv`. Only the
-smallest library set needed for Parquet metadata and projected-column queries
-will be installed. The environment is an investigation aid, not part of the
+The investigation will use an ignored, project-local `.venv` managed by `uv`.
+The minimal dependency and resolution will be recorded in project metadata and
+a lockfile, and inspection commands will run through `uv run` or the explicit
+`.venv` interpreter. The environment is an investigation aid, not part of the
 agent-facing bundle.
 
 Access proceeds in escalating gates:
 
-1. **Names and file metadata.** Inventory filenames, sizes, Parquet schemas,
-   row counts, and footer statistics. Do not open data pages.
+1. **Names and structural metadata.** Inventory filenames, sizes, Parquet
+   schemas, row counts, row-group counts, producer metadata, and null counts.
+   Do not inspect footer min/max values, because string statistics may expose
+   identifiers or clinical text.
 2. **Legend crosswalk.** Read the four legend columns for the specific purpose
    of mapping all released definitions and codes to the schema inventory. This
    is a bounded authoritative source, not a request for clinical-row data.
-3. **Metadata-first characterization.** Use footer null counts and min/max
-   statistics where present. Because each Parquet file has one row group,
-   row-group filtering cannot reduce access further.
+   Decode the BOM with `utf-8-sig`; retain source strings while matching exact
+   headers first. A derived match may trim surrounding whitespace, but it may
+   not silently change case, spelling, delimiters, side suffixes, or composite
+   codes. Case-folded candidates are surfaced for review rather than
+   auto-matched.
+3. **Metadata-first characterization.** Use footer null counts where present.
+   Inspect a min/max statistic only for a named non-text, non-identifier
+   range/sentinel question recorded in the access ledger. Because each Parquet
+   file has one row group, row-group filtering cannot reduce access further.
 4. **Projected bounded domains.** Read only named categorical columns whose
    code domain, blank handling, or legend agreement is under investigation.
    Never select unrelated columns or full rows.
@@ -157,22 +183,25 @@ Access proceeds in escalating gates:
 6. **Focused numeric checks.** Read one named numeric column only when a
    concrete range, unit, or sentinel question cannot be resolved from metadata
    or the legend.
-7. **Exceptional text access.** Do not read `report_anon` values during the
-   feature phase unless a specific representation or leakage question cannot
-   be answered from its schema, identifiers, and legend. Never reproduce
-   report text in tracked artifacts.
+7. **No report-text access.** Do not read `report_anon` values during Phase 1.
+   Its representation may be documented from schema and legend evidence only.
 
-Each query must have a written question, a limited column projection, and a
-recorded aggregate answer. Do not dump rows, export source subsets, calculate
-full-file hashes merely for inventory, or retain copied clinical data.
+Every data-page read must be registered in
+`docs/feature-context-investigation-results.md` with a query identifier,
+question, table and projected columns, why metadata or the legend was
+insufficient, operation, and aggregate-only result. No unregistered data-page
+reads are allowed. Do not dump rows, export source subsets, calculate full-file
+hashes merely for inventory, or retain copied clinical data.
 
 ## Investigation work packages
 
 ### A. Schema and legend coverage
 
 - Build the table-column inventory from schemas.
-- Normalize the legend's source formatting without silently correcting field
-  identifiers.
+- Crosswalk the legend with the raw-versus-derived matching rules above.
+- Determine whether lists, suffixes, delimiters, blank codes, and composite
+  codes are exhaustive, illustrative, or compositional before splitting or
+  normalizing them.
 - Crosswalk table-column occurrences to legend header/code rows.
 - Identify orphan legend entries, undocumented columns, duplicate meanings,
   conflicting codes, and case-sensitive mismatches.
@@ -212,8 +241,11 @@ full-file hashes merely for inventory, or retain copied clinical data.
 - Confirm that no row values or report text entered tracked files.
 
 Independent work packages may run in parallel after the schema/legend
-crosswalk fixes the shared feature vocabulary. Cross-table synthesis and final
-coverage review remain centralized to prevent contradictory definitions.
+crosswalk fixes the shared feature vocabulary. Agents receive disjoint table
+groups, append no shared artifact directly, and return ledger-ready aggregate
+findings for centralized synthesis. They may not repeat a registered query or
+read report text. Cross-table synthesis and final coverage review remain
+centralized to prevent contradictory definitions.
 
 ## Planned bundle shape
 
@@ -234,17 +266,19 @@ retrieval layer are out of scope.
 
 The feature layer is complete for this investigation when:
 
-- every physical table-column occurrence appears in a coverage check;
-- every applicable legend code is represented or explicitly marked orphaned or
-  unresolved;
+- all 243 physical table-column occurrences appear in the coverage denominator;
+- all legend rows, counted during the bounded legend parse, appear in a second
+  denominator as matched, duplicate, orphaned, or unresolved;
 - each agent-facing feature entry states its table/level, representation,
-  meaning, missing/sentinel behavior, caveats, and evidence;
+  meaning, missing/sentinel behavior, caveats, and evidence; a missing/sentinel
+  result may explicitly be `not documented; not value-probed`;
 - similarly named fields at different levels are not conflated;
 - `combined_anon` duplicates are either explained or clearly marked unresolved;
 - all inference, conflict, and maintainer-input needs are visible;
 - the bundle has one standalone entry point and contains no source rows or
   clinical text;
+- the access ledger accounts for every data-page read and contains aggregates
+  only;
 - project status and source/verification documentation are synchronized; and
 - focused validation plus a final coverage review pass with no unexplained
   omissions.
-

@@ -27,7 +27,7 @@ The question-driven, minimal-access plan for the feature layer is in
 
 ## Current status
 
-The repository is in its feature-investigation stage. The feature-context scope,
-evidence labels, targeted-access gates, and completion checks are defined, but
-no dataset field definitions, table relationships, or clinical interpretations
-have yet been added to the context bundle.
+The feature investigation is planned and initialized. Its scope, evidence
+labels, targeted-access gates, and completion checks are defined, but no dataset
+field definitions, table relationships, or clinical interpretations have yet
+been added to the context bundle.
