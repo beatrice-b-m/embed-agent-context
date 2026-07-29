@@ -718,6 +718,7 @@ class Catalog:
                     f"{sorted(binding_grains)!r}"
                 )
             seen_key_ids: set[str] = set()
+            keys_by_columns: dict[tuple[str, ...], KeyCandidate] = {}
             for key in table.keys:
                 if key.id in seen_key_ids:
                     raise CatalogValidationError(
@@ -725,6 +726,22 @@ class Catalog:
                         f"{key.id!r}"
                     )
                 seen_key_ids.add(key.id)
+                previous_key = keys_by_columns.get(key.columns)
+                if previous_key is not None and (
+                    previous_key.kind,
+                    previous_key.uniqueness,
+                    previous_key.completeness,
+                ) != (
+                    key.kind,
+                    key.uniqueness,
+                    key.completeness,
+                ):
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} has conflicting key "
+                        f"declarations {previous_key.id!r} and {key.id!r} "
+                        f"for columns {list(key.columns)!r}"
+                    )
+                keys_by_columns.setdefault(key.columns, key)
                 missing_columns = sorted(set(key.columns) - set(columns))
                 if missing_columns:
                     raise CatalogValidationError(
@@ -1626,6 +1643,29 @@ def _validate_relationship(
                 f"types for {source_column!r} and {target_column!r}: "
                 f"{source_type!r} != {target_type!r}"
             )
+    source = table_specs[source_key]
+    contradictory_key_completeness = {
+        "required": "incomplete",
+        "optional": "complete",
+    }.get(relationship.source.completeness)
+    if contradictory_key_completeness is not None and any(
+        key.columns == relationship.source.columns
+        and key.completeness == contradictory_key_completeness
+        for key in source.keys
+    ):
+        raise CatalogValidationError(
+            f"relationship {relationship.id!r} source completeness "
+            f"{relationship.source.completeness!r} contradicts the documented "
+            f"{contradictory_key_completeness!r} key completeness"
+        )
+    if (
+        relationship.targets_per_source in {"exactly_one", "one_or_more"}
+        and relationship.source.completeness != "required"
+    ):
+        raise CatalogValidationError(
+            f"relationship {relationship.id!r} claims at least one target per "
+            "source, so source completeness must be 'required'"
+        )
     if relationship.targets_per_source in {"exactly_one", "zero_or_one"}:
         target = table_specs[target_key]
         if not any(
@@ -1638,7 +1678,6 @@ def _validate_relationship(
                 "but its target columns are not a documented unique key"
             )
     if relationship.sources_per_target in {"exactly_one", "zero_or_one"}:
-        source = table_specs[source_key]
         if not any(
             key.columns == relationship.source.columns
             and key.uniqueness == "unique"

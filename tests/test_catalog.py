@@ -29,6 +29,34 @@ class CatalogLoaderTests(unittest.TestCase):
             write_catalog(self.directory / "catalog.json", data)
         )
 
+    @staticmethod
+    def exam_relationship(
+        *,
+        source_completeness: str = "required",
+        targets_per_source: str = "zero_or_one",
+    ) -> dict:
+        return {
+            "id": "synthetic.exam_reference",
+            "profile": "open-v2",
+            "kind": "reference",
+            "source": {
+                "table": "exam_level_anon",
+                "columns": ["acc_anon"],
+                "completeness": source_completeness,
+            },
+            "target": {
+                "table": "exam_level_anon",
+                "columns": ["acc_anon"],
+            },
+            "cardinality": {
+                "targets_per_source": targets_per_source,
+                "sources_per_target": "zero_or_more",
+            },
+            "evidence": ["inference"],
+            "caveats": [],
+            "join_hazards": [],
+        }
+
     def test_loads_and_freezes_synthetic_catalog(self) -> None:
         catalog = self.load()
 
@@ -169,6 +197,72 @@ class CatalogLoaderTests(unittest.TestCase):
             CatalogValidationError, "source columns.*unique key"
         ):
             self.load(data)
+
+    def test_rejects_conflicting_key_declarations_for_same_columns(self) -> None:
+        for field, value in (
+            ("kind", "technical"),
+            ("uniqueness", "not_unique"),
+            ("completeness", "incomplete"),
+        ):
+            with self.subTest(field=field):
+                data = synthetic_catalog()
+                conflicting = copy.deepcopy(data["tables"][1]["keys"][0])
+                conflicting["id"] = f"exam.accession.conflicting_{field}"
+                conflicting[field] = value
+                data["tables"][1]["keys"].append(conflicting)
+
+                with self.assertRaisesRegex(
+                    CatalogValidationError,
+                    "conflicting key declarations.*acc_anon",
+                ):
+                    self.load(data)
+
+    def test_rejects_source_completeness_conflicting_with_key(self) -> None:
+        for key_completeness, source_completeness in (
+            ("complete", "optional"),
+            ("incomplete", "required"),
+        ):
+            with self.subTest(
+                key=key_completeness,
+                source=source_completeness,
+            ):
+                data = synthetic_catalog()
+                data["tables"][1]["keys"][0][
+                    "completeness"
+                ] = key_completeness
+                data["relationships"] = [
+                    self.exam_relationship(
+                        source_completeness=source_completeness
+                    )
+                ]
+
+                with self.assertRaisesRegex(
+                    CatalogValidationError,
+                    "source completeness.*contradicts.*key completeness",
+                ):
+                    self.load(data)
+
+    def test_at_least_one_target_requires_complete_source_endpoint(self) -> None:
+        for source_completeness in ("optional", "unknown"):
+            for targets_per_source in ("exactly_one", "one_or_more"):
+                with self.subTest(
+                    source=source_completeness,
+                    cardinality=targets_per_source,
+                ):
+                    data = synthetic_catalog()
+                    data["tables"][1]["keys"][0]["completeness"] = "unknown"
+                    data["relationships"] = [
+                        self.exam_relationship(
+                            source_completeness=source_completeness,
+                            targets_per_source=targets_per_source,
+                        )
+                    ]
+
+                    with self.assertRaisesRegex(
+                        CatalogValidationError,
+                        "at least one target.*source completeness.*required",
+                    ):
+                        self.load(data)
 
     def test_rejects_duplicate_json_object_keys(self) -> None:
         serialized = json.dumps(synthetic_catalog())

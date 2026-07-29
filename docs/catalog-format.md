@@ -126,7 +126,14 @@ different claims and must not be substituted for one another.
 
 Every table declaration and relationship endpoint must resolve to bindings in
 the same profile. Ordered endpoint tuples must have equal arity and compatible
-physical types. A relationship claiming at most one target must point to a
+physical types. Different key IDs for the same ordered column tuple must not
+make conflicting kind, uniqueness, or completeness claims. When a relationship
+source matches a documented key, `required` source completeness cannot
+contradict an incomplete key and `optional` source completeness cannot
+contradict a complete key.
+
+A relationship claiming at least one target per source must declare the source
+endpoint `required`. A relationship claiming at most one target must point to a
 candidate key documented as unique; the reciprocal at-most-one-source claim
 requires a unique source key. Only hierarchy edges must be acyclic; reference
 and projection edges may legitimately form cycles.
