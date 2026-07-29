@@ -29,9 +29,6 @@ BINDING_GRAINS = (
     "risk_assessment",
     "wide_row",
 )
-# Compatibility for callers which used the v4 constant.  Schema-v5 documents
-# use ``binding_grains`` and never treat these values as the clinical ontology.
-GRAINS = BINDING_GRAINS
 FEATURE_KINDS = (
     "identifier",
     "date",
@@ -116,8 +113,6 @@ DISCOVERY_KINDS = (
 RELATIONSHIP_BINDING_KINDS = frozenset(
     {"hierarchy", "reference", "projection"}
 )
-# Compatibility name used by older adapters.
-RELATIONSHIP_KINDS = RELATIONSHIP_BINDING_KINDS
 OBJECT_BINDING_REPRESENTATIONS = frozenset(
     {"canonical", "partial", "co_located", "projection", "reference"}
 )
@@ -997,11 +992,6 @@ class RelationshipBinding:
         }
 
 
-# Compatibility alias: a v5 relationship is always explicitly a physical
-# relationship binding when this type name is used.
-Relationship = RelationshipBinding
-
-
 @dataclass(frozen=True, slots=True)
 class ProfileBinding:
     profile: str
@@ -1327,8 +1317,8 @@ class Catalog:
         return self._profile_bindings
 
     @property
-    def bindings(self) -> tuple[Binding, ...]:
-        """Flattened compatibility view of all profile feature bindings."""
+    def feature_bindings(self) -> tuple[Binding, ...]:
+        """Flattened secondary view of all profile feature bindings."""
 
         return self._bindings
 
@@ -1337,17 +1327,11 @@ class Catalog:
         return self._object_bindings
 
     @property
-    def tables(self) -> tuple[TableSpec, ...]:
+    def profile_tables(self) -> tuple[TableSpec, ...]:
         return self._tables
 
     @property
     def relationship_bindings(self) -> tuple[RelationshipBinding, ...]:
-        return self._relationship_bindings
-
-    @property
-    def relationships(self) -> tuple[RelationshipBinding, ...]:
-        """Compatibility view; these are physical relationship bindings."""
-
         return self._relationship_bindings
 
     @classmethod
@@ -1543,9 +1527,9 @@ class Catalog:
             "sources": len(self.sources),
             "contexts": len(self.contexts),
             "profile_bindings": len(self.profile_bindings),
-            "feature_bindings": len(self.bindings),
+            "feature_bindings": len(self.feature_bindings),
             "object_bindings": len(self.object_bindings),
-            "tables": len(self.tables),
+            "tables": len(self.profile_tables),
             "relationship_bindings": len(self.relationship_bindings),
         }
 
@@ -1977,7 +1961,7 @@ class Catalog:
             "table": table_spec.to_dict(),
             "feature_bindings": [
                 item.to_dict()
-                for item in self.bindings
+                for item in self.feature_bindings
                 if item.profile == normalized_profile
                 and item.table == normalized_table
             ],
@@ -1992,10 +1976,6 @@ class Catalog:
                 "incoming": incoming,
             },
         }
-
-    # Compatibility with the v4 method name; the envelope names the v5 layer.
-    def get_table(self, profile: str, table: str) -> dict[str, Any]:
-        return self.get_profile_table(profile, table)
 
     def get_relationship_binding(self, identifier: str) -> dict[str, Any]:
         normalized = _lookup_identifier(identifier, "identifier")
@@ -2014,9 +1994,6 @@ class Catalog:
             ],
             "provenance": self._provenance(entity.claim_refs),
         }
-
-    def get_relationship(self, identifier: str) -> dict[str, Any]:
-        return self.get_relationship_binding(identifier)
 
     def search_relationship_bindings(
         self,
@@ -2093,9 +2070,6 @@ class Catalog:
             "total": len(matches),
             "matches": [item.to_dict() for item in matches[:limit]],
         }
-
-    def search_relationships(self, **kwargs: Any) -> dict[str, Any]:
-        return self.search_relationship_bindings(**kwargs)
 
     def get_context(self, identifier: str) -> dict[str, Any]:
         normalized = _lookup_identifier(identifier, "identifier")
@@ -2380,7 +2354,7 @@ class Catalog:
         semantic_relationship_profiles: defaultdict[str, set[str]] = (
             defaultdict(set)
         )
-        for binding in self.bindings:
+        for binding in self.feature_bindings:
             concept_profiles[binding.concept].add(binding.profile)
         for binding in self.object_bindings:
             object_profiles[binding.object].add(binding.profile)
@@ -2780,7 +2754,7 @@ class Catalog:
             "profile": profile,
             "feature_bindings": [
                 item.to_dict()
-                for item in self.bindings
+                for item in self.feature_bindings
                 if item.profile == profile and item.concept in feature_ids
             ],
             "object_bindings": [

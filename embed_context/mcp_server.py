@@ -15,57 +15,19 @@ from typing import Any, Literal, Protocol
 from . import catalog as _catalog
 
 
-def _values(name: str, fallback: Sequence[str]) -> tuple[str, ...]:
-    """Read a v5 controlled constant with deterministic branch fallback."""
-
-    value = getattr(_catalog, name, fallback)
-    if isinstance(value, (set, frozenset)):
-        return tuple(sorted(value))
-    return tuple(value)
-
-
-# Fallbacks allow this isolated interface branch to run before the parallel v5
-# core branch lands. The integrated server reads every value from these v5
-# catalog constants.
-BINDING_GRAINS = _values(
-    "BINDING_GRAINS",
-    tuple(getattr(_catalog, "GRAINS", ())),
+BINDING_GRAINS = tuple(_catalog.BINDING_GRAINS)
+FEATURE_KINDS = tuple(_catalog.FEATURE_KINDS)
+DOMAINS = tuple(_catalog.DOMAINS)
+SEMANTIC_RELATIONSHIP_KINDS = tuple(
+    _catalog.SEMANTIC_RELATIONSHIP_KINDS
 )
-FEATURE_KINDS = _values("FEATURE_KINDS", tuple(_catalog.FEATURE_KINDS))
-DOMAINS = _values("DOMAINS", tuple(_catalog.DOMAINS))
-SEMANTIC_RELATIONSHIP_KINDS = _values(
-    "SEMANTIC_RELATIONSHIP_KINDS",
-    ("hierarchy", "association", "attribution", "documentation", "derivation"),
+TEMPORAL_KINDS = tuple(_catalog.TEMPORAL_KINDS)
+AGGREGATION_STATUSES = tuple(_catalog.AGGREGATION_STATUSES)
+COVERAGE_STATUSES = tuple(_catalog.COVERAGE_STATUSES)
+RELATIONSHIP_BINDING_KINDS = tuple(
+    sorted(_catalog.RELATIONSHIP_BINDING_KINDS)
 )
-TEMPORAL_KINDS = _values(
-    "TEMPORAL_KINDS",
-    ("event_time", "documentation_time", "availability_time"),
-)
-AGGREGATION_STATUSES = _values(
-    "AGGREGATION_STATUSES",
-    ("provided", "analyst_defined", "unsupported", "unresolved"),
-)
-COVERAGE_STATUSES = _values(
-    "COVERAGE_STATUSES",
-    ("supported", "unsupported", "unresolved", "not_cataloged"),
-)
-RELATIONSHIP_BINDING_KINDS = _values(
-    "RELATIONSHIP_BINDING_KINDS",
-    tuple(getattr(_catalog, "RELATIONSHIP_KINDS", ())),
-)
-DISCOVERY_KINDS = _values(
-    "DISCOVERY_KINDS",
-    (
-        "clinical_object",
-        "feature",
-        "semantic_relationship",
-        "temporal_semantic",
-        "aggregation",
-        "guardrail",
-        "coverage",
-        "context",
-    ),
-)
+DISCOVERY_KINDS = tuple(_catalog.DISCOVERY_KINDS)
 
 DomainFilter = Literal[*DOMAINS]
 DiscoveryKindFilter = Literal[*DISCOVERY_KINDS]

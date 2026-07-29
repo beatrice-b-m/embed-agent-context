@@ -48,14 +48,14 @@ class CatalogLoaderTests(unittest.TestCase):
         self.assertEqual(catalog.profiles, ("profile-a", "profile-b"))
         self.assertEqual(len(catalog.clinical_objects), 3)
         self.assertEqual(len(catalog.concepts), 4)
-        self.assertEqual(len(catalog.bindings), 8)
+        self.assertEqual(len(catalog.feature_bindings), 8)
         self.assertEqual(len(catalog.object_bindings), 6)
         self.assertEqual(len(catalog.relationship_bindings), 1)
         self.assertNotIn("analysis_patterns", catalog.summary())
         with self.assertRaises(TypeError):
             catalog.concepts["new"] = catalog.concepts["exam.study_date"]
         with self.assertRaises(FrozenInstanceError):
-            catalog.bindings[0].profile = "changed"
+            catalog.feature_bindings[0].profile = "changed"
         with self.assertRaises(AttributeError):
             catalog._schema_version = 6
 
@@ -564,7 +564,7 @@ class CatalogQueryTests(unittest.TestCase):
             len(result["relationship_bindings"]["outgoing"]), 1
         )
         self.assertEqual(
-            self.catalog.get_table("profile-b", "exams_b"), result
+            self.catalog.get_profile_table("profile-b", "exams_b"), result
         )
 
     def test_relationship_binding_get_and_search(self) -> None:

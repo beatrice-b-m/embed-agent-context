@@ -25,6 +25,16 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertNotIn("analysis_patterns", self.raw)
         self.assertFalse(hasattr(self.catalog, "analysis_patterns"))
         self.assertFalse(hasattr(self.catalog, "get_analysis_pattern"))
+        for legacy_name in (
+            "bindings",
+            "tables",
+            "relationships",
+            "get_table",
+            "get_relationship",
+            "search_relationships",
+        ):
+            with self.subTest(legacy_api=legacy_name):
+                self.assertFalse(hasattr(self.catalog, legacy_name))
 
         expected_objects = {
             "patient",

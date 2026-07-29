@@ -144,7 +144,7 @@ class FakeCatalog:
                 "definition": "An inverse ordered diagnosis group.",
                 "kind": "coded",
             },
-            "profile_bindings": [{"profile": "open-v2"}],
+            "bindings": [{"profile": "open-v2"}],
             "vocabulary": {
                 "id": "pathology-severity",
                 "completeness": "complete",

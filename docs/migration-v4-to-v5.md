@@ -123,6 +123,14 @@ Object-to-table representation is new at
 `profile_bindings[profile].object_bindings`. Nested records omit the redundant
 `profile` field; the reader adds profile identity to query results.
 
+The Python core removes the ambiguous v4 compatibility properties and methods
+`catalog.bindings`, `catalog.tables`, `catalog.relationships`, `get_table`,
+`get_relationship`, and `search_relationships`. Use `profile_bindings` for the
+authoritative nested layer. Explicit flattened secondary views are available
+as `feature_bindings`, `object_bindings`, `profile_tables`, and
+`relationship_bindings`; exact queries use the v5 method names documented
+above.
+
 ## Compatibility boundary
 
 There is no automatic v4-to-v5 in-memory conversion. A converter could preserve

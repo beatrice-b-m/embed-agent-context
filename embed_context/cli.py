@@ -9,36 +9,12 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from . import catalog as _catalog
-
-
-# The fallback values keep this interface branch importable while the v5 core
-# is developed in parallel. In an integrated v5 tree the confirmed constants
-# are always read from ``catalog``.
-DOMAINS = _catalog.DOMAINS
-RELATIONSHIP_BINDING_KINDS = getattr(
-    _catalog,
-    "RELATIONSHIP_BINDING_KINDS",
-    getattr(_catalog, "RELATIONSHIP_KINDS", ()),
-)
-CatalogError = _catalog.CatalogError
-load_catalog = _catalog.load_catalog
-
-DISCOVERY_KINDS = tuple(
-    getattr(
-        _catalog,
-        "DISCOVERY_KINDS",
-        (
-            "clinical_object",
-            "feature",
-            "semantic_relationship",
-            "temporal_semantic",
-            "aggregation",
-            "guardrail",
-            "coverage",
-            "context",
-        ),
-    )
+from .catalog import (
+    DISCOVERY_KINDS,
+    DOMAINS,
+    RELATIONSHIP_BINDING_KINDS,
+    CatalogError,
+    load_catalog,
 )
 
 
@@ -452,7 +428,7 @@ def _render_diagnostic_value(value: Any) -> str:
 
 
 def _format_feature(data: Mapping[str, Any]) -> str:
-    feature = _entity_from_result(data, "feature", fallback_key="concept")
+    feature = _entity_from_result(data, "feature")
     lines = _entity_lines(data, feature)
     bindings = data.get("profile_bindings", data.get("bindings", ()))
     if bindings:
@@ -577,12 +553,8 @@ def _format_entity_result(
 def _entity_from_result(
     data: Mapping[str, Any],
     entity_key: str,
-    *,
-    fallback_key: str | None = None,
 ) -> Mapping[str, Any]:
     entity = data.get(entity_key)
-    if not isinstance(entity, Mapping) and fallback_key is not None:
-        entity = data.get(fallback_key)
     return entity if isinstance(entity, Mapping) else data
 
 
