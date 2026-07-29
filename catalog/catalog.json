@@ -6792,58 +6792,715 @@
       "profile": "open-v2",
       "table": "combined_anon",
       "grain": "wide_row",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.combined_anon.finding_tuple",
+          "columns": ["acc_anon", "side", "numfind"],
+          "kind": "natural",
+          "uniqueness": "unknown",
+          "completeness": "incomplete",
+          "evidence": ["release_schema", "cross_table_check", "unresolved"],
+          "caveats": [
+            "The tuple resolves complete rows to finding surfaces but is not established as the wide-row key.",
+            "Null and sentinel-like side or finding states prevent an unconditional natural-key join."
+          ]
+        },
+        {
+          "id": "open-v2.combined_anon.export_index",
+          "columns": ["__index_level_0__"],
+          "kind": "technical",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "cross_table_check"],
+          "caveats": [
+            "The retained index is release-local construction provenance, not a clinical key or current row position.",
+            "The wide index contains rows outside both normalized finding-table index surfaces."
+          ]
+        }
+      ],
+      "caveats": [
+        "No tested standard natural-key join reproduces this table.",
+        "Its construction and authority when repeated values disagree with normalized tables remain unresolved."
+      ]
     },
     {
       "profile": "open-v2",
       "table": "exam_level_anon",
       "grain": "exam",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.exam_level_anon.accession_identifier",
+          "columns": ["acc_anon"],
+          "kind": "natural",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "cross_table_check"],
+          "caveats": [
+            "This is a release-verified locator, not a documented cross-profile database constraint."
+          ]
+        },
+        {
+          "id": "open-v2.exam_level_anon.patient_accession",
+          "columns": ["empi_anon", "acc_anon"],
+          "kind": "natural",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "cross_table_check"],
+          "caveats": [
+            "The composite is redundant because the accession identifier is itself unique; it is retained for a directly checked wide-table relationship."
+          ]
+        },
+        {
+          "id": "open-v2.exam_level_anon.patient_identifier",
+          "columns": ["empi_anon"],
+          "kind": "natural",
+          "uniqueness": "not_unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": ["A patient may be represented by multiple exam rows."]
+        }
+      ],
+      "caveats": [
+        "Anonymized study dates are not relationship keys unless their preservation properties are documented."
+      ]
     },
     {
       "profile": "open-v2",
       "table": "imaging_findings_anon",
       "grain": "imaging_finding",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.imaging_findings_anon.finding_tuple",
+          "columns": ["acc_anon", "side", "numfind"],
+          "kind": "natural",
+          "uniqueness": "not_unique",
+          "completeness": "incomplete",
+          "evidence": ["release_schema", "cross_table_check"],
+          "caveats": [
+            "The apparent accession, side, and finding tuple is incomplete and does not uniquely identify every imaging row.",
+            "Null side and sentinel-like finding numbers require explicit handling."
+          ]
+        },
+        {
+          "id": "open-v2.imaging_findings_anon.export_index",
+          "columns": ["__index_level_0__"],
+          "kind": "technical",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "cross_table_check"],
+          "caveats": [
+            "The pandas serialization index is release-local provenance, not a clinical or cross-release key."
+          ]
+        }
+      ],
+      "caveats": [
+        "No documented natural key uniquely identifies every imaging-finding row."
+      ]
     },
     {
       "profile": "open-v2",
       "table": "pathology_findings_anon",
       "grain": "pathology_finding",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.pathology_findings_anon.finding_tuple",
+          "columns": ["acc_anon", "side", "numfind"],
+          "kind": "natural",
+          "uniqueness": "not_unique",
+          "completeness": "incomplete",
+          "evidence": ["release_schema", "cross_table_check"],
+          "caveats": [
+            "No tested clinical tuple uniquely identifies every pathology row.",
+            "Complete tuples may resolve to more than one imaging row."
+          ]
+        },
+        {
+          "id": "open-v2.pathology_findings_anon.export_index",
+          "columns": ["__index_level_0__"],
+          "kind": "technical",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "cross_table_check"],
+          "caveats": [
+            "The pandas serialization index is release-local provenance, not a durable pathology identifier."
+          ]
+        }
+      ],
+      "caveats": [
+        "Procedure and report dates do not establish a unique row identity or contemporaneous availability."
+      ]
     },
     {
       "profile": "open-v2",
       "table": "patients_anon",
       "grain": "patient",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.patients_anon.patient_identifier",
+          "columns": ["empi_anon"],
+          "kind": "natural",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": [
+            "Uniqueness and completeness were verified for open-v2; no cross-release constraint is documented.",
+            "The anonymized identifier is opaque and must not be interpreted as a clinical value."
+          ]
+        }
+      ],
+      "caveats": [
+        "This patient surface is not a declaration that every auxiliary-table patient must occur here."
+      ]
     },
     {
       "profile": "open-v2",
       "table": "reports_anon",
       "grain": "report",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.reports_anon.accession_sequence",
+          "columns": ["acc_anon", "rseq"],
+          "kind": "natural",
+          "uniqueness": "not_unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": [
+            "Accession plus report sequence does not uniquely identify every report row.",
+            "Sequence chronology and zero semantics are unresolved."
+          ]
+        },
+        {
+          "id": "open-v2.reports_anon.full_clinical_tuple",
+          "columns": ["empi_anon", "acc_anon", "studydate_anon", "rseq"],
+          "kind": "natural",
+          "uniqueness": "not_unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": [
+            "Adding patient and anonymized study date still does not yield a unique clinical key."
+          ]
+        },
+        {
+          "id": "open-v2.reports_anon.export_index",
+          "columns": ["__index_level_0__"],
+          "kind": "technical",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": [
+            "This pandas serialization index is not current row position or a documented durable report identifier."
+          ]
+        }
+      ],
+      "caveats": [
+        "No tested natural key uniquely identifies all report rows.",
+        "Report content was not read during the registered investigation."
+      ]
     },
     {
       "profile": "open-v2",
       "table": "risk_anon",
       "grain": "risk_assessment",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.risk_anon.accession_identifier",
+          "columns": ["acc_anon"],
+          "kind": "natural",
+          "uniqueness": "unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": [
+            "Open-v2 has at most one represented risk row per accession, but no durable uniqueness constraint is documented."
+          ]
+        },
+        {
+          "id": "open-v2.risk_anon.patient_identifier",
+          "columns": ["empi_anon"],
+          "kind": "natural",
+          "uniqueness": "not_unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": ["A patient may have risk rows for multiple accessions."]
+        },
+        {
+          "id": "open-v2.risk_anon.export_index",
+          "columns": ["__index_level_0__"],
+          "kind": "technical",
+          "uniqueness": "unknown",
+          "completeness": "complete",
+          "evidence": ["release_schema"],
+          "caveats": [
+            "Parquet metadata identifies a pandas index; its uniqueness and stability were not established for relationship use."
+          ]
+        }
+      ],
+      "caveats": [
+        "Risk-to-exam referential coverage and computation timing require maintainer confirmation."
+      ]
     },
     {
       "profile": "open-v2",
       "table": "side_level_anon",
       "grain": "breast_side",
-      "keys": [],
-      "caveats": []
+      "keys": [
+        {
+          "id": "open-v2.side_level_anon.accession_side",
+          "columns": ["acc_anon", "side"],
+          "kind": "natural",
+          "uniqueness": "unique",
+          "completeness": "incomplete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": [
+            "Release uniqueness retained null side as a state; this is not a SQL uniqueness constraint over nullable columns.",
+            "The relationship between null, bilateral, left, and right rows is unresolved."
+          ]
+        },
+        {
+          "id": "open-v2.side_level_anon.accession_identifier",
+          "columns": ["acc_anon"],
+          "kind": "natural",
+          "uniqueness": "not_unique",
+          "completeness": "complete",
+          "evidence": ["release_schema", "observed_v2_values"],
+          "caveats": ["An accession may have multiple side-level rows."]
+        }
+      ],
+      "caveats": [
+        "Do not infer that a bilateral row decomposes into left and right rows."
+      ]
     }
   ],
-  "relationships": []
+  "relationships": [
+    {
+      "id": "open-v2.combined_anon.exam_projection",
+      "profile": "open-v2",
+      "kind": "projection",
+      "source": {
+        "table": "combined_anon",
+        "columns": ["empi_anon", "acc_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "exam_level_anon",
+        "columns": ["empi_anon", "acc_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "exactly_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["cross_table_check"],
+      "caveats": [
+        "Resolution was verified for open-v2 and does not explain wide-table construction."
+      ],
+      "join_hazards": [
+        "Resolution does not establish equality or authority of every repeated exam attribute."
+      ]
+    },
+    {
+      "id": "open-v2.combined_anon.imaging_index_projection",
+      "profile": "open-v2",
+      "kind": "projection",
+      "source": {
+        "table": "combined_anon",
+        "columns": ["__index_level_0__"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "imaging_findings_anon",
+        "columns": ["__index_level_0__"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "exactly_one"
+      },
+      "evidence": ["cross_table_check"],
+      "caveats": [
+        "Every normalized imaging index is represented in the wide index surface, but some wide rows have no imaging counterpart."
+      ],
+      "join_hazards": [
+        "This release-local technical projection is not a clinical join key.",
+        "Do not assume source ordering or cross-release index stability."
+      ]
+    },
+    {
+      "id": "open-v2.combined_anon.pathology_index_projection",
+      "profile": "open-v2",
+      "kind": "projection",
+      "source": {
+        "table": "combined_anon",
+        "columns": ["__index_level_0__"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "pathology_findings_anon",
+        "columns": ["__index_level_0__"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "exactly_one"
+      },
+      "evidence": ["cross_table_check"],
+      "caveats": [
+        "Every normalized pathology index is represented in the wide index surface, but some wide rows have no pathology counterpart."
+      ],
+      "join_hazards": [
+        "This release-local technical projection is not a clinical join key.",
+        "Do not infer pathology availability at imaging time from wide-row co-location."
+      ]
+    },
+    {
+      "id": "open-v2.combined_anon.patient_projection",
+      "profile": "open-v2",
+      "kind": "projection",
+      "source": {
+        "table": "combined_anon",
+        "columns": ["empi_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "patients_anon",
+        "columns": ["empi_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "exactly_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["cross_table_check"],
+      "caveats": [
+        "Exact resolution was verified for open-v2 and is not a cross-profile contract."
+      ],
+      "join_hazards": [
+        "Identity resolution does not establish equality of every repeated patient attribute."
+      ]
+    },
+    {
+      "id": "open-v2.combined_anon.side_projection",
+      "profile": "open-v2",
+      "kind": "projection",
+      "source": {
+        "table": "combined_anon",
+        "columns": ["acc_anon", "side"],
+        "completeness": "optional"
+      },
+      "target": {
+        "table": "side_level_anon",
+        "columns": ["acc_anon", "side"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["cross_table_check"],
+      "caveats": [
+        "Complete wide side tuples resolved during the registered check; incomplete tuples do not define a join."
+      ],
+      "join_hazards": [
+        "Do not coerce null side to bilateral, left, or right.",
+        "SQL null equality differs from the null-as-state comparison used during investigation."
+      ]
+    },
+    {
+      "id": "open-v2.exam_level_anon.patient",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "exam_level_anon",
+        "columns": ["empi_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "patients_anon",
+        "columns": ["empi_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "release_legend", "inference", "unresolved"],
+      "caveats": [
+        "The expected hierarchy is supported by shared identifier meaning, but full referential coverage was not registered."
+      ],
+      "join_hazards": [
+        "Do not promote this expectation to an enforced foreign key without a profile-specific check."
+      ]
+    },
+    {
+      "id": "open-v2.imaging_findings_anon.exam",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "imaging_findings_anon",
+        "columns": ["acc_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "exam_level_anon",
+        "columns": ["acc_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "inference", "unresolved"],
+      "caveats": [
+        "The accession relationship is expected, but complete referential coverage was not retained as a portable claim."
+      ],
+      "join_hazards": [
+        "Joining exam attributes to findings repeats exam values at finding grain."
+      ]
+    },
+    {
+      "id": "open-v2.imaging_findings_anon.linked_exam",
+      "profile": "open-v2",
+      "kind": "reference",
+      "source": {
+        "table": "imaging_findings_anon",
+        "columns": ["linkedaccession_anon"],
+        "completeness": "optional"
+      },
+      "target": {
+        "table": "exam_level_anon",
+        "columns": ["acc_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["cross_table_check"],
+      "caveats": [
+        "Some non-null linked accessions did not resolve to the open-v2 exam surface."
+      ],
+      "join_hazards": [
+        "Treat this as an optional reference with possible dangling values, not a foreign key."
+      ]
+    },
+    {
+      "id": "open-v2.imaging_findings_anon.side",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "imaging_findings_anon",
+        "columns": ["acc_anon", "side"],
+        "completeness": "optional"
+      },
+      "target": {
+        "table": "side_level_anon",
+        "columns": ["acc_anon", "side"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "inference", "unresolved"],
+      "caveats": [
+        "Null side prevents an unconditional side-level relationship."
+      ],
+      "join_hazards": [
+        "Do not match null side values or reinterpret bilateral side without an explicit policy."
+      ]
+    },
+    {
+      "id": "open-v2.pathology_findings_anon.exam",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "pathology_findings_anon",
+        "columns": ["acc_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "exam_level_anon",
+        "columns": ["acc_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "inference", "unresolved"],
+      "caveats": [
+        "The expected accession hierarchy is not an enforced foreign-key claim."
+      ],
+      "join_hazards": [
+        "Pathology timing may follow the imaging exam and must not be treated as contemporaneous by default."
+      ]
+    },
+    {
+      "id": "open-v2.pathology_findings_anon.imaging_finding",
+      "profile": "open-v2",
+      "kind": "reference",
+      "source": {
+        "table": "pathology_findings_anon",
+        "columns": ["acc_anon", "side", "numfind"],
+        "completeness": "optional"
+      },
+      "target": {
+        "table": "imaging_findings_anon",
+        "columns": ["acc_anon", "side", "numfind"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_more",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["cross_table_check"],
+      "caveats": [
+        "Complete pathology tuples resolve to imaging tuples, but duplicate imaging matches occur and incomplete tuples exist."
+      ],
+      "join_hazards": [
+        "This tuple is not a one-to-one key and can multiply rows in either direction.",
+        "Null side and sentinel-like finding numbers require an explicit matching policy."
+      ]
+    },
+    {
+      "id": "open-v2.pathology_findings_anon.side",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "pathology_findings_anon",
+        "columns": ["acc_anon", "side"],
+        "completeness": "optional"
+      },
+      "target": {
+        "table": "side_level_anon",
+        "columns": ["acc_anon", "side"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "inference", "unresolved"],
+      "caveats": [
+        "The physical side field may be absent and does not substitute for biopsy side."
+      ],
+      "join_hazards": [
+        "Do not join pathology bside to the side table; the relationship tuple uses the finding side field."
+      ]
+    },
+    {
+      "id": "open-v2.reports_anon.exam",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "reports_anon",
+        "columns": ["acc_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "exam_level_anon",
+        "columns": ["acc_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "inference", "unresolved"],
+      "caveats": [
+        "Report-to-exam referential coverage was not directly checked."
+      ],
+      "join_hazards": [
+        "Joining reports to finding-grain tables by accession multiplies rows.",
+        "Report sequence is neither documented as chronological nor unique within accession."
+      ]
+    },
+    {
+      "id": "open-v2.reports_anon.patient",
+      "profile": "open-v2",
+      "kind": "reference",
+      "source": {
+        "table": "reports_anon",
+        "columns": ["empi_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "patients_anon",
+        "columns": ["empi_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "release_legend", "inference", "unresolved"],
+      "caveats": [
+        "The report patient surface may extend beyond patients_anon; no anti-join was registered."
+      ],
+      "join_hazards": [
+        "Do not enforce this as a complete foreign key without profile-specific verification."
+      ]
+    },
+    {
+      "id": "open-v2.risk_anon.exam",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "risk_anon",
+        "columns": ["acc_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "exam_level_anon",
+        "columns": ["acc_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_one"
+      },
+      "evidence": ["release_schema", "observed_v2_values", "inference", "unresolved"],
+      "caveats": [
+        "Accession uniqueness supports an optional one-to-one expectation, but referential coverage is unresolved."
+      ],
+      "join_hazards": [
+        "Do not assume every exam has a risk row.",
+        "Do not infer that risk outputs were available at imaging time."
+      ]
+    },
+    {
+      "id": "open-v2.risk_anon.patient",
+      "profile": "open-v2",
+      "kind": "reference",
+      "source": {
+        "table": "risk_anon",
+        "columns": ["empi_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "patients_anon",
+        "columns": ["empi_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "release_legend", "inference", "unresolved"],
+      "caveats": [
+        "The direct patient reference is plausible but referential coverage was not checked."
+      ],
+      "join_hazards": [
+        "When exam context matters, join risk to exam by accession and validate patient identifiers."
+      ]
+    },
+    {
+      "id": "open-v2.side_level_anon.exam",
+      "profile": "open-v2",
+      "kind": "hierarchy",
+      "source": {
+        "table": "side_level_anon",
+        "columns": ["acc_anon"],
+        "completeness": "required"
+      },
+      "target": {
+        "table": "exam_level_anon",
+        "columns": ["acc_anon"]
+      },
+      "cardinality": {
+        "targets_per_source": "zero_or_one",
+        "sources_per_target": "zero_or_more"
+      },
+      "evidence": ["release_schema", "inference", "unresolved"],
+      "caveats": [
+        "The expected exam hierarchy was not retained as an enforced referential claim."
+      ],
+      "join_hazards": [
+        "Use accession for the exam edge; retain side only for side-grain identity."
+      ]
+    }
+  ]
 }

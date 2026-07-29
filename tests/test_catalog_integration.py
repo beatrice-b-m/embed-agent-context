@@ -50,6 +50,54 @@ class CheckedInCatalogTests(unittest.TestCase):
                 result = self.catalog.get_feature(binding.qualified_identifier)
                 self.assertEqual(result["binding"]["concept"], binding.concept)
 
+    def test_every_table_and_relationship_resolves_exactly(self) -> None:
+        for table in self.catalog.tables:
+            with self.subTest(table=table.identifier):
+                result = self.catalog.get_table(table.profile, table.table)
+                self.assertEqual(result["identifier"], table.identifier)
+
+        for relationship in self.catalog.relationships:
+            with self.subTest(relationship=relationship.id):
+                result = self.catalog.get_relationship(relationship.id)
+                self.assertEqual(result["identifier"], relationship.id)
+
+    def test_unreliable_natural_keys_and_wide_hazards_remain_explicit(self) -> None:
+        by_table = {table.table: table for table in self.catalog.tables}
+        for table_name in (
+            "imaging_findings_anon",
+            "pathology_findings_anon",
+            "reports_anon",
+        ):
+            with self.subTest(table=table_name):
+                natural_keys = [
+                    key
+                    for key in by_table[table_name].keys
+                    if key.kind == "natural"
+                ]
+                self.assertTrue(natural_keys)
+                self.assertTrue(
+                    all(
+                        key.uniqueness != "unique"
+                        for key in natural_keys
+                    )
+                )
+
+        wide_relationships = self.catalog.search_relationships(
+            table="combined_anon"
+        )["matches"]
+        self.assertTrue(wide_relationships)
+        self.assertTrue(
+            all(item["join_hazards"] for item in wide_relationships)
+        )
+
+        linked = self.catalog.get_relationship(
+            "open-v2.imaging_findings_anon.linked_exam"
+        )["relationship"]
+        self.assertEqual(linked["source"]["completeness"], "optional")
+        self.assertEqual(
+            linked["cardinality"]["targets_per_source"], "zero_or_one"
+        )
+
     def test_domain_only_search_returns_each_matching_concept_once(self) -> None:
         for domain in (
             "pathology",

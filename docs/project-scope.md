@@ -99,6 +99,13 @@ and join hazards. Relationship claims are
 structured separately from feature concepts and must not smuggle
 release-specific counts into the feature catalog.
 
+The `open-v2` profile records all eight physical table grains and conservative
+linkages among patient, exam, side, imaging-finding, pathology-finding, report,
+risk, and wide-row surfaces. Non-unique clinical tuples, optional or unresolved
+references, nullable side components, technical-index projections, temporal
+availability, and the wide table's unresolved construction remain explicit
+hazards rather than being promoted to foreign-key guarantees.
+
 ### 3. Clinical and procedural context
 
 Future work may explain imaging, reporting, assessment, risk, procedure, and
