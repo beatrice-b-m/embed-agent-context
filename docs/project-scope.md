@@ -117,10 +117,10 @@ unresolved meaning visible.
 ## Local source boundary
 
 The ignored `reference_files/` directory contains local release artifacts used
-to construct and verify the `open-v2` profile. Catalog construction may read
-Parquet footer schemas and the release legend. It must not copy clinical rows,
-identifiers, anonymized dates, report text, or empirical summaries into the
-catalog.
+to construct and verify the `open-v2` profile. Source-profile validation may
+read Parquet footer schemas and the release legend. It must not copy clinical
+rows, identifiers, anonymized dates, report text, or empirical summaries into
+the catalog.
 
 ## Documentation synchronization
 

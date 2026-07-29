@@ -110,6 +110,10 @@ Profile-specific statistics must remain outside the feature catalog. If a
 future use case needs empirical profiling, it should be a separate,
 explicitly-scoped artifact with its own lifecycle.
 
+The footer-only `scripts/validate_source_profile.py` verifier derives the
+selected profile's expected table and column manifest from bindings. It does
+not contain a hard-coded release occurrence total.
+
 ## Schema evolution
 
 Compatible content additions keep the current schema version. A change that

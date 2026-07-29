@@ -18,7 +18,8 @@ turning one release's measurements into apparent contracts.
 - [`catalog/catalog.schema.json`](catalog/catalog.schema.json) — the versioned
   JSON Schema for the catalog.
 - `embed_context/` — the dependency-free query core and command-line interface.
-- `tests/` — synthetic contract, validation, search, and CLI tests.
+- `tests/` — synthetic contract, validation, search, CLI, and source-profile
+  tests.
 - [`docs/catalog-format.md`](docs/catalog-format.md) — the data model,
   extension rules, and portability policy.
 - [`docs/project-scope.md`](docs/project-scope.md) — project boundaries and
@@ -74,11 +75,16 @@ domains, and feature kinds for programmatic discovery.
 
 ## Maintainer verification
 
-Run the complete test suite:
+Run the complete test suite and the footer-only source-profile check:
 
 ```bash
 uv run --locked python -m unittest discover -v
+uv run --locked python scripts/validate_source_profile.py
 ```
+
+The second command derives the expected manifest from the selected profile and
+compares table names, columns, physical types, and schema nullability. It reads
+Parquet footers only and does not inspect clinical values or statistics.
 
 ## Migration from the Markdown feature bundle
 
