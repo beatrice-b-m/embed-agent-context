@@ -133,16 +133,18 @@ An MCP client configuration can invoke it from any working directory:
 }
 ```
 
-The server exposes six read-only structured-output tools: `get_feature`,
-`search_features`, `lookup_code`, `get_table`, `get_relationship`, and
-`search_relationships`. It writes MCP protocol messages only to stdout;
-startup errors and diagnostics go to stderr. Search schemas enumerate their
-controlled feature or relationship filters, while descriptions list the
-profiles and tables present in the loaded catalog. Relationship results are
-descriptive metadata; clients must honor their optionality, cardinality,
-caveats, and join hazards rather than treating them as executable joins.
-`search_relationships` rejects undeclared arguments rather than silently
-broadening a query.
+The server exposes eight read-only structured-output tools: `get_feature`,
+`search_features`, `lookup_code`, `get_table`, `get_relationship`,
+`search_relationships`, `get_context`, and `search_contexts`. It writes MCP
+protocol messages only to stdout; startup errors and diagnostics go to stderr.
+Search schemas enumerate their controlled feature, relationship, or context
+filters, while descriptions list the profiles and tables present in the loaded
+catalog. Relationship results are descriptive metadata; clients must honor
+their optionality, cardinality, caveats, and join hazards rather than treating
+them as executable joins. Context results retain source metadata and
+claim-review status so unresolved or general background is not silently
+presented as verified open-v2 behavior. The relationship and context tools
+reject undeclared arguments rather than silently broadening a query.
 
 ## Maintainer verification
 

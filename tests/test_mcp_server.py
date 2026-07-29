@@ -105,6 +105,70 @@ class FakeCatalog:
             "meaning": "Synthetic code",
         }
 
+    def get_context(self, identifier: str) -> dict[str, Any]:
+        self.calls.append(
+            (
+                "get_context",
+                {"identifier": identifier},
+            )
+        )
+        return {
+            "kind": "context",
+            "identifier": identifier,
+            "context": {
+                "title": "Synthetic context",
+                "claims": [],
+            },
+            "sources": [],
+        }
+
+    def search_contexts(
+        self,
+        query: str = "",
+        *,
+        kind: str | None = None,
+        scope: str | None = None,
+        profile: str | None = None,
+        domain: str | None = None,
+        concept: str | None = None,
+        table: str | None = None,
+        relationship: str | None = None,
+        status: str | None = None,
+        source: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        arguments = {
+            "query": query,
+            "kind": kind,
+            "scope": scope,
+            "profile": profile,
+            "domain": domain,
+            "concept": concept,
+            "table": table,
+            "relationship": relationship,
+            "status": status,
+            "source": source,
+            "limit": limit,
+        }
+        self.calls.append(("search_contexts", arguments))
+        return {
+            "filters": {
+                name: value
+                for name, value in arguments.items()
+                if name not in {"query", "limit"}
+            },
+            "query": query,
+            "count": 1,
+            "total": 1,
+            "matches": [
+                {
+                    "identifier": "synthetic.context",
+                    "title": "Synthetic context",
+                    "claims": [],
+                }
+            ],
+        }
+
     def get_table(self, profile: str, table: str) -> dict[str, Any]:
         self.calls.append(
             (
@@ -243,6 +307,15 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.catalog = FakeCatalog()
         self.server = build_server(self.catalog)
 
+    def test_server_metadata_describes_phase_three_context(self) -> None:
+        self.assertEqual(self.server.version, "0.3.0")
+        self.assertIn("clinical context", self.server.description)
+        self.assertIn("Context claims carry review status", self.server.instructions)
+        self.assertIn(
+            "do not treat unresolved claims as verified",
+            self.server.instructions,
+        )
+
     async def test_lists_only_read_only_closed_world_tools(self) -> None:
         async with Client(self.server) as client:
             result = await client.list_tools()
@@ -256,6 +329,8 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 "get_table",
                 "get_relationship",
                 "search_relationships",
+                "get_context",
+                "search_contexts",
             },
         )
         for tool in result.tools:
@@ -304,8 +379,36 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 "limit",
             },
         )
+        self.assertEqual(
+            set(schemas["get_context"]["properties"]),
+            {"identifier"},
+        )
+        self.assertEqual(
+            set(schemas["search_contexts"]["properties"]),
+            {
+                "query",
+                "kind",
+                "scope",
+                "profile",
+                "domain",
+                "concept",
+                "table",
+                "relationship",
+                "status",
+                "source",
+                "limit",
+            },
+        )
         self.assertIs(
             schemas["search_relationships"]["additionalProperties"],
+            False,
+        )
+        self.assertIs(
+            schemas["get_context"]["additionalProperties"],
+            False,
+        )
+        self.assertIs(
+            schemas["search_contexts"]["additionalProperties"],
             False,
         )
         search_properties = schemas["search_features"]["properties"]
@@ -322,6 +425,23 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             relationship_properties["kind"]["anyOf"][0]["enum"],
             ["hierarchy", "projection", "reference"],
+        )
+        context_properties = schemas["search_contexts"]["properties"]
+        self.assertIn(
+            "clinical_workflow",
+            schema_enums(context_properties["kind"]),
+        )
+        self.assertIn(
+            "profile_specific",
+            schema_enums(context_properties["scope"]),
+        )
+        self.assertIn(
+            "workflow",
+            schema_enums(context_properties["domain"]),
+        )
+        self.assertIn(
+            "unresolved",
+            schema_enums(context_properties["status"]),
         )
 
     async def test_get_feature_returns_structured_content(self) -> None:
@@ -506,6 +626,77 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             ("search_relationships", arguments),
         )
 
+    async def test_get_context_returns_core_result_unchanged(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "get_context",
+                {"identifier": "synthetic.context"},
+            )
+
+        self.assertFalse(result.is_error)
+        self.assertEqual(
+            result.structured_content,
+            {
+                "kind": "context",
+                "identifier": "synthetic.context",
+                "context": {
+                    "title": "Synthetic context",
+                    "claims": [],
+                },
+                "sources": [],
+            },
+        )
+        self.assertEqual(
+            self.catalog.calls[-1],
+            (
+                "get_context",
+                {"identifier": "synthetic.context"},
+            ),
+        )
+
+    async def test_search_contexts_returns_core_result_unchanged(self) -> None:
+        arguments = {
+            "query": "pathology",
+            "kind": "interpretation_guardrail",
+            "scope": "profile_specific",
+            "profile": "open-v2",
+            "domain": "pathology",
+            "concept": "pathology.severity",
+            "table": "pathology_findings_anon",
+            "relationship": "open-v2.pathology_findings_anon.imaging_finding",
+            "status": "unresolved",
+            "source": "open-v2.release-schema",
+            "limit": 3,
+        }
+        async with Client(self.server) as client:
+            result = await client.call_tool("search_contexts", arguments)
+
+        self.assertFalse(result.is_error)
+        self.assertEqual(
+            result.structured_content,
+            {
+                "filters": {
+                    name: value
+                    for name, value in arguments.items()
+                    if name not in {"query", "limit"}
+                },
+                "query": "pathology",
+                "count": 1,
+                "total": 1,
+                "matches": [
+                    {
+                        "identifier": "synthetic.context",
+                        "title": "Synthetic context",
+                        "claims": [],
+                    }
+                ],
+            },
+        )
+        self.assertEqual(
+            self.catalog.calls[-1],
+            ("search_contexts", arguments),
+        )
+
     async def test_invalid_limit_from_core_is_a_tool_error(self) -> None:
         server = build_server(load_catalog())
         async with Client(server) as client:
@@ -541,6 +732,39 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             result = await client.call_tool(
                 "search_relationships",
                 {"sourceTable": "combined_anon"},
+            )
+
+        self.assertTrue(result.is_error)
+        self.assertEqual(self.catalog.calls, [])
+
+    async def test_invalid_context_filter_is_a_schema_error(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "search_contexts",
+                {"kind": "diagnosis"},
+            )
+
+        self.assertTrue(result.is_error)
+        self.assertEqual(self.catalog.calls, [])
+
+    async def test_unknown_context_filter_is_a_schema_error(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "search_contexts",
+                {"claimStatus": "verified"},
+            )
+
+        self.assertTrue(result.is_error)
+        self.assertEqual(self.catalog.calls, [])
+
+    async def test_unknown_get_context_argument_is_a_schema_error(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "get_context",
+                {
+                    "identifier": "synthetic.context",
+                    "include_sources": True,
+                },
             )
 
         self.assertTrue(result.is_error)
@@ -587,6 +811,26 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("grains:", relationship_search.description)
         self.assertNotIn("domains:", relationship_search.description)
         self.assertNotIn("feature kinds:", relationship_search.description)
+        context_search = next(
+            tool for tool in result.tools if tool.name == "search_contexts"
+        )
+        self.assertIn(
+            "clinical_workflow, data_representation, "
+            "interpretation_guardrail, known_issue",
+            context_search.description,
+        )
+        self.assertIn(
+            "general_clinical, embed_general, profile_specific",
+            context_search.description,
+        )
+        self.assertIn(
+            "verified, reconciled, unverified, unresolved, contradicted",
+            context_search.description,
+        )
+        self.assertIn(
+            "profiles in this catalog: open-v2",
+            context_search.description,
+        )
 
     async def test_all_tools_query_the_checked_in_catalog(self) -> None:
         server = build_server(load_catalog())
@@ -624,6 +868,18 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     "kind": "hierarchy",
                 },
             )
+            context = await client.call_tool(
+                "get_context",
+                {"identifier": "open-v2.pathology-procedure-context"},
+            )
+            contexts = await client.call_tool(
+                "search_contexts",
+                {
+                    "profile": "open-v2",
+                    "domain": "pathology",
+                    "status": "unresolved",
+                },
+            )
 
         self.assertFalse(feature.is_error)
         self.assertEqual(
@@ -658,6 +914,21 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
             for match in relationships.structured_content["matches"]
         }
         self.assertIn("open-v2.exam_level_anon.patient", relationship_ids)
+        self.assertFalse(context.is_error)
+        self.assertEqual(
+            context.structured_content["identifier"],
+            "open-v2.pathology-procedure-context",
+        )
+        self.assertTrue(context.structured_content["sources"])
+        self.assertFalse(contexts.is_error)
+        context_ids = {
+            match["identifier"]
+            for match in contexts.structured_content["matches"]
+        }
+        self.assertIn("open-v2.pathology-procedure-context", context_ids)
+        for match in contexts.structured_content["matches"]:
+            for claim in match["matching_claims"]:
+                self.assertEqual(claim["status"], "unresolved")
 
 
 if __name__ == "__main__":

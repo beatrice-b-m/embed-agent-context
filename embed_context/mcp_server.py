@@ -12,7 +12,15 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from .catalog import DOMAINS, FEATURE_KINDS, GRAINS, RELATIONSHIP_KINDS
+from .catalog import (
+    CLAIM_STATUSES,
+    CONTEXT_KINDS,
+    CONTEXT_SCOPES,
+    DOMAINS,
+    FEATURE_KINDS,
+    GRAINS,
+    RELATIONSHIP_KINDS,
+)
 
 
 GrainFilter = Literal[*GRAINS]
@@ -20,6 +28,9 @@ DomainFilter = Literal[*DOMAINS]
 FeatureKindFilter = Literal[*FEATURE_KINDS]
 _RELATIONSHIP_KIND_VALUES = tuple(sorted(RELATIONSHIP_KINDS))
 RelationshipKindFilter = Literal[*_RELATIONSHIP_KIND_VALUES]
+ContextKindFilter = Literal[*CONTEXT_KINDS]
+ContextScopeFilter = Literal[*CONTEXT_SCOPES]
+ClaimStatusFilter = Literal[*CLAIM_STATUSES]
 
 
 MCP_INSTALL_HINT = (
@@ -64,6 +75,24 @@ class CatalogProtocol(Protocol):
 
     def lookup_code(
         self, feature_or_vocabulary: str, code: str
+    ) -> dict[str, Any]: ...
+
+    def get_context(self, identifier: str) -> dict[str, Any]: ...
+
+    def search_contexts(
+        self,
+        query: str = "",
+        *,
+        kind: str | None = None,
+        scope: str | None = None,
+        profile: str | None = None,
+        domain: str | None = None,
+        concept: str | None = None,
+        table: str | None = None,
+        relationship: str | None = None,
+        status: str | None = None,
+        source: str | None = None,
+        limit: int = 50,
     ) -> dict[str, Any]: ...
 
 
@@ -148,18 +177,36 @@ def build_server(catalog: CatalogProtocol) -> Any:
         )
         if part
     )
+    context_filter_description = "; ".join(
+        part
+        for part in (
+            f"context kinds: {', '.join(CONTEXT_KINDS)}",
+            f"context scopes: {', '.join(CONTEXT_SCOPES)}",
+            f"domains: {', '.join(DOMAINS)}",
+            f"claim statuses: {', '.join(CLAIM_STATUSES)}",
+            catalog_scope,
+        )
+        if part
+    )
     server = MCPServer(
         "embed-v2-feature-context",
-        description="Read-only EMBED V2 feature and table-linkage metadata lookup",
-        version="0.2.0",
+        description=(
+            "Read-only EMBED V2 feature, table-linkage, and clinical context "
+            "metadata lookup"
+        ),
+        version="0.3.0",
         instructions=(
             "Use these read-only tools for EMBED V2 feature meanings, table "
-            "linkages, evidence, caveats, join hazards, and coded values. "
+            "linkages, sourced clinical and workflow context, evidence, caveats, "
+            "join hazards, and coded values. Context claims carry review status "
+            "and explicit scope; do not treat unresolved claims as verified or "
+            "general clinical background as EMBED-specific behavior. "
             "Relationships are descriptive metadata, not executable joins; honor "
             "their documented optionality, cardinality, and hazards. The catalog "
             "does not provide clinical rows, report text, or clinical advice. "
             f"Feature search filters — {feature_filter_description}. "
-            f"Relationship search filters — {relationship_filter_description}."
+            f"Relationship search filters — {relationship_filter_description}. "
+            f"Context search filters — {context_filter_description}."
         ),
     )
     read_only = ToolAnnotations(
@@ -250,7 +297,53 @@ def build_server(catalog: CatalogProtocol) -> Any:
             limit=limit,
         )
 
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_context(identifier: str) -> dict[str, Any]:
+        """Get one sourced clinical or workflow context by stable identifier."""
+
+        return catalog.get_context(identifier)
+
+    @server.tool(
+        annotations=read_only,
+        structured_output=True,
+        description=(
+            "Search sourced clinical and workflow contexts by text and/or "
+            "controlled facets. Claim-level filters return only matching claims. "
+            f"Valid filters — {context_filter_description}."
+        ),
+    )
+    def search_contexts(
+        query: str = "",
+        kind: ContextKindFilter | None = None,
+        scope: ContextScopeFilter | None = None,
+        profile: str | None = None,
+        domain: DomainFilter | None = None,
+        concept: str | None = None,
+        table: str | None = None,
+        relationship: str | None = None,
+        status: ClaimStatusFilter | None = None,
+        source: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Search contexts without interpreting unresolved claims as facts."""
+
+        return catalog.search_contexts(
+            query,
+            kind=kind,
+            scope=scope,
+            profile=profile,
+            domain=domain,
+            concept=concept,
+            table=table,
+            relationship=relationship,
+            status=status,
+            source=source,
+            limit=limit,
+        )
+
     _require_exact_tool_arguments(server, "search_relationships")
+    _require_exact_tool_arguments(server, "get_context")
+    _require_exact_tool_arguments(server, "search_contexts")
     return server
 
 
