@@ -54,6 +54,9 @@ uv run --locked --no-dev python -m embed_context get imaging_findings_anon.asses
 uv run --locked --no-dev python -m embed_context search "breast density"
 uv run --locked --no-dev python -m embed_context search --domain pathology --grain pathology_finding
 uv run --locked --no-dev python -m embed_context code imaging.assessment N
+uv run --locked --no-dev python -m embed_context table open-v2 exam_level_anon
+uv run --locked --no-dev python -m embed_context relationship open-v2.pathology_findings_anon.imaging_finding
+uv run --locked --no-dev python -m embed_context relationships --table imaging_findings_anon
 ```
 
 Use `--format json` before the subcommand for a stable machine-readable
@@ -70,6 +73,13 @@ not semantic embedding search. Exact lookup accepts a concept ID,
 only when the same physical name has different meanings in different profiles.
 Search returns up to fifty concepts by default; use `--limit` for a broader
 result set when needed.
+
+Table lookup returns the declared grain, key candidates, and incoming and
+outgoing linkage claims. Relationship lookup returns one exact directional
+claim, while `relationships` supports profile, either-endpoint table,
+source-table, target-table, and relationship-kind filters. Cardinality,
+evidence, caveats, and join hazards are included in the structured results;
+they describe safe interpretation rather than executing a join.
 
 Run `python -m embed_context --help` or a subcommand's `--help` for the complete
 filter surface. `--format json validate` also returns the controlled grains,

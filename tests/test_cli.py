@@ -10,15 +10,42 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from embed_context.cli import main
-from tests.catalog_fixture import write_catalog
+from tests.catalog_fixture import synthetic_catalog, write_catalog
 
 
 class CatalogCLITests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
+        data = synthetic_catalog()
+        data["relationships"].append(
+            {
+                "id": "wide.tissue-density-projection",
+                "profile": "open-v2",
+                "kind": "projection",
+                "source": {
+                    "table": "combined_anon",
+                    "columns": ["tissueden"],
+                    "completeness": "unknown",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["tissueden"],
+                },
+                "cardinality": {
+                    "targets_per_source": "unknown",
+                    "sources_per_target": "unknown",
+                },
+                "evidence": ["release_schema"],
+                "caveats": ["Projection equality is not established."],
+                "join_hazards": [
+                    "Do not use the wide projection as an authoritative join."
+                ],
+            }
+        )
         self.catalog_path = write_catalog(
-            Path(self.temporary.name) / "catalog.json"
+            Path(self.temporary.name) / "catalog.json",
+            data,
         )
 
     def run_cli(self, *arguments: str):
@@ -89,9 +116,16 @@ class CatalogCLITests(unittest.TestCase):
                 "bindings": 3,
                 "vocabularies": 1,
                 "tables": 2,
-                "relationships": 0,
+                "relationships": 1,
             },
         )
+
+    def test_validate_text_includes_phase_two_counts(self) -> None:
+        status, stdout, stderr = self.run_cli("validate")
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("2 tables, 1 relationship", stdout)
 
     def test_get_text_is_concise(self) -> None:
         status, stdout, stderr = self.run_cli(
@@ -164,6 +198,155 @@ class CatalogCLITests(unittest.TestCase):
             stdout,
             "exam.tissue_density 2 — Scattered fibroglandular densities\n",
         )
+
+    def test_table_json_returns_core_result(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "table",
+            "open-v2",
+            "exam_level_anon",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        envelope = json.loads(stdout)
+        self.assertEqual(envelope["command"], "table")
+        data = envelope["data"]
+        self.assertEqual(data["kind"], "table")
+        self.assertEqual(data["identifier"], "open-v2:exam_level_anon")
+        self.assertEqual(data["table"]["keys"][0]["id"], "exam.accession")
+        self.assertEqual(
+            [item["id"] for item in data["relationships"]["incoming"]],
+            ["wide.tissue-density-projection"],
+        )
+
+    def test_table_text_summarizes_keys_and_relationships(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "table", "open-v2", "exam_level_anon"
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("open-v2:exam_level_anon — exam table", stdout)
+        self.assertIn(
+            "exam.accession — acc_anon (natural; unique; complete)",
+            stdout,
+        )
+        self.assertIn("relationships: 0 outgoing, 1 incoming", stdout)
+
+    def test_relationship_json_returns_core_result(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "relationship",
+            "wide.tissue-density-projection",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        envelope = json.loads(stdout)
+        self.assertEqual(envelope["command"], "relationship")
+        self.assertEqual(envelope["data"]["kind"], "relationship")
+        self.assertEqual(
+            envelope["data"]["relationship"]["source"]["table"],
+            "combined_anon",
+        )
+
+    def test_relationship_text_preserves_direction_and_hazards(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "relationship", "wide.tissue-density-projection"
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("wide.tissue-density-projection — projection", stdout)
+        self.assertIn(
+            "combined_anon(tissueden) → exam_level_anon(tissueden)",
+            stdout,
+        )
+        self.assertIn("unknown target(s) per source", stdout)
+        self.assertIn("hazards:", stdout)
+
+    def test_relationships_help_lists_directional_and_kind_filters(self) -> None:
+        stdout = io.StringIO()
+        with self.assertRaises(SystemExit) as raised, redirect_stdout(stdout):
+            main(["relationships", "--help"])
+
+        self.assertEqual(raised.exception.code, 0)
+        help_text = stdout.getvalue()
+        self.assertIn("--source-table", help_text)
+        self.assertIn("--target-table", help_text)
+        self.assertIn("hierarchy", help_text)
+        self.assertIn("projection", help_text)
+        self.assertIn("reference", help_text)
+
+    def test_relationships_json_passes_filters_and_limit(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "relationships",
+            "--profile",
+            "open-v2",
+            "--table",
+            "combined_anon",
+            "--source-table",
+            "combined_anon",
+            "--target-table",
+            "exam_level_anon",
+            "--kind",
+            "projection",
+            "--limit",
+            "1",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        data = json.loads(stdout)["data"]
+        self.assertEqual(
+            data["filters"],
+            {
+                "profile": "open-v2",
+                "table": "combined_anon",
+                "source_table": "combined_anon",
+                "target_table": "exam_level_anon",
+                "kind": "projection",
+            },
+        )
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(
+            data["matches"][0]["id"],
+            "wide.tissue-density-projection",
+        )
+
+    def test_relationships_text_handles_matches_and_empty_results(self) -> None:
+        status, stdout, stderr = self.run_cli("relationships")
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("wide.tissue-density-projection — projection", stdout)
+
+        status, stdout, stderr = self.run_cli(
+            "relationships", "--table", "missing_table"
+        )
+        self.assertEqual(status, 0)
+        self.assertEqual(stdout, "No relationships.\n")
+        self.assertEqual(stderr, "")
+
+    def test_relationship_errors_use_existing_error_envelopes(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "relationship",
+            "missing.relationship",
+        )
+
+        self.assertEqual(status, 2)
+        self.assertEqual(stderr, "")
+        envelope = json.loads(stdout)
+        self.assertEqual(envelope["command"], "relationship")
+        self.assertEqual(envelope["error"]["type"], "not_found")
 
     def test_json_error_is_machine_readable(self) -> None:
         status, stdout, stderr = self.run_cli(

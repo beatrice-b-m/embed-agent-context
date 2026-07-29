@@ -13,6 +13,7 @@ from .catalog import (
     DOMAINS,
     FEATURE_KINDS,
     GRAINS,
+    RELATIONSHIP_KINDS,
     CatalogError,
     load_catalog,
 )
@@ -58,6 +59,36 @@ def build_parser() -> argparse.ArgumentParser:
     code_parser = subparsers.add_parser("code", help="look up an exact code")
     code_parser.add_argument("feature_or_vocabulary")
     code_parser.add_argument("code")
+
+    table_parser = subparsers.add_parser(
+        "table",
+        help="get one profile-specific table specification",
+    )
+    table_parser.add_argument("profile")
+    table_parser.add_argument("table")
+
+    relationship_parser = subparsers.add_parser(
+        "relationship",
+        help="get one exact table relationship",
+    )
+    relationship_parser.add_argument("identifier")
+
+    relationships_parser = subparsers.add_parser(
+        "relationships",
+        help="list and filter table relationships",
+    )
+    relationships_parser.add_argument("--profile")
+    relationships_parser.add_argument(
+        "--table",
+        help="match relationships where either endpoint uses this table",
+    )
+    relationships_parser.add_argument("--source-table")
+    relationships_parser.add_argument("--target-table")
+    relationships_parser.add_argument(
+        "--kind",
+        choices=sorted(RELATIONSHIP_KINDS),
+    )
+    relationships_parser.add_argument("--limit", type=int, default=50)
     return parser
 
 
@@ -84,6 +115,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         elif args.command == "code":
             data = catalog.lookup_code(args.feature_or_vocabulary, args.code)
+        elif args.command == "table":
+            data = catalog.get_table(args.profile, args.table)
+        elif args.command == "relationship":
+            data = catalog.get_relationship(args.identifier)
+        elif args.command == "relationships":
+            data = catalog.search_relationships(
+                profile=args.profile,
+                table=args.table,
+                source_table=args.source_table,
+                target_table=args.target_table,
+                kind=args.kind,
+                limit=args.limit,
+            )
         else:  # pragma: no cover - argparse constrains this branch.
             raise AssertionError(f"unsupported command {args.command!r}")
     except (CatalogError, OSError, ValueError) as exc:
@@ -147,7 +191,10 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
         return (
             f"valid: schema v{data['schema_version']}; "
             f"{data['concepts']} concepts, {data['bindings']} bindings, "
-            f"{data['vocabularies']} vocabularies"
+            f"{data['vocabularies']} vocabularies, "
+            f"{data['tables']} tables, "
+            f"{data['relationships']} "
+            f"{'relationship' if data['relationships'] == 1 else 'relationships'}"
         )
     if command == "get":
         concept = data["concept"]
@@ -194,7 +241,60 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
         return (
             f"{data['vocabulary']} {data['code']} — {data['meaning']}"
         )
+    if command == "table":
+        table = data["table"]
+        lines = [
+            f"{data['identifier']} — {table['grain']} table",
+        ]
+        keys = table["keys"]
+        if keys:
+            lines.append("keys:")
+            lines.extend(
+                f"  {key['id']} — {', '.join(key['columns'])} "
+                f"({key['kind']}; {key['uniqueness']}; "
+                f"{key['completeness']})"
+                for key in keys
+            )
+        else:
+            lines.append("keys: none documented")
+        relationships = data["relationships"]
+        lines.append(
+            f"relationships: {len(relationships['outgoing'])} outgoing, "
+            f"{len(relationships['incoming'])} incoming"
+        )
+        return "\n".join(lines)
+    if command == "relationship":
+        return _format_relationship(data["relationship"])
+    if command == "relationships":
+        matches = data["matches"]
+        if not matches:
+            return "No relationships."
+        lines = [_format_relationship(item) for item in matches]
+        if data["total"] > len(matches):
+            lines.append(
+                f"Showing {len(matches)} of {data['total']} relationships."
+            )
+        return "\n".join(lines)
     raise ValueError(f"unsupported command {command!r}")
+
+
+def _format_relationship(relationship: dict[str, Any]) -> str:
+    source = relationship["source"]
+    target = relationship["target"]
+    cardinality = relationship["cardinality"]
+    source_columns = ", ".join(source["columns"])
+    target_columns = ", ".join(target["columns"])
+    line = (
+        f"{relationship['id']} — {relationship['kind']} · "
+        f"{relationship['profile']}:{source['table']}({source_columns}) → "
+        f"{target['table']}({target_columns}) · "
+        f"{cardinality['targets_per_source']} target(s) per source; "
+        f"{cardinality['sources_per_target']} source(s) per target"
+    )
+    hazards = relationship["join_hazards"]
+    if hazards:
+        line += "\n  hazards: " + "; ".join(hazards)
+    return line
 
 
 if __name__ == "__main__":
