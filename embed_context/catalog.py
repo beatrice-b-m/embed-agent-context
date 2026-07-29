@@ -620,6 +620,23 @@ class _ConceptSearchDocument:
     bindings: tuple[_BindingSearchDocument, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _ContextClaimSearchDocument:
+    claim: ContextClaim
+    all_tokens: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class _ContextSearchDocument:
+    context: ClinicalContext
+    identifier_text: str
+    title_text: str
+    search_terms_text: str
+    summary_text: str
+    all_tokens: frozenset[str]
+    claims: tuple[_ContextClaimSearchDocument, ...]
+
+
 class Catalog:
     """Validated immutable catalog with deterministic lookup indexes."""
 
@@ -639,6 +656,7 @@ class Catalog:
         "_by_qualified",
         "_bindings_by_concept",
         "_search_documents",
+        "_context_search_documents",
         "_sealed",
     )
 
@@ -716,6 +734,11 @@ class Catalog:
             self, "_bindings_by_concept", MappingProxyType(by_concept)
         )
         object.__setattr__(self, "_search_documents", self._build_search_documents())
+        object.__setattr__(
+            self,
+            "_context_search_documents",
+            self._build_context_search_documents(),
+        )
         object.__setattr__(self, "_sealed", True)
 
     def __setattr__(self, name: str, value: object) -> None:
@@ -1228,6 +1251,253 @@ class Catalog:
             ],
         }
 
+    def get_context(self, identifier: str) -> dict[str, Any]:
+        """Get one clinical context and the sources cited by its claims."""
+
+        normalized = _lookup_identifier(identifier, "identifier")
+        context = self._contexts.get(normalized)
+        if context is None:
+            raise CatalogNotFoundError(
+                f"context {normalized!r} was not found"
+            )
+        source_ids = sorted(
+            {
+                source_id
+                for claim in context.claims
+                for source_id in claim.sources
+            }
+        )
+        return {
+            "kind": "context",
+            "identifier": normalized,
+            "context": context.to_dict(),
+            "sources": {
+                source_id: self.sources[source_id].to_dict()
+                for source_id in source_ids
+            },
+        }
+
+    def search_contexts(
+        self,
+        query: str = "",
+        *,
+        kind: str | None = None,
+        scope: str | None = None,
+        profile: str | None = None,
+        domain: str | None = None,
+        concept: str | None = None,
+        table: str | None = None,
+        relationship: str | None = None,
+        status: str | None = None,
+        source: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Search contexts and return only claims matching the query filters."""
+
+        if not isinstance(query, str):
+            raise CatalogValidationError("query must be a string")
+        query_text = query.strip().casefold()
+        filters = {
+            "kind": _optional_filter(kind, "kind"),
+            "scope": _optional_filter(scope, "scope"),
+            "profile": _optional_filter(profile, "profile"),
+            "domain": _optional_filter(domain, "domain"),
+            "concept": _optional_filter(concept, "concept"),
+            "table": _optional_filter(table, "table"),
+            "relationship": _optional_filter(
+                relationship, "relationship"
+            ),
+            "status": _optional_filter(status, "status"),
+            "source": _optional_filter(source, "source"),
+        }
+        if not query_text and not any(filters.values()):
+            raise CatalogValidationError(
+                "provide a query or at least one context search filter"
+            )
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or not 1 <= limit <= 500
+        ):
+            raise CatalogValidationError("limit must be an integer from 1 to 500")
+        controlled_filters = {
+            "kind": CONTEXT_KINDS,
+            "scope": CONTEXT_SCOPES,
+            "profile": self.profiles,
+            "domain": DOMAINS,
+            "status": CLAIM_STATUSES,
+        }
+        for name, allowed in controlled_filters.items():
+            if filters[name] is not None and filters[name] not in allowed:
+                raise CatalogValidationError(
+                    f"unknown {name} filter {filters[name]!r}"
+                )
+        reference_filters = {
+            "concept": self.concepts,
+            "relationship": self._relationships_by_id,
+            "source": self.sources,
+        }
+        for name, allowed in reference_filters.items():
+            if filters[name] is not None and filters[name] not in allowed:
+                raise CatalogValidationError(
+                    f"unknown {name} filter {filters[name]!r}"
+                )
+        if filters["table"] is not None:
+            _physical_component(filters["table"], "table")
+
+        query_tokens = frozenset(
+            token
+            for token in _tokens(query_text)
+            if token not in _SEARCH_STOPWORDS
+        )
+        if query_text and not query_tokens and not any(filters.values()):
+            raise CatalogValidationError(
+                "query must contain at least one meaningful token"
+            )
+
+        candidates: list[
+            tuple[
+                int,
+                str,
+                _ContextSearchDocument,
+                tuple[_ContextClaimSearchDocument, ...],
+                frozenset[str],
+            ]
+        ] = []
+        has_complete_match = False
+        for document in self._context_search_documents:
+            context = document.context
+            if (
+                filters["kind"] is not None
+                and context.kind != filters["kind"]
+            ):
+                continue
+            if (
+                filters["scope"] is not None
+                and context.scope != filters["scope"]
+            ):
+                continue
+            if (
+                filters["profile"] is not None
+                and filters["profile"] not in context.profiles
+            ):
+                continue
+            if (
+                filters["domain"] is not None
+                and filters["domain"] not in context.domains
+            ):
+                continue
+            if (
+                filters["concept"] is not None
+                and filters["concept"] not in context.related_concepts
+            ):
+                continue
+            if filters["table"] is not None and not any(
+                table_reference.table == filters["table"]
+                for table_reference in context.related_tables
+            ):
+                continue
+            if (
+                filters["relationship"] is not None
+                and filters["relationship"]
+                not in context.related_relationships
+            ):
+                continue
+
+            eligible_claims = tuple(
+                claim_document
+                for claim_document in document.claims
+                if (
+                    filters["status"] is None
+                    or claim_document.claim.status == filters["status"]
+                )
+                and (
+                    filters["source"] is None
+                    or filters["source"] in claim_document.claim.sources
+                )
+            )
+            if not eligible_claims:
+                continue
+
+            context_overlap = query_tokens & document.all_tokens
+            claim_overlaps = tuple(
+                (
+                    claim_document,
+                    query_tokens & claim_document.all_tokens,
+                )
+                for claim_document in eligible_claims
+            )
+            matched_tokens = frozenset(context_overlap).union(
+                *(
+                    overlap
+                    for _, overlap in claim_overlaps
+                    if overlap
+                )
+            )
+            if query_tokens and not matched_tokens:
+                continue
+            matching_claims = (
+                eligible_claims
+                if not query_tokens or context_overlap
+                else tuple(
+                    claim_document
+                    for claim_document, overlap in claim_overlaps
+                    if overlap
+                )
+            )
+            score = _score_context_document(
+                document,
+                matching_claims,
+                query_text,
+                query_tokens,
+                matched_tokens,
+            )
+            has_complete_match |= (
+                bool(query_tokens)
+                and len(matched_tokens) == len(query_tokens)
+            )
+            candidates.append(
+                (
+                    score,
+                    context.id,
+                    document,
+                    matching_claims,
+                    matched_tokens,
+                )
+            )
+
+        if query_tokens and has_complete_match:
+            candidates = [
+                candidate
+                for candidate in candidates
+                if len(candidate[4]) == len(query_tokens)
+            ]
+        candidates.sort(key=lambda item: (-item[0], item[1]))
+        selected = candidates[:limit]
+        matches = [
+            _context_search_match(document.context, claims, score)
+            for score, _, document, claims, _ in selected
+        ]
+        selected_source_ids = sorted(
+            {
+                source_id
+                for _, _, _, claim_documents, _ in selected
+                for claim_document in claim_documents
+                for source_id in claim_document.claim.sources
+            }
+        )
+        return {
+            "query": query,
+            "filters": filters,
+            "count": len(matches),
+            "total": len(candidates),
+            "matches": matches,
+            "sources": {
+                source_id: self.sources[source_id].to_dict()
+                for source_id in selected_source_ids
+            },
+        }
+
     def get_feature(
         self, identifier: str, include_codes: bool = False
     ) -> dict[str, Any]:
@@ -1550,6 +1820,87 @@ class Catalog:
                     search_terms_text=search_terms_text,
                     definition_text=definition_text,
                     bindings=tuple(binding_documents),
+                )
+            )
+        return tuple(documents)
+
+    def _build_context_search_documents(
+        self,
+    ) -> tuple[_ContextSearchDocument, ...]:
+        documents: list[_ContextSearchDocument] = []
+        for context in self.contexts.values():
+            identifier_text = context.id.casefold()
+            title_text = context.title.casefold()
+            search_terms_text = " ".join(context.search_terms).casefold()
+            summary_text = context.summary.casefold()
+            auxiliary_text = " ".join(
+                (
+                    context.kind,
+                    context.scope,
+                    *context.profiles,
+                    *context.domains,
+                    *context.caveats,
+                    *context.related_concepts,
+                    *(
+                        table.identifier for table in context.related_tables
+                    ),
+                    *context.related_relationships,
+                    *(
+                        part
+                        for step in context.workflow_steps
+                        for part in (step.id, step.label)
+                    ),
+                    _compact_identifier(context.id),
+                    *(
+                        _compact_identifier(term)
+                        for term in context.search_terms
+                    ),
+                )
+            ).casefold()
+            claim_documents: list[_ContextClaimSearchDocument] = []
+            for claim in context.claims:
+                claim_sources = [
+                    self.sources[source_id] for source_id in claim.sources
+                ]
+                claim_text = " ".join(
+                    (
+                        claim.id,
+                        f"{context.id}.{claim.id}",
+                        claim.statement,
+                        claim.status,
+                        *claim.caveats,
+                        *claim.sources,
+                        *(source.title for source in claim_sources),
+                        *(source.version_scope for source in claim_sources),
+                    )
+                ).casefold()
+                claim_documents.append(
+                    _ContextClaimSearchDocument(
+                        claim=claim,
+                        all_tokens=frozenset(_tokens(claim_text)),
+                    )
+                )
+            documents.append(
+                _ContextSearchDocument(
+                    context=context,
+                    identifier_text=identifier_text,
+                    title_text=title_text,
+                    search_terms_text=search_terms_text,
+                    summary_text=summary_text,
+                    all_tokens=frozenset(
+                        _tokens(
+                            " ".join(
+                                (
+                                    identifier_text,
+                                    title_text,
+                                    search_terms_text,
+                                    summary_text,
+                                    auxiliary_text,
+                                )
+                            )
+                        )
+                    ),
+                    claims=tuple(claim_documents),
                 )
             )
         return tuple(documents)
@@ -2685,6 +3036,100 @@ def _score_document(
             if token in field_tokens:
                 score += token_weight
     return score
+
+
+def _score_context_document(
+    document: _ContextSearchDocument,
+    claims: tuple[_ContextClaimSearchDocument, ...],
+    query_text: str,
+    query_tokens: frozenset[str],
+    matched_tokens: frozenset[str],
+) -> int:
+    if not query_text:
+        return 0
+    score = 0
+    if query_text == document.identifier_text:
+        score += 1000
+    if _compact_identifier(query_text) == _compact_identifier(
+        document.identifier_text
+    ):
+        score += 500
+    fields = (
+        (document.identifier_text, 120),
+        (document.title_text, 100),
+        (document.search_terms_text, 70),
+        (document.summary_text, 40),
+    )
+    for text, phrase_weight in fields:
+        if query_text in text:
+            score += phrase_weight
+    if any(query_text in claim.claim.statement.casefold() for claim in claims):
+        score += 60
+    token_fields = (
+        (frozenset(_tokens(document.identifier_text)), 24),
+        (frozenset(_tokens(document.title_text)), 20),
+        (frozenset(_tokens(document.search_terms_text)), 14),
+        (frozenset(_tokens(document.summary_text)), 8),
+        (document.all_tokens, 3),
+    )
+    claim_tokens = frozenset().union(
+        *(claim.all_tokens for claim in claims)
+    )
+    for token in query_tokens:
+        for field_tokens, token_weight in token_fields:
+            if token in field_tokens:
+                score += token_weight
+        if token in claim_tokens:
+            score += 10
+    if query_tokens:
+        score += round(40 * len(matched_tokens) / len(query_tokens))
+    return score
+
+
+def _context_search_match(
+    context: ClinicalContext,
+    claim_documents: tuple[_ContextClaimSearchDocument, ...],
+    score: int,
+) -> dict[str, Any]:
+    matching_claims = tuple(
+        claim_document.claim for claim_document in claim_documents
+    )
+    matching_claim_ids = {claim.id for claim in matching_claims}
+    workflow_steps = []
+    for step in context.workflow_steps:
+        claims = [
+            claim_id
+            for claim_id in step.claims
+            if claim_id in matching_claim_ids
+        ]
+        if claims:
+            workflow_steps.append(
+                {
+                    "id": step.id,
+                    "label": step.label,
+                    "claims": claims,
+                }
+            )
+    return {
+        "score": score,
+        "identifier": context.id,
+        "title": context.title,
+        "kind": context.kind,
+        "scope": context.scope,
+        "profiles": list(context.profiles),
+        "summary": context.summary,
+        "domains": list(context.domains),
+        "related_concepts": list(context.related_concepts),
+        "related_tables": [
+            table.to_dict() for table in context.related_tables
+        ],
+        "related_relationships": list(context.related_relationships),
+        "matching_claims": [
+            claim.to_dict() for claim in matching_claims
+        ],
+        "workflow_steps": workflow_steps,
+        "caveats": list(context.caveats),
+    }
 
 
 def _search_match(

@@ -114,6 +114,17 @@ filterable by profile, either endpoint table, directional source or target
 table, and relationship kind; results are sorted deterministically by ID.
 These APIs do not alter existing feature lookup or search result shapes.
 
+Context lookup accepts a stable context ID and returns the complete context
+plus a deduplicated map of every cited source. Context search is independently
+filterable by kind, scope, profile, domain, related concept, related table,
+related relationship, claim status, and source. Text search covers context
+navigation fields, claim text and caveats, and source titles, but not raw source
+locators. A profile filter matches only contexts that explicitly declare that
+profile; profile-independent context is not silently treated as universal.
+Search results contain only the claims that matched claim-level filters or
+text, along with their source details. Workflow stages are trimmed to those
+matching claims so returned references remain internally resolvable.
+
 Search scans the in-memory catalog linearly. It considers concept IDs, physical
 names, labels, definitions, search terms, facets, caveats, and vocabulary
 meanings. A small prompt-word stoplist plus weighted token overlap makes short

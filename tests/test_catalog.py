@@ -688,6 +688,170 @@ class CatalogQueryTests(unittest.TestCase):
             )
         )
 
+    def test_gets_context_with_cited_source_details(self) -> None:
+        result = self.catalog.get_context(
+            "open-v2.density-interpretation"
+        )
+
+        self.assertEqual(result["kind"], "context")
+        self.assertEqual(
+            result["identifier"], "open-v2.density-interpretation"
+        )
+        self.assertEqual(
+            result["context"]["claims"][0]["id"], "coded-feature"
+        )
+        self.assertEqual(
+            set(result["sources"]), {"open-v2.release-schema"}
+        )
+        self.assertEqual(
+            result["sources"]["open-v2.release-schema"]["kind"],
+            "release_schema",
+        )
+
+    def test_context_results_are_mutation_isolated(self) -> None:
+        first = self.catalog.get_context(
+            "open-v2.density-interpretation"
+        )
+        first["context"]["claims"][0]["statement"] = "Changed"
+        first["sources"]["open-v2.release-schema"]["title"] = "Changed"
+
+        second = self.catalog.get_context(
+            "open-v2.density-interpretation"
+        )
+        self.assertIn(
+            "synthetic density field",
+            second["context"]["claims"][0]["statement"],
+        )
+        self.assertEqual(
+            second["sources"]["open-v2.release-schema"]["title"],
+            "Synthetic open-v2 release schema",
+        )
+
+    def test_searches_context_text_and_returns_matching_claim_sources(
+        self,
+    ) -> None:
+        result = self.catalog.search_contexts("coded exam feature")
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(
+            result["matches"][0]["identifier"],
+            "open-v2.density-interpretation",
+        )
+        self.assertEqual(
+            [
+                claim["id"]
+                for claim in result["matches"][0]["matching_claims"]
+            ],
+            ["coded-feature"],
+        )
+        self.assertEqual(
+            set(result["sources"]), {"open-v2.release-schema"}
+        )
+
+    def test_searches_contexts_with_every_filter(self) -> None:
+        result = self.catalog.search_contexts(
+            "",
+            kind="interpretation_guardrail",
+            scope="profile_specific",
+            profile="open-v2",
+            domain="mammography",
+            concept="exam.tissue_density",
+            table="exam_level_anon",
+            status="verified",
+            source="open-v2.release-schema",
+            limit=1,
+        )
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(
+            result["matches"][0]["identifier"],
+            "open-v2.density-interpretation",
+        )
+        self.assertEqual(
+            result["filters"],
+            {
+                "kind": "interpretation_guardrail",
+                "scope": "profile_specific",
+                "profile": "open-v2",
+                "domain": "mammography",
+                "concept": "exam.tissue_density",
+                "table": "exam_level_anon",
+                "relationship": None,
+                "status": "verified",
+                "source": "open-v2.release-schema",
+            },
+        )
+
+    def test_context_search_returns_only_matching_claims(self) -> None:
+        data = synthetic_catalog()
+        context = data["contexts"]["open-v2.density-interpretation"]
+        context["claims"].append(
+            {
+                "id": "unresolved-units",
+                "statement": "Synthetic unit semantics remain unresolved.",
+                "status": "unresolved",
+                "sources": ["open-v2.release-schema"],
+                "caveats": ["No unit is asserted."],
+            }
+        )
+        catalog = load_catalog(
+            write_catalog(
+                Path(self.temporary.name) / "claim-filter.json",
+                data,
+            )
+        )
+
+        by_text = catalog.search_contexts("unit semantics")
+        self.assertEqual(
+            [
+                claim["id"]
+                for claim in by_text["matches"][0]["matching_claims"]
+            ],
+            ["unresolved-units"],
+        )
+
+        by_status = catalog.search_contexts("", status="verified")
+        self.assertEqual(
+            [
+                claim["id"]
+                for claim in by_status["matches"][0]["matching_claims"]
+            ],
+            ["coded-feature"],
+        )
+
+    def test_context_queries_validate_inputs_and_report_missing(self) -> None:
+        with self.assertRaises(CatalogNotFoundError):
+            self.catalog.get_context("missing.context")
+        with self.assertRaises(CatalogValidationError):
+            self.catalog.get_context(" ")
+        with self.assertRaises(CatalogValidationError):
+            self.catalog.search_contexts("")
+        with self.assertRaisesRegex(CatalogValidationError, "unknown kind"):
+            self.catalog.search_contexts("", kind="workflow")
+        with self.assertRaisesRegex(CatalogValidationError, "unknown concept"):
+            self.catalog.search_contexts("", concept="missing.concept")
+        with self.assertRaisesRegex(
+            CatalogValidationError, "unknown relationship"
+        ):
+            self.catalog.search_contexts(
+                "", relationship="missing.relationship"
+            )
+        with self.assertRaisesRegex(CatalogValidationError, "unknown source"):
+            self.catalog.search_contexts("", source="missing.source")
+        with self.assertRaisesRegex(
+            CatalogValidationError, "must not contain ':'"
+        ):
+            self.catalog.search_contexts(
+                "", table="open-v2:exam_level_anon"
+            )
+        with self.assertRaisesRegex(CatalogValidationError, "limit"):
+            self.catalog.search_contexts("density", limit=0)
+        filtered_punctuation = self.catalog.search_contexts(
+            "...", domain="mammography"
+        )
+        self.assertEqual(filtered_punctuation["total"], 1)
+
     def relationship_catalog(self):
         data = synthetic_catalog()
         data["relationships"] = [
