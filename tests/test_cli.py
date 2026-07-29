@@ -152,12 +152,13 @@ class CatalogCLITests(unittest.TestCase):
             },
         )
 
-    def test_validate_text_includes_phase_two_counts(self) -> None:
+    def test_validate_text_includes_structural_and_context_counts(self) -> None:
         status, stdout, stderr = self.run_cli("validate")
 
         self.assertEqual(status, 0)
         self.assertEqual(stderr, "")
         self.assertIn("2 tables, 1 relationship", stdout)
+        self.assertIn("1 source, 1 context", stdout)
 
     def test_get_text_is_concise(self) -> None:
         status, stdout, stderr = self.run_cli(

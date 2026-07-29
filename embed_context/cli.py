@@ -235,7 +235,11 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
             f"{data['vocabularies']} vocabularies, "
             f"{data['tables']} tables, "
             f"{data['relationships']} "
-            f"{'relationship' if data['relationships'] == 1 else 'relationships'}"
+            f"{'relationship' if data['relationships'] == 1 else 'relationships'}, "
+            f"{data['sources']} "
+            f"{'source' if data['sources'] == 1 else 'sources'}, "
+            f"{data['contexts']} "
+            f"{'context' if data['contexts'] == 1 else 'contexts'}"
         )
     if command == "get":
         concept = data["concept"]

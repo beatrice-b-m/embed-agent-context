@@ -102,7 +102,8 @@ join, construct a cohort, derive an outcome, or prescribe care.
 Run `python -m embed_context --help` or a subcommand's `--help` for the complete
 filter surface. `--format json validate` also returns the controlled grains,
 domains, feature kinds, context facets, source kinds, and claim statuses for
-programmatic discovery.
+programmatic discovery. The text validation summary reports both structural
+and context/source inventory counts.
 
 ## Stdio MCP server
 
