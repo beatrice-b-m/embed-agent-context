@@ -17,7 +17,7 @@ from typing import Any
 
 
 SCHEMA_REFERENCE = "./catalog.schema.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 GRAINS = (
     "patient",
     "exam",
@@ -74,6 +74,14 @@ VOCABULARY_COMPLETENESS = frozenset({"unknown", "open", "closed"})
 VOCABULARY_PARSING = frozenset(
     {"atomic", "comma_composed_undocumented", "shared_slot_dictionary"}
 )
+KEY_KINDS = frozenset({"natural", "technical"})
+KEY_UNIQUENESS = frozenset({"unique", "not_unique", "unknown"})
+KEY_COMPLETENESS = frozenset({"complete", "incomplete", "unknown"})
+RELATIONSHIP_KINDS = frozenset({"hierarchy", "reference", "projection"})
+ENDPOINT_COMPLETENESS = frozenset({"required", "optional", "unknown"})
+CARDINALITY_VALUES = frozenset(
+    {"exactly_one", "zero_or_one", "one_or_more", "zero_or_more", "unknown"}
+)
 
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]*$")
 _TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
@@ -110,6 +118,8 @@ _TOP_LEVEL_KEYS = frozenset(
         "concepts",
         "bindings",
         "vocabularies",
+        "tables",
+        "relationships",
     }
 )
 _CONCEPT_KEYS = frozenset(
@@ -145,6 +155,36 @@ _VOCABULARY_KEYS = frozenset(
     {"label", "completeness", "parsing", "evidence", "caveats", "codes"}
 )
 _VOCABULARY_REQUIRED_KEYS = _VOCABULARY_KEYS - {"caveats"}
+_TABLE_KEYS = frozenset({"profile", "table", "grain", "keys", "caveats"})
+_KEY_KEYS = frozenset(
+    {
+        "id",
+        "columns",
+        "kind",
+        "uniqueness",
+        "completeness",
+        "evidence",
+        "caveats",
+    }
+)
+_RELATIONSHIP_KEYS = frozenset(
+    {
+        "id",
+        "profile",
+        "kind",
+        "source",
+        "target",
+        "cardinality",
+        "evidence",
+        "caveats",
+        "join_hazards",
+    }
+)
+_SOURCE_ENDPOINT_KEYS = frozenset({"table", "columns", "completeness"})
+_TARGET_ENDPOINT_KEYS = frozenset({"table", "columns"})
+_CARDINALITY_KEYS = frozenset(
+    {"targets_per_source", "sources_per_target"}
+)
 
 class CatalogError(Exception):
     """Base class for catalog failures safe to present to a caller."""
@@ -266,6 +306,105 @@ class Vocabulary:
 
 
 @dataclass(frozen=True, slots=True)
+class KeyCandidate:
+    """A documented candidate key or explicitly non-key column tuple."""
+
+    id: str
+    columns: tuple[str, ...]
+    kind: str
+    uniqueness: str
+    completeness: str
+    evidence: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "columns": list(self.columns),
+            "kind": self.kind,
+            "uniqueness": self.uniqueness,
+            "completeness": self.completeness,
+            "evidence": list(self.evidence),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class TableSpec:
+    """One profile-specific table grain and its documented key candidates."""
+
+    profile: str
+    table: str
+    grain: str
+    keys: tuple[KeyCandidate, ...]
+    caveats: tuple[str, ...]
+
+    @property
+    def identifier(self) -> str:
+        return f"{self.profile}:{self.table}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "identifier": self.identifier,
+            "profile": self.profile,
+            "table": self.table,
+            "grain": self.grain,
+            "keys": [key.to_dict() for key in self.keys],
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RelationshipEndpoint:
+    """One ordered physical-column endpoint in a table relationship."""
+
+    table: str
+    columns: tuple[str, ...]
+    completeness: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "table": self.table,
+            "columns": list(self.columns),
+        }
+        if self.completeness is not None:
+            result["completeness"] = self.completeness
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class Relationship:
+    """A count-free, profile-scoped linkage claim between physical tables."""
+
+    id: str
+    profile: str
+    kind: str
+    source: RelationshipEndpoint
+    target: RelationshipEndpoint
+    targets_per_source: str
+    sources_per_target: str
+    evidence: tuple[str, ...]
+    caveats: tuple[str, ...]
+    join_hazards: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "profile": self.profile,
+            "kind": self.kind,
+            "source": self.source.to_dict(),
+            "target": self.target.to_dict(),
+            "cardinality": {
+                "targets_per_source": self.targets_per_source,
+                "sources_per_target": self.sources_per_target,
+            },
+            "evidence": list(self.evidence),
+            "caveats": list(self.caveats),
+            "join_hazards": list(self.join_hazards),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class _BindingSearchDocument:
     binding: Binding
     identifier_text: str
@@ -293,6 +432,10 @@ class Catalog:
         "_concepts",
         "_bindings",
         "_vocabularies",
+        "_tables",
+        "_relationships",
+        "_tables_by_qualified",
+        "_relationships_by_id",
         "_by_physical",
         "_by_qualified",
         "_bindings_by_concept",
@@ -308,6 +451,8 @@ class Catalog:
         concepts: Mapping[str, Concept],
         bindings: tuple[Binding, ...],
         vocabularies: Mapping[str, Vocabulary],
+        tables: tuple[TableSpec, ...],
+        relationships: tuple[Relationship, ...],
     ) -> None:
         object.__setattr__(self, "_schema_version", schema_version)
         object.__setattr__(self, "_profiles", profiles)
@@ -319,6 +464,20 @@ class Catalog:
             self,
             "_vocabularies",
             MappingProxyType(dict(sorted(vocabularies.items()))),
+        )
+        object.__setattr__(self, "_tables", tables)
+        object.__setattr__(self, "_relationships", relationships)
+        object.__setattr__(
+            self,
+            "_tables_by_qualified",
+            MappingProxyType({table.identifier: table for table in tables}),
+        )
+        object.__setattr__(
+            self,
+            "_relationships_by_id",
+            MappingProxyType(
+                {relationship.id: relationship for relationship in relationships}
+            ),
         )
 
         physical_groups: defaultdict[str, list[Binding]] = defaultdict(list)
@@ -389,6 +548,14 @@ class Catalog:
     def vocabularies(self) -> Mapping[str, Vocabulary]:
         return self._vocabularies
 
+    @property
+    def tables(self) -> tuple[TableSpec, ...]:
+        return self._tables
+
+    @property
+    def relationships(self) -> tuple[Relationship, ...]:
+        return self._relationships
+
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> Catalog:
         """Validate an already-decoded mapping and freeze its contents."""
@@ -444,6 +611,20 @@ class Catalog:
         bindings = [
             _parse_binding(raw, index, frozenset(profiles))
             for index, raw in enumerate(raw_bindings)
+        ]
+        raw_tables = _expect_list(data["tables"], "$.tables")
+        if not raw_tables:
+            raise CatalogValidationError("$.tables must not be empty")
+        tables = [
+            _parse_table(raw, index, frozenset(profiles))
+            for index, raw in enumerate(raw_tables)
+        ]
+        raw_relationships = _expect_list(
+            data["relationships"], "$.relationships"
+        )
+        relationships = [
+            _parse_relationship(raw, index, frozenset(profiles))
+            for index, raw in enumerate(raw_relationships)
         ]
 
         for concept in concepts.values():
@@ -507,6 +688,71 @@ class Catalog:
                 + ", ".join(vocabulary_collisions)
             )
 
+        bindings_by_table: defaultdict[
+            tuple[str, str], dict[str, Binding]
+        ] = defaultdict(dict)
+        grains_by_table: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
+        for binding in bindings:
+            table_key = (binding.profile, binding.table)
+            bindings_by_table[table_key][binding.column] = binding
+            grains_by_table[table_key].add(binding.grain)
+
+        table_specs: dict[tuple[str, str], TableSpec] = {}
+        for table in tables:
+            table_key = (table.profile, table.table)
+            if table_key in table_specs:
+                raise CatalogValidationError(
+                    f"duplicate table specification {table.identifier!r}"
+                )
+            table_specs[table_key] = table
+            columns = bindings_by_table.get(table_key)
+            if columns is None:
+                raise CatalogValidationError(
+                    f"table specification {table.identifier!r} has no bindings"
+                )
+            binding_grains = grains_by_table[table_key]
+            if binding_grains != {table.grain}:
+                raise CatalogValidationError(
+                    f"table specification {table.identifier!r} grain "
+                    f"{table.grain!r} does not match binding grains "
+                    f"{sorted(binding_grains)!r}"
+                )
+            seen_key_ids: set[str] = set()
+            for key in table.keys:
+                if key.id in seen_key_ids:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} has duplicate key ID "
+                        f"{key.id!r}"
+                    )
+                seen_key_ids.add(key.id)
+                missing_columns = sorted(set(key.columns) - set(columns))
+                if missing_columns:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} key {key.id!r} references "
+                        "unknown columns: " + ", ".join(missing_columns)
+                    )
+
+        missing_table_specs = sorted(set(bindings_by_table) - set(table_specs))
+        if missing_table_specs:
+            formatted = ", ".join(
+                f"{profile}:{table}" for profile, table in missing_table_specs
+            )
+            raise CatalogValidationError(
+                "physical tables have no table specification: " + formatted
+            )
+
+        relationship_ids: set[str] = set()
+        for relationship in relationships:
+            if relationship.id in relationship_ids:
+                raise CatalogValidationError(
+                    f"duplicate relationship ID {relationship.id!r}"
+                )
+            relationship_ids.add(relationship.id)
+            _validate_relationship(
+                relationship, bindings_by_table, table_specs
+            )
+        _validate_hierarchy_acyclic(relationships)
+
         ordered_bindings = tuple(
             sorted(
                 bindings,
@@ -524,6 +770,12 @@ class Catalog:
             concepts=concepts,
             bindings=ordered_bindings,
             vocabularies=vocabularies,
+            tables=tuple(
+                sorted(tables, key=lambda item: (item.profile, item.table))
+            ),
+            relationships=tuple(
+                sorted(relationships, key=lambda item: item.id)
+            ),
         )
 
     def summary(self) -> dict[str, Any]:
@@ -536,6 +788,8 @@ class Catalog:
             "concepts": len(self.concepts),
             "bindings": len(self.bindings),
             "vocabularies": len(self.vocabularies),
+            "tables": len(self.tables),
+            "relationships": len(self.relationships),
         }
 
     def get_feature(
@@ -1070,6 +1324,236 @@ def _parse_vocabulary(vocabulary_id: str, value: object) -> Vocabulary:
     )
 
 
+def _parse_table(
+    value: object, index: int, profiles: frozenset[str]
+) -> TableSpec:
+    path = f"$.tables[{index}]"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _TABLE_KEYS, _TABLE_KEYS, path)
+    profile = _controlled_identifier(
+        data["profile"], f"{path}.profile", profiles
+    )
+    grain = _controlled_string(data["grain"], f"{path}.grain", GRAINS)
+    raw_keys = _expect_list(data["keys"], f"{path}.keys")
+    keys = tuple(
+        _parse_key(raw_key, f"{path}.keys[{key_index}]")
+        for key_index, raw_key in enumerate(raw_keys)
+    )
+    return TableSpec(
+        profile=profile,
+        table=_physical_component(data["table"], f"{path}.table"),
+        grain=grain,
+        keys=keys,
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_key(value: object, path: str) -> KeyCandidate:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _KEY_KEYS, _KEY_KEYS, path)
+    key_id = _nonempty_string(data["id"], f"{path}.id")
+    _require_identifier(key_id, f"{path}.id")
+    return KeyCandidate(
+        id=key_id,
+        columns=_physical_component_array(
+            data["columns"], f"{path}.columns"
+        ),
+        kind=_controlled_string(
+            data["kind"], f"{path}.kind", KEY_KINDS
+        ),
+        uniqueness=_controlled_string(
+            data["uniqueness"],
+            f"{path}.uniqueness",
+            KEY_UNIQUENESS,
+        ),
+        completeness=_controlled_string(
+            data["completeness"],
+            f"{path}.completeness",
+            KEY_COMPLETENESS,
+        ),
+        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_relationship(
+    value: object, index: int, profiles: frozenset[str]
+) -> Relationship:
+    path = f"$.relationships[{index}]"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _RELATIONSHIP_KEYS, _RELATIONSHIP_KEYS, path
+    )
+    relationship_id = _nonempty_string(data["id"], f"{path}.id")
+    _require_identifier(relationship_id, f"{path}.id")
+    profile = _controlled_identifier(
+        data["profile"], f"{path}.profile", profiles
+    )
+    cardinality = _expect_mapping(
+        data["cardinality"], f"{path}.cardinality"
+    )
+    _require_exact_keys(
+        cardinality,
+        _CARDINALITY_KEYS,
+        _CARDINALITY_KEYS,
+        f"{path}.cardinality",
+    )
+    return Relationship(
+        id=relationship_id,
+        profile=profile,
+        kind=_controlled_string(
+            data["kind"], f"{path}.kind", RELATIONSHIP_KINDS
+        ),
+        source=_parse_source_endpoint(
+            data["source"], f"{path}.source"
+        ),
+        target=_parse_target_endpoint(
+            data["target"], f"{path}.target"
+        ),
+        targets_per_source=_controlled_string(
+            cardinality["targets_per_source"],
+            f"{path}.cardinality.targets_per_source",
+            CARDINALITY_VALUES,
+        ),
+        sources_per_target=_controlled_string(
+            cardinality["sources_per_target"],
+            f"{path}.cardinality.sources_per_target",
+            CARDINALITY_VALUES,
+        ),
+        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+        join_hazards=_string_array(
+            data["join_hazards"], f"{path}.join_hazards"
+        ),
+    )
+
+
+def _parse_source_endpoint(
+    value: object, path: str
+) -> RelationshipEndpoint:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _SOURCE_ENDPOINT_KEYS, _SOURCE_ENDPOINT_KEYS, path
+    )
+    return RelationshipEndpoint(
+        table=_physical_component(data["table"], f"{path}.table"),
+        columns=_physical_component_array(
+            data["columns"], f"{path}.columns"
+        ),
+        completeness=_controlled_string(
+            data["completeness"],
+            f"{path}.completeness",
+            ENDPOINT_COMPLETENESS,
+        ),
+    )
+
+
+def _parse_target_endpoint(
+    value: object, path: str
+) -> RelationshipEndpoint:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _TARGET_ENDPOINT_KEYS, _TARGET_ENDPOINT_KEYS, path
+    )
+    return RelationshipEndpoint(
+        table=_physical_component(data["table"], f"{path}.table"),
+        columns=_physical_component_array(
+            data["columns"], f"{path}.columns"
+        ),
+    )
+
+
+def _validate_relationship(
+    relationship: Relationship,
+    bindings_by_table: Mapping[tuple[str, str], Mapping[str, Binding]],
+    table_specs: Mapping[tuple[str, str], TableSpec],
+) -> None:
+    source_key = (relationship.profile, relationship.source.table)
+    target_key = (relationship.profile, relationship.target.table)
+    source_columns = bindings_by_table.get(source_key)
+    target_columns = bindings_by_table.get(target_key)
+    if source_columns is None:
+        raise CatalogValidationError(
+            f"relationship {relationship.id!r} references unknown source "
+            f"table {relationship.profile}:{relationship.source.table}"
+        )
+    if target_columns is None:
+        raise CatalogValidationError(
+            f"relationship {relationship.id!r} references unknown target "
+            f"table {relationship.profile}:{relationship.target.table}"
+        )
+    if len(relationship.source.columns) != len(relationship.target.columns):
+        raise CatalogValidationError(
+            f"relationship {relationship.id!r} endpoint column tuples must "
+            "have equal length"
+        )
+    for endpoint_name, columns, available in (
+        ("source", relationship.source.columns, source_columns),
+        ("target", relationship.target.columns, target_columns),
+    ):
+        missing = sorted(set(columns) - set(available))
+        if missing:
+            raise CatalogValidationError(
+                f"relationship {relationship.id!r} {endpoint_name} references "
+                "unknown columns: " + ", ".join(missing)
+            )
+    for source_column, target_column in zip(
+        relationship.source.columns, relationship.target.columns, strict=True
+    ):
+        source_type = source_columns[source_column].physical_type
+        target_type = target_columns[target_column].physical_type
+        if source_type != target_type:
+            raise CatalogValidationError(
+                f"relationship {relationship.id!r} has incompatible physical "
+                f"types for {source_column!r} and {target_column!r}: "
+                f"{source_type!r} != {target_type!r}"
+            )
+    if relationship.targets_per_source in {"exactly_one", "zero_or_one"}:
+        target = table_specs[target_key]
+        if not any(
+            key.columns == relationship.target.columns
+            and key.uniqueness == "unique"
+            for key in target.keys
+        ):
+            raise CatalogValidationError(
+                f"relationship {relationship.id!r} claims at most one target "
+                "but its target columns are not a documented unique key"
+            )
+
+
+def _validate_hierarchy_acyclic(
+    relationships: Sequence[Relationship],
+) -> None:
+    graph: defaultdict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
+    nodes: set[tuple[str, str]] = set()
+    for relationship in relationships:
+        if relationship.kind != "hierarchy":
+            continue
+        source = (relationship.profile, relationship.source.table)
+        target = (relationship.profile, relationship.target.table)
+        graph[source].add(target)
+        nodes.update((source, target))
+
+    visiting: set[tuple[str, str]] = set()
+    visited: set[tuple[str, str]] = set()
+
+    def visit(node: tuple[str, str]) -> None:
+        if node in visited:
+            return
+        if node in visiting:
+            raise CatalogValidationError(
+                "hierarchy relationships must be acyclic"
+            )
+        visiting.add(node)
+        for target in graph.get(node, ()):
+            visit(target)
+        visiting.remove(node)
+        visited.add(node)
+
+    for node in sorted(nodes):
+        visit(node)
+
+
 def _expect_mapping(value: object, path: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise CatalogValidationError(f"{path} must be an object")
@@ -1120,6 +1604,46 @@ def _physical_component(value: object, path: str) -> str:
             f"{path} must not contain ':' because it separates profiles"
         )
     return component
+
+
+def _physical_component_array(
+    value: object, path: str
+) -> tuple[str, ...]:
+    items = _expect_list(value, path)
+    if not items:
+        raise CatalogValidationError(
+            f"{path} must contain at least 1 item(s)"
+        )
+    parsed = tuple(
+        _physical_component(item, f"{path}[{index}]")
+        for index, item in enumerate(items)
+    )
+    if len(set(parsed)) != len(parsed):
+        raise CatalogValidationError(f"{path} must contain unique values")
+    return parsed
+
+
+def _controlled_string(
+    value: object, path: str, allowed: Sequence[str] | frozenset[str]
+) -> str:
+    parsed = _nonempty_string(value, path)
+    if parsed not in allowed:
+        raise CatalogValidationError(
+            f"{path} has unknown value {parsed!r}"
+        )
+    return parsed
+
+
+def _controlled_identifier(
+    value: object, path: str, allowed: Sequence[str] | frozenset[str]
+) -> str:
+    parsed = _nonempty_string(value, path)
+    _require_identifier(parsed, path)
+    if parsed not in allowed:
+        raise CatalogValidationError(
+            f"{path} references unknown value {parsed!r}"
+        )
+    return parsed
 
 
 def _string_array(

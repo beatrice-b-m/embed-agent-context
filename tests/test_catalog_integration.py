@@ -9,10 +9,16 @@ from pathlib import Path
 from embed_context import load_catalog
 from embed_context.catalog import (
     BINDING_PARAMETER_KEYS,
+    CARDINALITY_VALUES,
     DOMAINS,
+    ENDPOINT_COMPLETENESS,
     EVIDENCE_VALUES,
     FEATURE_KINDS,
     GRAINS,
+    KEY_COMPLETENESS,
+    KEY_KINDS,
+    KEY_UNIQUENESS,
+    RELATIONSHIP_KINDS,
     ROLES,
     VOCABULARY_COMPLETENESS,
     VOCABULARY_PARSING,
@@ -180,6 +186,34 @@ class CheckedInCatalogTests(unittest.TestCase):
                 definitions["vocabulary"]["properties"]["parsing"]["enum"]
             ),
             VOCABULARY_PARSING,
+        )
+        self.assertEqual(
+            set(definitions["key"]["properties"]["kind"]["enum"]),
+            KEY_KINDS,
+        )
+        self.assertEqual(
+            set(definitions["key"]["properties"]["uniqueness"]["enum"]),
+            KEY_UNIQUENESS,
+        )
+        self.assertEqual(
+            set(definitions["key"]["properties"]["completeness"]["enum"]),
+            KEY_COMPLETENESS,
+        )
+        self.assertEqual(
+            set(definitions["relationship"]["properties"]["kind"]["enum"]),
+            RELATIONSHIP_KINDS,
+        )
+        self.assertEqual(
+            set(
+                definitions["source_endpoint"]["properties"][
+                    "completeness"
+                ]["enum"]
+            ),
+            ENDPOINT_COMPLETENESS,
+        )
+        self.assertEqual(
+            set(definitions["cardinality_value"]["enum"]),
+            CARDINALITY_VALUES,
         )
         for definition, allowed, required in (
             ("concept", _CONCEPT_KEYS, _CONCEPT_REQUIRED_KEYS),

@@ -43,7 +43,7 @@ class CatalogCLITests(unittest.TestCase):
         self.assertEqual(
             envelope["data"],
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "profiles": ["open-v2"],
                 "grains": [
                     "patient",
@@ -88,6 +88,8 @@ class CatalogCLITests(unittest.TestCase):
                 "concepts": 2,
                 "bindings": 3,
                 "vocabularies": 1,
+                "tables": 2,
+                "relationships": 0,
             },
         )
 

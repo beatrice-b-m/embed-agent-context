@@ -12,7 +12,7 @@ from embed_context.catalog import DOMAINS, FEATURE_KINDS, GRAINS
 def synthetic_catalog() -> dict[str, Any]:
     return {
         "$schema": "./catalog.schema.json",
-        "schema_version": 1,
+        "schema_version": 2,
         "profiles": ["open-v2"],
         "grains": list(GRAINS),
         "feature_kinds": list(FEATURE_KINDS),
@@ -84,6 +84,33 @@ def synthetic_catalog() -> dict[str, Any]:
                 },
             }
         },
+        "tables": [
+            {
+                "profile": "open-v2",
+                "table": "combined_anon",
+                "grain": "wide_row",
+                "keys": [],
+                "caveats": ["Synthetic wide table has no declared key."],
+            },
+            {
+                "profile": "open-v2",
+                "table": "exam_level_anon",
+                "grain": "exam",
+                "keys": [
+                    {
+                        "id": "exam.accession",
+                        "columns": ["acc_anon"],
+                        "kind": "natural",
+                        "uniqueness": "unique",
+                        "completeness": "complete",
+                        "evidence": ["cross_table_check"],
+                        "caveats": [],
+                    }
+                ],
+                "caveats": [],
+            },
+        ],
+        "relationships": [],
     }
 
 

@@ -13,14 +13,16 @@
     "domains",
     "concepts",
     "bindings",
-    "vocabularies"
+    "vocabularies",
+    "tables",
+    "relationships"
   ],
   "properties": {
     "$schema": {
       "const": "./catalog.schema.json"
     },
     "schema_version": {
-      "const": 1
+      "const": 2
     },
     "profiles": {
       "type": "array",
@@ -102,6 +104,19 @@
         }
       },
       "additionalProperties": false
+    },
+    "tables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/table"
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relationship"
+      }
     }
   },
   "$defs": {
@@ -344,6 +359,267 @@
             }
           },
           "additionalProperties": false
+        }
+      }
+    },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "columns",
+        "kind",
+        "uniqueness",
+        "completeness",
+        "evidence",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+          }
+        },
+        "kind": {
+          "enum": [
+            "natural",
+            "technical"
+          ]
+        },
+        "uniqueness": {
+          "enum": [
+            "unique",
+            "not_unique",
+            "unknown"
+          ]
+        },
+        "completeness": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "table",
+        "grain",
+        "keys",
+        "caveats"
+      ],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+        },
+        "grain": {
+          "enum": [
+            "patient",
+            "exam",
+            "breast_side",
+            "imaging_finding",
+            "pathology_finding",
+            "report",
+            "risk_assessment",
+            "wide_row"
+          ]
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/key"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "source_endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "columns",
+        "completeness"
+      ],
+      "properties": {
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+          }
+        },
+        "completeness": {
+          "enum": [
+            "required",
+            "optional",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "target_endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "columns"
+      ],
+      "properties": {
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+          }
+        }
+      }
+    },
+    "cardinality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targets_per_source",
+        "sources_per_target"
+      ],
+      "properties": {
+        "targets_per_source": {
+          "$ref": "#/$defs/cardinality_value"
+        },
+        "sources_per_target": {
+          "$ref": "#/$defs/cardinality_value"
+        }
+      }
+    },
+    "cardinality_value": {
+      "enum": [
+        "exactly_one",
+        "zero_or_one",
+        "one_or_more",
+        "zero_or_more",
+        "unknown"
+      ]
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "profile",
+        "kind",
+        "source",
+        "target",
+        "cardinality",
+        "evidence",
+        "caveats",
+        "join_hazards"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "profile": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "kind": {
+          "enum": [
+            "hierarchy",
+            "reference",
+            "projection"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/source_endpoint"
+        },
+        "target": {
+          "$ref": "#/$defs/target_endpoint"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/cardinality"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "join_hazards": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }

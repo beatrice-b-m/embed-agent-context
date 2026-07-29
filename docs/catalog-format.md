@@ -8,6 +8,10 @@ The catalog separates semantic knowledge from physical representation:
 concept ──< binding >── profile / table / column / grain
    │
    └──── optional vocabulary ── code → meaning
+
+profile / table ──< key candidate
+       │
+       └──── relationship ── profile / table
 ```
 
 This is intentionally a small registry rather than a generic knowledge graph.
@@ -45,6 +49,18 @@ an ontology engine, database, generated documentation, or probabilistic search.
 : Reusable code-to-meaning maps. Each vocabulary declares whether its code list
   is known to be closed and whether values are atomic, share a slot dictionary,
   or use an undocumented comma-composed representation.
+
+`tables`
+: Profile-specific table declarations. Each declaration fixes the table grain
+  and records natural or technical key candidates with explicit uniqueness,
+  completeness, evidence, and caveats. A candidate may be non-unique or
+  unresolved; its presence is not a database-constraint claim.
+
+`relationships`
+: Profile-scoped, directional linkage claims. Source and target endpoints use
+  ordered physical-column tuples. Relationship kind, source completeness,
+  cardinality in both directions, evidence, caveats, and join hazards remain
+  explicit and separate from semantic feature concepts.
 
 The authoritative field constraints are in
 [`catalog/catalog.schema.json`](../catalog/catalog.schema.json).
@@ -94,6 +110,23 @@ rules, and missing-value semantics belong in caveats.
 The catalog records no empirical distribution. See the count-free policy in
 [`project-scope.md`](project-scope.md).
 
+Relationship cardinality is qualitative and directional. It never records
+release row totals, match rates, orphan counts, or duplicate counts. Column
+nullability, source-endpoint completeness, and referential coverage are
+different claims and must not be substituted for one another.
+
+## Relationship validation
+
+Every table declaration and relationship endpoint must resolve to bindings in
+the same profile. Ordered endpoint tuples must have equal arity and compatible
+physical types. A relationship claiming at most one target must point to a
+candidate key documented as unique. Only hierarchy edges must be acyclic;
+reference and projection edges may legitimately form cycles.
+
+The default source-profile verifier remains footer-only. It verifies the
+physical table and column surface through bindings but does not scan clinical
+data to prove uniqueness, coverage, or cardinality.
+
 ## Adding a profile
 
 To support another EMBED variant:
@@ -121,3 +154,8 @@ alters required fields, field meaning, identifier resolution, or query
 semantics requires a version decision and migration note. Consumers must fail
 clearly on an unsupported schema version rather than silently interpreting it
 as the current format.
+
+Schema version 2 adds required `tables` and `relationships` collections.
+Version-1 consumers must upgrade before loading a version-2 catalog. Existing
+feature lookup, search, and code-lookup result shapes remain unchanged;
+linkage queries use separate APIs.

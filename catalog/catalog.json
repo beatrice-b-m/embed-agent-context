@@ -1,6 +1,6 @@
 {
   "$schema": "./catalog.schema.json",
-  "schema_version": 1,
+  "schema_version": 2,
   "profiles": [
     "open-v2"
   ],
@@ -6786,5 +6786,64 @@
         "R": "rim vascularity"
       }
     }
-  }
+  },
+  "tables": [
+    {
+      "profile": "open-v2",
+      "table": "combined_anon",
+      "grain": "wide_row",
+      "keys": [],
+      "caveats": []
+    },
+    {
+      "profile": "open-v2",
+      "table": "exam_level_anon",
+      "grain": "exam",
+      "keys": [],
+      "caveats": []
+    },
+    {
+      "profile": "open-v2",
+      "table": "imaging_findings_anon",
+      "grain": "imaging_finding",
+      "keys": [],
+      "caveats": []
+    },
+    {
+      "profile": "open-v2",
+      "table": "pathology_findings_anon",
+      "grain": "pathology_finding",
+      "keys": [],
+      "caveats": []
+    },
+    {
+      "profile": "open-v2",
+      "table": "patients_anon",
+      "grain": "patient",
+      "keys": [],
+      "caveats": []
+    },
+    {
+      "profile": "open-v2",
+      "table": "reports_anon",
+      "grain": "report",
+      "keys": [],
+      "caveats": []
+    },
+    {
+      "profile": "open-v2",
+      "table": "risk_anon",
+      "grain": "risk_assessment",
+      "keys": [],
+      "caveats": []
+    },
+    {
+      "profile": "open-v2",
+      "table": "side_level_anon",
+      "grain": "breast_side",
+      "keys": [],
+      "caveats": []
+    }
+  ],
+  "relationships": []
 }

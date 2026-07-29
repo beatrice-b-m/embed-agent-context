@@ -93,8 +93,9 @@ where each concept occurs in a profile.
 
 ### 2. Table linkages
 
-Future work should describe keys, optional relationships, hierarchy edges,
-cardinality expectations, and join hazards. Relationship claims should be
+Implemented as a structured, profile-scoped layer for table grains, key
+candidates, optional relationships, hierarchy edges, cardinality expectations,
+and join hazards. Relationship claims are
 structured separately from feature concepts and must not smuggle
 release-specific counts into the feature catalog.
 

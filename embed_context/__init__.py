@@ -9,6 +9,10 @@ from .catalog import (
     CatalogNotFoundError,
     CatalogValidationError,
     Concept,
+    KeyCandidate,
+    Relationship,
+    RelationshipEndpoint,
+    TableSpec,
     Vocabulary,
     load_catalog,
 )
@@ -22,6 +26,10 @@ __all__ = [
     "CatalogNotFoundError",
     "CatalogValidationError",
     "Concept",
+    "KeyCandidate",
+    "Relationship",
+    "RelationshipEndpoint",
+    "TableSpec",
     "Vocabulary",
     "load_catalog",
 ]

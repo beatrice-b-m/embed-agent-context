@@ -63,7 +63,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
             json.dumps(
                 {
                     "$schema": "./catalog.schema.json",
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "profiles": profiles or ["sample"],
                     "grains": list(GRAINS),
                     "feature_kinds": list(FEATURE_KINDS),
@@ -81,6 +81,24 @@ class SourceProfileVerifierTests(unittest.TestCase):
                     },
                     "bindings": bindings,
                     "vocabularies": {},
+                    "tables": [
+                        {
+                            "profile": profile,
+                            "table": table,
+                            "grain": "exam",
+                            "keys": [],
+                            "caveats": [],
+                        }
+                        for profile in (profiles or ["sample"])
+                        for table in sorted(
+                            {
+                                binding["table"]
+                                for binding in bindings
+                                if binding["profile"] == profile
+                            }
+                        )
+                    ],
+                    "relationships": [],
                 }
             ),
             encoding="utf-8",

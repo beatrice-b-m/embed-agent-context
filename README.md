@@ -14,7 +14,8 @@ turning one release's measurements into apparent contracts.
 ## Repository layout
 
 - [`catalog/catalog.json`](catalog/catalog.json) — the canonical feature
-  concepts, physical bindings, facets, and code vocabularies.
+  concepts, physical bindings, code vocabularies, table keys, and linkage
+  claims.
 - [`catalog/catalog.schema.json`](catalog/catalog.schema.json) — the versioned
   JSON Schema for the catalog.
 - `embed_context/` — the dependency-free query core and command-line interface,
@@ -37,9 +38,9 @@ bindings. Finding-level flags remain distinct from side- and exam-level
 aggregates because those levels carry different meanings. Repeated physical
 projections, including the wide table, do not duplicate semantic definitions.
 
-The query CLI and optional MCP adapter expose the same validated in-memory
-catalog. Full relationship/cardinality specifications and broader clinical
-workflow context remain later phases.
+The version-2 catalog also has a separate profile-scoped structure for table
+grains, candidate keys, relationships, cardinality expectations, and join
+hazards. Broader clinical workflow context remains a later phase.
 
 ## Command-line queries
 

@@ -32,7 +32,7 @@ class CatalogLoaderTests(unittest.TestCase):
     def test_loads_and_freezes_synthetic_catalog(self) -> None:
         catalog = self.load()
 
-        self.assertEqual(catalog.schema_version, 1)
+        self.assertEqual(catalog.schema_version, 2)
         self.assertEqual(catalog.profiles, ("open-v2",))
         self.assertEqual(len(catalog.concepts), 2)
         self.assertEqual(len(catalog.bindings), 3)
@@ -42,13 +42,108 @@ class CatalogLoaderTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             catalog.bindings[0].profile = "changed"
         with self.assertRaises(AttributeError):
-            catalog._schema_version = 2
+            catalog._schema_version = 3
+
+    def test_loads_and_freezes_table_relationship_metadata(self) -> None:
+        data = synthetic_catalog()
+        data["relationships"] = [
+            {
+                "id": "synthetic.wide_density_projection",
+                "profile": "open-v2",
+                "kind": "projection",
+                "source": {
+                    "table": "combined_anon",
+                    "columns": ["tissueden"],
+                    "completeness": "optional",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["tissueden"],
+                },
+                "cardinality": {
+                    "targets_per_source": "unknown",
+                    "sources_per_target": "unknown",
+                },
+                "evidence": ["inference"],
+                "caveats": ["Synthetic relationship for contract tests."],
+                "join_hazards": ["Values are not established as equal."],
+            }
+        ]
+
+        catalog = self.load(data)
+
+        self.assertEqual(len(catalog.tables), 2)
+        self.assertEqual(len(catalog.relationships), 1)
+        self.assertEqual(
+            catalog.relationships[0].source.columns, ("tissueden",)
+        )
+        with self.assertRaises(FrozenInstanceError):
+            catalog.tables[0].grain = "exam"
+        with self.assertRaises(FrozenInstanceError):
+            catalog.relationships[0].kind = "reference"
+
+    def test_rejects_incomplete_table_and_relationship_contracts(self) -> None:
+        missing_table = synthetic_catalog()
+        missing_table["tables"].pop()
+        with self.assertRaisesRegex(
+            CatalogValidationError, "no table specification"
+        ):
+            self.load(missing_table)
+
+        unknown_key_column = synthetic_catalog()
+        unknown_key_column["tables"][1]["keys"][0]["columns"] = ["missing"]
+        with self.assertRaisesRegex(
+            CatalogValidationError, "references unknown columns"
+        ):
+            self.load(unknown_key_column)
+
+        bad_relationship = synthetic_catalog()
+        bad_relationship["relationships"] = [
+            {
+                "id": "synthetic.bad",
+                "profile": "open-v2",
+                "kind": "reference",
+                "source": {
+                    "table": "combined_anon",
+                    "columns": ["tissueden"],
+                    "completeness": "unknown",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["tissueden", "acc_anon"],
+                },
+                "cardinality": {
+                    "targets_per_source": "unknown",
+                    "sources_per_target": "unknown",
+                },
+                "evidence": ["unresolved"],
+                "caveats": [],
+                "join_hazards": [],
+            }
+        ]
+        with self.assertRaisesRegex(
+            CatalogValidationError, "equal length"
+        ):
+            self.load(bad_relationship)
+
+    def test_rejects_empirical_fields_in_linkage_objects(self) -> None:
+        for target in ("table", "key"):
+            with self.subTest(target=target):
+                data = synthetic_catalog()
+                if target == "table":
+                    data["tables"][0]["row_count"] = 10
+                else:
+                    data["tables"][1]["keys"][0]["duplicate_count"] = 10
+                with self.assertRaisesRegex(
+                    CatalogValidationError, "unexpected fields"
+                ):
+                    self.load(data)
 
     def test_rejects_duplicate_json_object_keys(self) -> None:
         serialized = json.dumps(synthetic_catalog())
         serialized = serialized.replace(
-            '"schema_version": 1',
-            '"schema_version": 1, "schema_version": 1',
+            '"schema_version": 2',
+            '"schema_version": 2, "schema_version": 2',
             1,
         )
         path = self.directory / "duplicate.json"
@@ -211,6 +306,10 @@ class CatalogLoaderTests(unittest.TestCase):
         future = copy.deepcopy(data["bindings"][0])
         future["profile"] = "future"
         data["bindings"].append(future)
+        future_table = copy.deepcopy(data["tables"][1])
+        future_table["profile"] = "future"
+        future_table["keys"] = []
+        data["tables"].append(future_table)
 
         catalog = self.load(data)
 
@@ -233,6 +332,10 @@ class CatalogLoaderTests(unittest.TestCase):
         future["profile"] = "future"
         future["concept"] = "identity.accession"
         data["bindings"].append(future)
+        future_table = copy.deepcopy(data["tables"][1])
+        future_table["profile"] = "future"
+        future_table["keys"] = []
+        data["tables"].append(future_table)
         catalog = self.load(data)
 
         with self.assertRaisesRegex(
@@ -431,6 +534,10 @@ class CatalogQueryTests(unittest.TestCase):
         future = copy.deepcopy(data["bindings"][0])
         future["profile"] = "future"
         data["bindings"].append(future)
+        future_table = copy.deepcopy(data["tables"][1])
+        future_table["profile"] = "future"
+        future_table["keys"] = []
+        data["tables"].append(future_table)
         catalog = load_catalog(
             write_catalog(
                 Path(self.temporary.name) / "profiles.json",
