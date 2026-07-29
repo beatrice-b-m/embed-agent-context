@@ -18,7 +18,8 @@ from .catalog import DOMAINS, FEATURE_KINDS, GRAINS, RELATIONSHIP_KINDS
 GrainFilter = Literal[*GRAINS]
 DomainFilter = Literal[*DOMAINS]
 FeatureKindFilter = Literal[*FEATURE_KINDS]
-RelationshipKindFilter = Literal[*RELATIONSHIP_KINDS]
+_RELATIONSHIP_KIND_VALUES = tuple(sorted(RELATIONSHIP_KINDS))
+RelationshipKindFilter = Literal[*_RELATIONSHIP_KIND_VALUES]
 
 
 MCP_INSTALL_HINT = (
@@ -142,7 +143,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
     relationship_filter_description = "; ".join(
         part
         for part in (
-            f"relationship kinds: {', '.join(sorted(RELATIONSHIP_KINDS))}",
+            f"relationship kinds: {', '.join(_RELATIONSHIP_KIND_VALUES)}",
             catalog_scope,
         )
         if part

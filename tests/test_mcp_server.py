@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import os
+import subprocess
+import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
@@ -160,6 +163,29 @@ class FakeCatalog:
         }
 
 
+class RelationshipKindSchemaStabilityTests(unittest.TestCase):
+    def test_kind_order_does_not_depend_on_python_hash_seed(self) -> None:
+        script = (
+            "from typing import get_args; "
+            "from embed_context.mcp_server import RelationshipKindFilter; "
+            "print(','.join(get_args(RelationshipKindFilter)))"
+        )
+        orders = set()
+        for seed in ("1", "2", "3"):
+            environment = dict(os.environ)
+            environment["PYTHONHASHSEED"] = seed
+            completed = subprocess.run(
+                [sys.executable, "-c", script],
+                check=True,
+                capture_output=True,
+                env=environment,
+                text=True,
+            )
+            orders.add(completed.stdout.strip())
+
+        self.assertEqual(orders, {"hierarchy,projection,reference"})
+
+
 class MissingMCPDependencyTests(unittest.TestCase):
     def test_module_entry_point_reports_missing_extra_on_stderr(self) -> None:
         stdout = io.StringIO()
@@ -294,8 +320,8 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         )
         relationship_properties = schemas["search_relationships"]["properties"]
         self.assertEqual(
-            schema_enums(relationship_properties["kind"]),
-            {"hierarchy", "reference", "projection"},
+            relationship_properties["kind"]["anyOf"][0]["enum"],
+            ["hierarchy", "projection", "reference"],
         )
 
     async def test_get_feature_returns_structured_content(self) -> None:
