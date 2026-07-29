@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -32,7 +31,7 @@ class CatalogProtocol(Protocol):
 
     def get_feature(
         self, identifier: str, *, include_codes: bool = False
-    ) -> Mapping[str, Any] | object: ...
+    ) -> dict[str, Any]: ...
 
     def search_features(
         self,
@@ -44,11 +43,11 @@ class CatalogProtocol(Protocol):
         domain: str | None = None,
         feature_kind: str | None = None,
         limit: int = 50,
-    ) -> Mapping[str, Any] | Sequence[Mapping[str, Any] | object]: ...
+    ) -> dict[str, Any]: ...
 
     def lookup_code(
         self, feature_or_vocabulary: str, code: str
-    ) -> Mapping[str, Any] | object: ...
+    ) -> dict[str, Any]: ...
 
 
 def _require_mcp() -> tuple[type[Any], type[Any]]:
@@ -58,36 +57,6 @@ def _require_mcp() -> tuple[type[Any], type[Any]]:
     except ImportError as exc:
         raise RuntimeError(MCP_INSTALL_HINT) from exc
     return MCPServer, ToolAnnotations
-
-
-def _structured_dict(value: object, *, operation: str) -> dict[str, Any]:
-    """Convert a core result to the JSON-object shape required by MCP."""
-
-    if isinstance(value, Mapping):
-        return dict(value)
-    to_dict = getattr(value, "to_dict", None)
-    if callable(to_dict):
-        converted = to_dict()
-        if isinstance(converted, Mapping):
-            return dict(converted)
-    if is_dataclass(value) and not isinstance(value, type):
-        return asdict(value)
-    raise TypeError(f"{operation} must return a mapping or serializable dataclass")
-
-
-def _search_result(value: object) -> dict[str, Any]:
-    if (
-        isinstance(value, Mapping)
-        or (is_dataclass(value) and not isinstance(value, type))
-        or callable(getattr(value, "to_dict", None))
-    ):
-        return _structured_dict(value, operation="search_features")
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        matches = [
-            _structured_dict(item, operation="search_features") for item in value
-        ]
-        return {"matches": matches, "count": len(matches)}
-    raise TypeError("search_features must return a mapping or sequence of records")
 
 
 def _catalog_filter_description(catalog: CatalogProtocol) -> str:
@@ -153,10 +122,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
     def get_feature(identifier: str, include_codes: bool = False) -> dict[str, Any]:
         """Get one concept ID or physical table-column feature alias."""
 
-        if not identifier.strip():
-            raise ValueError("identifier must not be blank")
-        result = catalog.get_feature(identifier, include_codes=include_codes)
-        return _structured_dict(result, operation="get_feature")
+        return catalog.get_feature(identifier, include_codes=include_codes)
 
     @server.tool(
         annotations=read_only,
@@ -177,12 +143,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
     ) -> dict[str, Any]:
         """Search features by text and/or profile, table, grain, domain, and kind."""
 
-        filters = (profile, table, grain, domain, feature_kind)
-        if not query.strip() and not any(value and value.strip() for value in filters):
-            raise ValueError("provide a query or at least one filter")
-        if not 1 <= limit <= 500:
-            raise ValueError("limit must be between 1 and 500")
-        result = catalog.search_features(
+        return catalog.search_features(
             query,
             profile=profile,
             table=table,
@@ -191,18 +152,12 @@ def build_server(catalog: CatalogProtocol) -> Any:
             feature_kind=feature_kind,
             limit=limit,
         )
-        return _search_result(result)
 
     @server.tool(annotations=read_only, structured_output=True)
     def lookup_code(feature_or_vocabulary: str, code: str) -> dict[str, Any]:
         """Look up a code using a vocabulary ID, concept ID, or physical feature."""
 
-        if not feature_or_vocabulary.strip():
-            raise ValueError("feature_or_vocabulary must not be blank")
-        if not code:
-            raise ValueError("code must not be empty")
-        result = catalog.lookup_code(feature_or_vocabulary, code)
-        return _structured_dict(result, operation="lookup_code")
+        return catalog.lookup_code(feature_or_vocabulary, code)
 
     return server
 

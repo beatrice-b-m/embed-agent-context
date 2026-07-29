@@ -59,7 +59,7 @@ class FakeCatalog:
         domain: str | None = None,
         feature_kind: str | None = None,
         limit: int = 50,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         self.calls.append(
             (
                 "search_features",
@@ -74,12 +74,15 @@ class FakeCatalog:
                 },
             )
         )
-        return [
-            {
-                "name": "synthetic_table.synthetic_column",
-                "meaning": "Synthetic match",
-            }
-        ]
+        return {
+            "matches": [
+                {
+                    "name": "synthetic_table.synthetic_column",
+                    "meaning": "Synthetic match",
+                }
+            ],
+            "count": 1,
+        }
 
     def lookup_code(
         self, feature_or_vocabulary: str, code: str
@@ -235,7 +238,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    async def test_search_wraps_record_sequences(self) -> None:
+    async def test_search_returns_core_result_unchanged(self) -> None:
         async with Client(self.server) as client:
             result = await client.call_tool(
                 "search_features",
@@ -299,15 +302,15 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_invalid_limit_is_a_tool_error_without_catalog_access(self) -> None:
-        async with Client(self.server) as client:
+    async def test_invalid_limit_from_core_is_a_tool_error(self) -> None:
+        server = build_server(load_catalog())
+        async with Client(server) as client:
             result = await client.call_tool(
                 "search_features",
                 {"query": "density", "limit": 501},
             )
 
         self.assertTrue(result.is_error)
-        self.assertEqual(self.catalog.calls, [])
 
     async def test_invalid_controlled_filter_is_a_schema_error(self) -> None:
         async with Client(self.server) as client:
@@ -320,11 +323,11 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.catalog.calls, [])
 
     async def test_empty_query_without_filters_is_a_tool_error(self) -> None:
-        async with Client(self.server) as client:
+        server = build_server(load_catalog())
+        async with Client(server) as client:
             result = await client.call_tool("search_features", {})
 
         self.assertTrue(result.is_error)
-        self.assertEqual(self.catalog.calls, [])
 
 
 @unittest.skipUnless(MCP_AVAILABLE, "optional MCP SDK is not installed")
