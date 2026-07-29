@@ -1,9 +1,14 @@
 [project]
 name = "embedv2-agent-context"
-version = "0.0.0"
-description = "Investigation environment for the EMBED V2 agent context bundle"
+version = "0.1.0"
+description = "Count-free structured feature context for EMBED clinical data"
 requires-python = ">=3.12,<3.14"
 dependencies = []
+
+[project.optional-dependencies]
+mcp = [
+    "mcp==2.0.0",
+]
 
 [dependency-groups]
 dev = [

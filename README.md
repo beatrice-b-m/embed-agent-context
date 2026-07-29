@@ -17,9 +17,10 @@ turning one release's measurements into apparent contracts.
   concepts, physical bindings, facets, and code vocabularies.
 - [`catalog/catalog.schema.json`](catalog/catalog.schema.json) — the versioned
   JSON Schema for the catalog.
-- `embed_context/` — the dependency-free query core and command-line interface.
-- `tests/` — synthetic contract, validation, search, CLI, and source-profile
-  tests.
+- `embed_context/` — the dependency-free query core and command-line interface,
+  plus an optional stdio MCP adapter.
+- `tests/` — synthetic contract, validation, search, CLI, MCP, and
+  source-profile tests.
 - [`docs/catalog-format.md`](docs/catalog-format.md) — the data model,
   extension rules, and portability policy.
 - [`docs/project-scope.md`](docs/project-scope.md) — project boundaries and
@@ -36,9 +37,9 @@ bindings. Finding-level flags remain distinct from side- and exam-level
 aggregates because those levels carry different meanings. Repeated physical
 projections, including the wide table, do not duplicate semantic definitions.
 
-The query CLI exposes the validated in-memory catalog. Full
-relationship/cardinality specifications and broader clinical workflow context
-remain later phases.
+The query CLI and optional MCP adapter expose the same validated in-memory
+catalog. Full relationship/cardinality specifications and broader clinical
+workflow context remain later phases.
 
 ## Command-line queries
 
@@ -73,6 +74,42 @@ Run `python -m embed_context --help` or a subcommand's `--help` for the complete
 filter surface. `--format json validate` also returns the controlled grains,
 domains, and feature kinds for programmatic discovery.
 
+## Stdio MCP server
+
+MCP support is optional so the catalog and CLI remain dependency-free. Start
+the server with the pinned official SDK extra:
+
+```bash
+uv run --locked --no-dev --extra mcp python -m embed_context.mcp_server
+```
+
+An MCP client configuration can invoke it from any working directory:
+
+```json
+{
+  "command": "uv",
+  "args": [
+    "--directory",
+    "/absolute/path/to/embedv2-agent-context",
+    "run",
+    "--locked",
+    "--no-dev",
+    "--extra",
+    "mcp",
+    "python",
+    "-m",
+    "embed_context.mcp_server"
+  ]
+}
+```
+
+The server exposes three read-only structured-output tools:
+`get_feature`, `search_features`, and `lookup_code`. It writes MCP protocol
+messages only to stdout; startup errors and diagnostics go to stderr. The
+search tool's input schema enumerates the controlled grain, domain, and feature
+kind filters, while its description lists the profiles and tables present in
+the loaded catalog.
+
 ## Maintainer verification
 
 Run the complete test suite and the footer-only source-profile check:
@@ -85,6 +122,12 @@ uv run --locked python scripts/validate_source_profile.py
 The second command derives the expected manifest from the selected profile and
 compares table names, columns, physical types, and schema nullability. It reads
 Parquet footers only and does not inspect clinical values or statistics.
+
+To exercise the optional protocol adapter against the pinned MCP SDK:
+
+```bash
+uv run --locked --no-dev --extra mcp python -m unittest tests.test_mcp_server -v
+```
 
 ## Migration from the Markdown feature bundle
 

@@ -79,6 +79,10 @@ search use only the Python standard library. The search implementation is
 intentionally transparent and small; embeddings, a vector database, a search
 service, SQLite FTS, and fuzzy-matching dependencies are outside Phase 1.
 
+The stdio MCP adapter is optional and adds one direct runtime integration
+dependency: the official MCP SDK. It must call the same core API as the CLI,
+emit protocol messages only on stdout, and expose read-only tools.
+
 ## Phased implementation
 
 ### 1. Feature meanings
