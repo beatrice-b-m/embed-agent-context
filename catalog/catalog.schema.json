@@ -601,6 +601,7 @@
         "attribution",
         "attribution_limitations",
         "temporal_qualification",
+        "temporal_semantics",
         "domains",
         "search_terms",
         "claim_refs",
@@ -639,6 +640,9 @@
         },
         "temporal_qualification": {
           "$ref": "#/$defs/nonblank_string"
+        },
+        "temporal_semantics": {
+          "$ref": "#/$defs/identifiers"
         },
         "domains": {
           "$ref": "#/$defs/domains_list"
@@ -695,6 +699,7 @@
           "$ref": "#/$defs/identifiers"
         },
         "relative_to": {
+          "description": "Other candidate time semantics that should be compared when interpreting this time; membership does not assert order, causality, certainty, or a required interval.",
           "$ref": "#/$defs/identifiers"
         },
         "domains": {
@@ -721,6 +726,7 @@
         "target_object",
         "source_concept",
         "result_concept",
+        "semantic_relationships",
         "method",
         "ordering",
         "domains",
@@ -758,6 +764,9 @@
               "type": "null"
             }
           ]
+        },
+        "semantic_relationships": {
+          "$ref": "#/$defs/identifiers"
         },
         "method": {
           "$ref": "#/$defs/nonblank_string"

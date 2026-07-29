@@ -47,14 +47,74 @@ Clinical discovery begins with `discover`, followed by exact semantic getters.
 Table and physical relationship operations are renamed or documented as profile
 binding queries.
 
-The CLI `pattern` and `patterns` commands and MCP
-`get_analysis_pattern` and `search_analysis_patterns` tools are removed.
-Callers should search for the clinical question with `discover` and follow
-links to outcome semantics, temporal semantics, aggregations, and guardrails.
+### CLI command mapping
+
+| Version 4 command | Version 5 replacement | Important change |
+|---|---|---|
+| `search QUERY` | `discover QUERY --kind feature` or unfiltered `discover QUERY` | Unified discovery can return every semantic kind and includes match reasons, unmatched terms, filter effects, support diagnostics, and coverage gaps. |
+| `get ID` | `feature ID` | The response uses `feature`, returns all profile feature bindings, and can include resolved navigation and provenance. |
+| `table PROFILE TABLE` | `profile-table PROFILE TABLE` | The name makes the secondary implementation role explicit. |
+| `relationship ID` | `relationship-binding ID` | This gets a physical join binding, not a clinical relationship. Use `semantic-relationship ID` for portable meaning. |
+| `relationships [filters]` | `relationship-bindings [filters]` | Physical filters are retained and clearly separated from clinical discovery. |
+| `context ID` / `contexts QUERY` | `discover QUERY --kind context`, then a relevant semantic getter | Context claims remain evidence, but there is no context-first exact command. Semantic getter provenance resolves supporting claim, scope, and source records. |
+| `pattern ID` / `patterns QUERY` | `discover QUERY --kind guardrail --kind temporal_semantic --kind aggregation --kind coverage` | There is deliberately no one-to-one pattern replacement and no cohort recipe. |
+
+The new exact semantic commands are `object`, `feature`,
+`semantic-relationship`, `temporal`, `aggregation`, `guardrail`, and
+`coverage`. `validate` and `code` remain, although their summaries and linked
+entity envelopes reflect schema version 5.
+
+### MCP tool mapping
+
+| Version 4 tool | Version 5 replacement |
+|---|---|
+| `search_features` | `discover` with `kinds: ["feature"]`, or unfiltered `discover` |
+| `get_table` | `get_profile_table` |
+| `get_relationship` | `get_relationship_binding` |
+| `search_relationships` | `search_relationship_bindings` |
+| `get_context` / `search_contexts` | `discover` plus an exact semantic getter with resolved provenance |
+| `get_analysis_pattern` / `search_analysis_patterns` | `discover` across guardrails, temporal semantics, aggregations, and coverage |
+
+The v5 MCP server additionally exposes `get_clinical_object`,
+`get_semantic_relationship`, `get_temporal_semantic`, `get_aggregation`,
+`get_guardrail`, and `get_coverage`.
+
+### Parameters and responses
+
+- `discover.kinds` is a list and may combine entity kinds. CLI callers repeat
+  `--kind`.
+- `profile` adds profile support context; it does not turn tables into the
+  search ontology.
+- Discovery matches contain `kind`, `identifier`, `score`, `label`, `entity`,
+  `match_reasons`, `matched_terms`, and `unmatched_terms`.
+- Discovery responses include normalized filters, pre- and post-filter counts,
+  and diagnostics that distinguish excluded matches, invalid controlled
+  vocabulary, unsupported profile coverage, and absent catalog coverage.
+- Exact semantic getters use a kind-specific entity key and may add computed
+  `related` and `provenance` sections. Those sections are derived navigation,
+  not duplicated catalog assertions.
+- `get_feature` returns every applicable binding rather than implying one
+  canonical physical occurrence. Code maps remain opt-in.
+- Physical table and relationship responses are explicitly profile-scoped and
+  must not be interpreted as the clinical conceptual model.
 
 Version 4 context claims are retained as provenance, but the discovery API
 returns them through the semantic entities they support rather than requiring a
 caller to choose a context-specific search surface first.
+
+### Direct catalog consumers
+
+Version 4 top-level physical arrays move beneath the selected profile:
+
+| Version 4 path | Version 5 path |
+|---|---|
+| `bindings` filtered by `profile` | `profile_bindings[profile].feature_bindings` |
+| `tables` filtered by `profile` | `profile_bindings[profile].tables` |
+| `relationships` filtered by `profile` | `profile_bindings[profile].relationship_bindings` |
+
+Object-to-table representation is new at
+`profile_bindings[profile].object_bindings`. Nested records omit the redundant
+`profile` field; the reader adds profile identity to query results.
 
 ## Compatibility boundary
 

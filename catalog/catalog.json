@@ -114,7 +114,6 @@
       ],
       "claim_refs": [],
       "caveats": [
-        "Patient identifiers are anonymized and release scoped.",
         "The catalog does not establish complete longitudinal care or outside-system follow-up."
       ]
     },
@@ -137,8 +136,7 @@
         "open-v2.linked-exam-context#link-meaning"
       ],
       "caveats": [
-        "Open-v2 has no canonical episode identifier.",
-        "Optional linked-accession references do not establish a complete episode graph."
+        "Episode identity and boundaries can remain incomplete when a representation relies on optional links among exams."
       ]
     },
     "imaging_exam": {
@@ -235,7 +233,6 @@
         "clinical.screening-diagnostic-pathway#assessment-guides-next-step"
       ],
       "caveats": [
-        "Open-v2 does not provide an independent interpretation row identity or timestamp.",
         "Assessment and recommendation are separate fields and must not be collapsed into pathology truth."
       ]
     },
@@ -260,7 +257,6 @@
         "open-v2.pathology-procedure-context#separate-pathology-surface"
       ],
       "caveats": [
-        "The open-v2 pathology row co-locates procedure and pathology fields and has no established clinical row identity.",
         "A procedure-to-finding association may be absent or ambiguous."
       ]
     },
@@ -326,7 +322,6 @@
         "open-v2.report-context#sequence-meaning"
       ],
       "caveats": [
-        "No tested natural tuple uniquely identifies every open-v2 report row.",
         "Report text may contain sensitive content and is not exposed by this tool."
       ]
     },
@@ -349,7 +344,7 @@
         "open-v2.risk-context#risk-availability"
       ],
       "caveats": [
-        "Several field definitions, sentinel meanings, units, and generating model versions remain unresolved.",
+        "Risk-output interpretation depends on the named model, version, units, and field-specific exceptional-value semantics.",
         "A risk output is not an imaging assessment or pathology diagnosis."
       ]
     }
@@ -364,8 +359,7 @@
         "mammography"
       ],
       "search_terms": [
-        "side-level architectural distortion aggregate",
-        "arch_distortion_side_level"
+        "side-level architectural distortion aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -392,8 +386,7 @@
         "mammography"
       ],
       "search_terms": [
-        "side-level asymmetry aggregate",
-        "asymmetry_side_level"
+        "side-level asymmetry aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -420,8 +413,7 @@
         "mammography"
       ],
       "search_terms": [
-        "side-level calcification aggregate",
-        "calc_side_level"
+        "side-level calcification aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -448,8 +440,7 @@
         "mammography"
       ],
       "search_terms": [
-        "side-level mass aggregate",
-        "mass_side_level"
+        "side-level mass aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -476,8 +467,7 @@
         "pathology"
       ],
       "search_terms": [
-        "side-level pathology severity aggregate",
-        "path_severity_side_level"
+        "side-level pathology severity aggregate"
       ],
       "caveats": [
         "Pathology severity uses inverse ordering, so the minimum value is the most severe."
@@ -492,10 +482,26 @@
         "breast_side"
       ],
       "claim_refs": [
+        "open-v2.pathology-procedure-context#severity-meaning",
         "open-v2.pathology-procedure-context#severity-aggregation"
       ],
-      "missing_states": [],
-      "temporal_semantics": [],
+      "missing_states": [
+        {
+          "id": "unattached_pathology",
+          "representation": "null",
+          "meaning": "No pathology severity is attached within the represented breast-side aggregate group; this is not a diagnosis category or negative outcome.",
+          "claim_refs": [
+            "open-v2.pathology-procedure-context#severity-meaning"
+          ],
+          "caveats": [
+            "It does not establish benign disease, no cancer, complete capture, or adequate follow-up for the breast side."
+          ]
+        }
+      ],
+      "temporal_semantics": [
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "aggregations": [
         "aggregation.pathology-severity-to-side"
       ]
@@ -509,7 +515,6 @@
       ],
       "search_terms": [
         "breast side",
-        "side",
         "laterality"
       ],
       "caveats": [
@@ -543,7 +548,6 @@
       ],
       "search_terms": [
         "anonymized age at exam",
-        "age_at_study_anon",
         "age at study"
       ],
       "caveats": [
@@ -572,8 +576,7 @@
         "temporal"
       ],
       "search_terms": [
-        "anonymized menarche age",
-        "menarcheage_anon"
+        "anonymized menarche age"
       ],
       "caveats": [
         "Values such as zero are data-quality errors, not documented sentinel codes."
@@ -601,8 +604,7 @@
         "temporal"
       ],
       "search_terms": [
-        "anonymized menopause age",
-        "menopauseage_anon"
+        "anonymized menopause age"
       ],
       "caveats": [
         "Values such as zero are data-quality errors, not documented sentinel codes."
@@ -630,8 +632,7 @@
         "temporal"
       ],
       "search_terms": [
-        "anonymized pregnancy age",
-        "pregnancyage_anon"
+        "anonymized pregnancy age"
       ],
       "caveats": [
         "The represented pregnancy event is unresolved.",
@@ -661,7 +662,6 @@
       ],
       "search_terms": [
         "ashkenazi ancestry indicator",
-        "ASHKENAZI",
         "ancestry"
       ],
       "caveats": [
@@ -691,7 +691,6 @@
       ],
       "search_terms": [
         "anonymized birth date",
-        "PATIENT_BIRTH_DT_anon",
         "date of birth",
         "dob"
       ],
@@ -718,8 +717,7 @@
         "demographics"
       ],
       "search_terms": [
-        "patient cohort",
-        "cohort_num"
+        "patient cohort"
       ],
       "caveats": [
         "Cohort construction and intended interpretation are not documented."
@@ -745,8 +743,7 @@
         "social_determinants_of_health"
       ],
       "search_terms": [
-        "patient ethnicity",
-        "ethnicity"
+        "patient ethnicity"
       ],
       "caveats": [
         "Collection method, category completeness, and the distinction between null and explicit unknown values are unresolved."
@@ -772,7 +769,6 @@
       ],
       "search_terms": [
         "gender description",
-        "GENDER_DESC",
         "gender",
         "sex"
       ],
@@ -801,7 +797,6 @@
       ],
       "search_terms": [
         "patient language",
-        "patient_language",
         "spoken language"
       ],
       "caveats": [
@@ -828,8 +823,7 @@
         "social_determinants_of_health"
       ],
       "search_terms": [
-        "patient race",
-        "race"
+        "patient race"
       ],
       "caveats": [
         "Collection method, category completeness, and the distinction between null and explicit unknown values are unresolved."
@@ -856,7 +850,6 @@
       ],
       "search_terms": [
         "exam accession identifier",
-        "acc_anon",
         "accession",
         "exam id",
         "acc"
@@ -888,8 +881,7 @@
         "mammography"
       ],
       "search_terms": [
-        "exam-level architectural distortion aggregate",
-        "arch_distortion_exam_level"
+        "exam-level architectural distortion aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -916,8 +908,7 @@
         "mammography"
       ],
       "search_terms": [
-        "exam-level asymmetry aggregate",
-        "asymmetry_exam_level"
+        "exam-level asymmetry aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -945,8 +936,7 @@
         "workflow"
       ],
       "search_terms": [
-        "biopsy-related exam flag",
-        "biopsy_flag"
+        "biopsy-related exam flag"
       ],
       "caveats": [
         "Null is not documented as meaning No, and biopsy timing is unresolved."
@@ -972,8 +962,7 @@
         "mammography"
       ],
       "search_terms": [
-        "exam-level calcification aggregate",
-        "calc_exam_level"
+        "exam-level calcification aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -1000,8 +989,7 @@
         "workflow"
       ],
       "search_terms": [
-        "imaging extraction eligibility flag",
-        "extract_flag"
+        "imaging extraction eligibility flag"
       ],
       "caveats": [
         "This is an extraction or workflow field, not a clinical finding."
@@ -1028,8 +1016,7 @@
         "imaging"
       ],
       "search_terms": [
-        "left finding total",
-        "total_L_find"
+        "left finding total"
       ],
       "caveats": [
         "This exam-wide side-specific total is stored on breast-side-grain rows; repeated storage does not change its meaning."
@@ -1055,8 +1042,7 @@
         "workflow"
       ],
       "search_terms": [
-        "anonymized exam location",
-        "loc_num_anon"
+        "anonymized exam location"
       ],
       "caveats": [
         "The mapping to the legend's unsuffixed loc_num header is inferred, and the listed sites are not guaranteed exhaustive.",
@@ -1086,8 +1072,7 @@
         "mammography"
       ],
       "search_terms": [
-        "mammography exam type",
-        "mg_exam_type"
+        "mammography exam type"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -1114,8 +1099,7 @@
         "mammography"
       ],
       "search_terms": [
-        "exam-level mass aggregate",
-        "mass_exam_level"
+        "exam-level mass aggregate"
       ],
       "caveats": [
         "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
@@ -1142,8 +1126,7 @@
         "imaging"
       ],
       "search_terms": [
-        "imaging modality",
-        "modality_desc"
+        "imaging modality"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -1170,8 +1153,7 @@
         "pathology"
       ],
       "search_terms": [
-        "exam-level pathology severity aggregate",
-        "path_severity_exam_level"
+        "exam-level pathology severity aggregate"
       ],
       "caveats": [
         "Pathology severity uses inverse ordering, so the minimum value is the most severe."
@@ -1186,10 +1168,26 @@
         "imaging_exam"
       ],
       "claim_refs": [
+        "open-v2.pathology-procedure-context#severity-meaning",
         "open-v2.pathology-procedure-context#severity-aggregation"
       ],
-      "missing_states": [],
-      "temporal_semantics": [],
+      "missing_states": [
+        {
+          "id": "unattached_pathology",
+          "representation": "null",
+          "meaning": "No pathology severity is attached within the represented exam aggregate group; this is not a diagnosis category or negative outcome.",
+          "claim_refs": [
+            "open-v2.pathology-procedure-context#severity-meaning"
+          ],
+          "caveats": [
+            "It does not establish benign disease, no cancer, complete capture, or adequate follow-up for the exam."
+          ]
+        }
+      ],
+      "temporal_semantics": [
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "aggregations": [
         "aggregation.pathology-severity-to-exam"
       ]
@@ -1203,8 +1201,7 @@
         "procedure"
       ],
       "search_terms": [
-        "procedure description",
-        "desc"
+        "procedure description"
       ],
       "caveats": [
         "Treat the field as potentially sensitive text-like content and avoid exposing raw values without a use-specific policy."
@@ -1231,8 +1228,7 @@
         "workflow"
       ],
       "search_terms": [
-        "procedure-related exam flag",
-        "proc_flag"
+        "procedure-related exam flag"
       ],
       "caveats": [
         "Null is not documented as meaning No, and procedure timing is unresolved."
@@ -1258,8 +1254,7 @@
         "workflow"
       ],
       "search_terms": [
-        "embed data version",
-        "version"
+        "embed data version"
       ],
       "caveats": [
         "This records first inclusion in EMBED, not a per-row processing-lineage or schema-version guarantee."
@@ -1288,8 +1283,7 @@
         "imaging"
       ],
       "search_terms": [
-        "right finding total",
-        "total_R_find"
+        "right finding total"
       ],
       "caveats": [
         "This exam-wide side-specific total is stored on breast-side-grain rows; repeated storage does not change its meaning."
@@ -1316,7 +1310,6 @@
       ],
       "search_terms": [
         "anonymized exam date",
-        "studydate_anon",
         "study date"
       ],
       "caveats": [
@@ -1334,7 +1327,17 @@
         "open-v2.temporal-availability-context#date-representation",
         "open-v2.temporal-availability-context#anonymization-properties"
       ],
-      "missing_states": [],
+      "missing_states": [
+        {
+          "id": "missing_or_unknown",
+          "representation": "null",
+          "meaning": "No exam event date is represented in this field; this does not establish that an imaging exam did not occur.",
+          "claim_refs": [],
+          "caveats": [
+            "The available metadata does not distinguish source absence, extraction loss, or another reason for null."
+          ]
+        }
+      ],
       "temporal_semantics": [
         "time.exam-event"
       ],
@@ -1350,7 +1353,6 @@
       ],
       "search_terms": [
         "breast tissue density",
-        "tissueden",
         "breast density"
       ],
       "caveats": [
@@ -1378,8 +1380,7 @@
         "workflow"
       ],
       "search_terms": [
-        "visit type",
-        "vtype"
+        "visit type"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -1406,7 +1407,6 @@
       ],
       "search_terms": [
         "patient identifier",
-        "empi_anon",
         "patient id",
         "empi"
       ],
@@ -1435,8 +1435,7 @@
         "workflow"
       ],
       "search_terms": [
-        "addendum flag",
-        "addendum_flag"
+        "addendum flag"
       ],
       "caveats": [
         "This flag was added during EMBED data processing rather than extracted directly from MagView.",
@@ -1466,7 +1465,6 @@
       ],
       "search_terms": [
         "imaging assessment",
-        "asses",
         "birads",
         "bi-rads"
       ],
@@ -1498,8 +1496,7 @@
         "imaging"
       ],
       "search_terms": [
-        "finding change",
-        "changed"
+        "finding change"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -1527,8 +1524,7 @@
         "breast_side"
       ],
       "search_terms": [
-        "imaging finding depth",
-        "depth"
+        "imaging finding depth"
       ],
       "caveats": [
         "Letter and grid representations coexist; null semantics are not documented."
@@ -1555,8 +1551,7 @@
         "breast_side"
       ],
       "search_terms": [
-        "imaging finding distance",
-        "distance"
+        "imaging finding distance"
       ],
       "caveats": [
         "Negative and zero values require an explicit sentinel policy."
@@ -1584,8 +1579,7 @@
         "imaging"
       ],
       "search_terms": [
-        "finding number",
-        "numfind"
+        "finding number"
       ],
       "caveats": [
         "The reserved value -9 identifies a derived synthetic contralateral negative finding implied by a non-negative finding on the other breast but not explicitly entered in MagView.",
@@ -1616,8 +1610,7 @@
         "mammography"
       ],
       "search_terms": [
-        "imaging finding size",
-        "size"
+        "imaging finding size"
       ],
       "caveats": [
         "Negative and zero values require an explicit sentinel policy."
@@ -1646,7 +1639,6 @@
       ],
       "search_terms": [
         "linked exam accession identifier",
-        "linkedaccession_anon",
         "linked study",
         "linked accession"
       ],
@@ -1677,8 +1669,7 @@
         "workflow"
       ],
       "search_terms": [
-        "linked study flag",
-        "linked_study_flag"
+        "linked study flag"
       ],
       "caveats": [
         "The flag is expected to identify a linked same-episode exam, but data-quality edge cases mean it must not be used to repair a missing linked-accession value."
@@ -1706,8 +1697,7 @@
         "breast_side"
       ],
       "search_terms": [
-        "imaging finding location",
-        "location"
+        "imaging finding location"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -1734,8 +1724,7 @@
         "imaging"
       ],
       "search_terms": [
-        "new finding flag",
-        "new"
+        "new finding flag"
       ],
       "caveats": [
         "The legend does not explicitly define the numeric flag encoding."
@@ -1762,8 +1751,7 @@
         "workflow"
       ],
       "search_terms": [
-        "imaging recommendation",
-        "recc"
+        "imaging recommendation"
       ],
       "caveats": [
         "The loose MagView reporting schema permits site- and time-dependent formatting heterogeneity; preserve the source string rather than imposing a canonical ordering or grammar.",
@@ -1800,8 +1788,7 @@
         "imaging"
       ],
       "search_terms": [
-        "stable finding flag",
-        "stable"
+        "stable finding flag"
       ],
       "caveats": [
         "The legend does not explicitly define the numeric flag encoding."
@@ -1828,8 +1815,7 @@
         "mammography"
       ],
       "search_terms": [
-        "architectural distortion presence",
-        "arch_distortion"
+        "architectural distortion presence"
       ],
       "caveats": [
         "The legend describes presence but does not explicitly define the numeric flag encoding."
@@ -1856,8 +1842,7 @@
         "mammography"
       ],
       "search_terms": [
-        "asymmetry presence",
-        "asymmetry"
+        "asymmetry presence"
       ],
       "caveats": [
         "The legend describes presence but does not explicitly define the numeric flag encoding."
@@ -1884,8 +1869,7 @@
         "mammography"
       ],
       "search_terms": [
-        "calcification distribution",
-        "calcdistri"
+        "calcification distribution"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -1912,8 +1896,7 @@
         "mammography"
       ],
       "search_terms": [
-        "calcification morphology",
-        "calcfind"
+        "calcification morphology"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -1944,8 +1927,7 @@
         "mammography"
       ],
       "search_terms": [
-        "number of calcifications",
-        "calcnumber"
+        "number of calcifications"
       ],
       "caveats": [
         "The physical type is string and negative numeric-looking values have undocumented meanings; do not coerce without a sentinel policy."
@@ -1973,8 +1955,7 @@
         "mammography"
       ],
       "search_terms": [
-        "calcification presence",
-        "calc"
+        "calcification presence"
       ],
       "caveats": [
         "The legend describes presence but does not explicitly define the numeric flag encoding."
@@ -2001,8 +1982,7 @@
         "mammography"
       ],
       "search_terms": [
-        "consistent-with interpretation",
-        "consistent"
+        "consistent-with interpretation"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -2033,8 +2013,7 @@
         "mammography"
       ],
       "search_terms": [
-        "implant finding",
-        "implanfind"
+        "implant finding"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -2062,8 +2041,7 @@
         "mammography"
       ],
       "search_terms": [
-        "mammographic mass density",
-        "massdens"
+        "mammographic mass density"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -2090,8 +2068,7 @@
         "mammography"
       ],
       "search_terms": [
-        "mammographic mass margin",
-        "massmargin"
+        "mammographic mass margin"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -2118,8 +2095,7 @@
         "mammography"
       ],
       "search_terms": [
-        "mass presence",
-        "mass"
+        "mass presence"
       ],
       "caveats": [
         "The legend describes presence but does not explicitly define the numeric flag encoding."
@@ -2146,8 +2122,7 @@
         "mammography"
       ],
       "search_terms": [
-        "mammographic mass shape",
-        "massshape"
+        "mammographic mass shape"
       ],
       "caveats": [
         "The legend list is not guaranteed exhaustive.",
@@ -2177,8 +2152,7 @@
         "mammography"
       ],
       "search_terms": [
-        "other mammographic finding",
-        "otherfind"
+        "other mammographic finding"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -2206,8 +2180,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri associated finding",
-        "massoc"
+        "mri associated finding"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2237,8 +2210,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri background parenchymal enhancement level",
-        "mbpe_level"
+        "mri background parenchymal enhancement level"
       ],
       "caveats": [
         "Letter order is not an ordinal encoding.",
@@ -2266,8 +2238,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri background parenchymal enhancement symmetry",
-        "MBPE_SYM"
+        "mri background parenchymal enhancement symmetry"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2296,8 +2267,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri delayed kinetics",
-        "mdelayed"
+        "mri delayed kinetics"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2326,8 +2296,7 @@
         "mri"
       ],
       "search_terms": [
-        "secondary delayed-kinetics field",
-        "mdelayed.1"
+        "secondary delayed-kinetics field"
       ],
       "caveats": [
         "Equivalence to mdelayed is not established, and no matching legend header was found."
@@ -2354,8 +2323,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri enhancement distribution",
-        "mdist"
+        "mri enhancement distribution"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match, and the legend list is not guaranteed exhaustive.",
@@ -2385,8 +2353,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri focus",
-        "mfocus"
+        "mri focus"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2415,8 +2382,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri initial kinetics",
-        "minitial"
+        "mri initial kinetics"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2445,8 +2411,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri internal enhancement",
-        "menhance"
+        "mri internal enhancement"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2475,8 +2440,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri mass margin",
-        "mmargin"
+        "mri mass margin"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2505,8 +2469,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri mass shape",
-        "mshape"
+        "mri mass shape"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2535,8 +2498,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri other finding",
-        "mother"
+        "mri other finding"
       ],
       "caveats": [
         "No legend header defines this field; token overlap with other fields is not proof of equivalent meanings."
@@ -2563,8 +2525,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri enhancement pattern",
-        "mpattern"
+        "mri enhancement pattern"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2593,8 +2554,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri size field",
-        "msize"
+        "mri size field"
       ],
       "caveats": [
         "Do not treat the field as a usable size measurement without maintainer confirmation."
@@ -2621,8 +2581,7 @@
         "mri"
       ],
       "search_terms": [
-        "mri finding symmetry",
-        "msym"
+        "mri finding symmetry"
       ],
       "caveats": [
         "The vocabulary binding is a case-only legend match.",
@@ -2651,8 +2610,7 @@
         "procedure"
       ],
       "search_terms": [
-        "biopsy complication",
-        "bcomp"
+        "biopsy complication"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -2680,8 +2638,7 @@
         "breast_side"
       ],
       "search_terms": [
-        "biopsy depth",
-        "bdepth"
+        "biopsy depth"
       ],
       "caveats": [
         "Letter and grid representations coexist; null semantics are not documented."
@@ -2709,8 +2666,7 @@
         "breast_side"
       ],
       "search_terms": [
-        "biopsy distance",
-        "bdistance"
+        "biopsy distance"
       ],
       "caveats": [
         "Negative and zero values require an explicit sentinel policy."
@@ -2739,8 +2695,7 @@
         "breast_side"
       ],
       "search_terms": [
-        "biopsy location",
-        "loc"
+        "biopsy location"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -2769,8 +2724,7 @@
         "breast_side"
       ],
       "search_terms": [
-        "biopsy side",
-        "bside"
+        "biopsy side"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -2797,8 +2751,7 @@
         "procedure"
       ],
       "search_terms": [
-        "biopsy technique",
-        "technique"
+        "biopsy technique"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -2825,8 +2778,7 @@
         "procedure"
       ],
       "search_terms": [
-        "biopsy type",
-        "type"
+        "biopsy type"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -2853,16 +2805,6 @@
       ],
       "search_terms": [
         "pathology diagnosis code slot",
-        "path1",
-        "path2",
-        "path3",
-        "path4",
-        "path5",
-        "path6",
-        "path7",
-        "path8",
-        "path9",
-        "path10",
         "pathology finding"
       ],
       "caveats": [
@@ -2887,7 +2829,10 @@
         "open-v2.pathology-procedure-context#pathology-code-mappings"
       ],
       "missing_states": [],
-      "temporal_semantics": [],
+      "temporal_semantics": [
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "aggregations": [
         "aggregation.pathology-observation-severity"
       ]
@@ -2901,8 +2846,7 @@
         "procedure"
       ],
       "search_terms": [
-        "lymph-node surgery type",
-        "lymphsurg"
+        "lymph-node surgery type"
       ],
       "caveats": [
         "Surgery may be post-exam and requires a task-specific temporal anchor.",
@@ -2931,8 +2875,7 @@
         "temporal"
       ],
       "search_terms": [
-        "anonymized procedure date",
-        "procdate_anon"
+        "anonymized procedure date"
       ],
       "caveats": [
         "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved.",
@@ -2949,7 +2892,17 @@
       "claim_refs": [
         "open-v2.temporal-availability-context#date-representation"
       ],
-      "missing_states": [],
+      "missing_states": [
+        {
+          "id": "missing_or_unknown",
+          "representation": "null",
+          "meaning": "No procedure event date is represented in this field; this does not establish that a procedure did not occur.",
+          "claim_refs": [],
+          "caveats": [
+            "The available metadata does not distinguish source absence, extraction loss, an unattached procedure, or another reason for null."
+          ]
+        }
+      ],
       "temporal_semantics": [
         "time.procedure-event"
       ],
@@ -2965,8 +2918,7 @@
         "temporal"
       ],
       "search_terms": [
-        "anonymized pathology report date",
-        "pdate_anon"
+        "anonymized pathology report date"
       ],
       "caveats": [
         "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved.",
@@ -2978,12 +2930,23 @@
         "maintainer_confirmed"
       ],
       "objects": [
+        "pathology_observation",
         "pathology_diagnosis"
       ],
       "claim_refs": [
         "open-v2.temporal-availability-context#date-representation"
       ],
-      "missing_states": [],
+      "missing_states": [
+        {
+          "id": "missing_or_unknown",
+          "representation": "null",
+          "meaning": "No pathology documentation date is represented in this field; this does not establish that a pathology report or diagnosis did not exist.",
+          "claim_refs": [],
+          "caveats": [
+            "The available metadata does not distinguish source absence, extraction loss, an unattached report, or another reason for null."
+          ]
+        }
+      ],
       "temporal_semantics": [
         "time.pathology-report-documentation"
       ],
@@ -2997,8 +2960,7 @@
         "pathology"
       ],
       "search_terms": [
-        "pathology severity",
-        "path_severity"
+        "pathology severity"
       ],
       "caveats": [
         "Lower values are more severe; do not use an increasing numeric threshold to select cancer-positive pathology.",
@@ -3030,7 +2992,10 @@
           ]
         }
       ],
-      "temporal_semantics": [],
+      "temporal_semantics": [
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "aggregations": [
         "aggregation.pathology-observation-severity",
         "aggregation.pathology-severity-to-side",
@@ -3048,8 +3013,7 @@
         "procedure"
       ],
       "search_terms": [
-        "breast surgery type",
-        "surgery"
+        "breast surgery type"
       ],
       "caveats": [
         "Surgery may be post-exam and requires a task-specific temporal anchor.",
@@ -3076,8 +3040,7 @@
         "report"
       ],
       "search_terms": [
-        "report sequence",
-        "rseq"
+        "report sequence"
       ],
       "caveats": [
         "Within an accession, the minimum sequence identifies the earliest represented report and the maximum identifies the latest represented report.",
@@ -3105,8 +3068,7 @@
         "report"
       ],
       "search_terms": [
-        "anonymized report text",
-        "report_anon"
+        "anonymized report text"
       ],
       "caveats": [
         "No report content was read during Phase 1; content, blank behavior, and vocabulary are not characterized."
@@ -3132,7 +3094,6 @@
       ],
       "search_terms": [
         "ibis brca1 output",
-        "IBISBRCA1",
         "risk model"
       ],
       "caveats": [
@@ -3161,7 +3122,6 @@
       ],
       "search_terms": [
         "ibis brca2 output",
-        "IBISBRCA2",
         "risk model"
       ],
       "caveats": [
@@ -3190,7 +3150,6 @@
       ],
       "search_terms": [
         "ibis lifetime output",
-        "IBISLIFE",
         "risk model"
       ],
       "caveats": [
@@ -3219,7 +3178,6 @@
       ],
       "search_terms": [
         "ibis population lifetime-like output",
-        "IBISPOPL",
         "risk model"
       ],
       "caveats": [
@@ -3248,7 +3206,6 @@
       ],
       "search_terms": [
         "ibis population ten-year-like output",
-        "IBISPOP10",
         "risk model"
       ],
       "caveats": [
@@ -3277,7 +3234,6 @@
       ],
       "search_terms": [
         "ibis td1 output",
-        "IBIS_TD1",
         "risk model"
       ],
       "caveats": [
@@ -3306,7 +3262,6 @@
       ],
       "search_terms": [
         "ibis td2 output",
-        "IBIS_TD2",
         "risk model"
       ],
       "caveats": [
@@ -3335,7 +3290,6 @@
       ],
       "search_terms": [
         "ibis td3 output",
-        "IBIS_TD3",
         "risk model"
       ],
       "caveats": [
@@ -3364,7 +3318,6 @@
       ],
       "search_terms": [
         "ibis td4 output",
-        "IBIS_TD4",
         "risk model"
       ],
       "caveats": [
@@ -3393,7 +3346,6 @@
       ],
       "search_terms": [
         "ibis ten-year-like output",
-        "IBIS10",
         "risk model"
       ],
       "caveats": [
@@ -3422,7 +3374,6 @@
       ],
       "search_terms": [
         "nci five-year-like output",
-        "NCI5",
         "risk model"
       ],
       "caveats": [
@@ -3451,7 +3402,6 @@
       ],
       "search_terms": [
         "nci lifetime output",
-        "NCILIFE",
         "risk model"
       ],
       "caveats": [
@@ -3480,7 +3430,6 @@
       ],
       "search_terms": [
         "serialized pandas index",
-        "__index_level_0__",
         "export index",
         "row index"
       ],
@@ -3505,8 +3454,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound echotexture",
-        "echotexture"
+        "ultrasound echotexture"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3534,8 +3482,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound finding",
-        "USFinding"
+        "ultrasound finding"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3563,8 +3510,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound margins",
-        "margins"
+        "ultrasound margins"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3593,7 +3539,6 @@
       ],
       "search_terms": [
         "ultrasound modifiers",
-        "modifers",
         "modifiers"
       ],
       "caveats": [
@@ -3622,8 +3567,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound orientation",
-        "orientation"
+        "ultrasound orientation"
       ],
       "caveats": [
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -3650,8 +3594,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound posterior features",
-        "posteriorfeatures"
+        "ultrasound posterior features"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3679,8 +3622,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound secondary findings",
-        "secondaryfindings"
+        "ultrasound secondary findings"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3708,8 +3650,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound shape",
-        "shape"
+        "ultrasound shape"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3737,8 +3678,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound surrounding tissue",
-        "surroundingtissue"
+        "ultrasound surrounding tissue"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3766,8 +3706,7 @@
         "ultrasound"
       ],
       "search_terms": [
-        "ultrasound vascularity",
-        "vascularity"
+        "ultrasound vascularity"
       ],
       "caveats": [
         "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
@@ -3803,9 +3742,10 @@
       },
       "attribution": "Clinical ownership of an episode by a patient.",
       "attribution_limitations": [
-        "The open-v2 release does not provide a canonical episode identifier."
+        "A profile may represent episode membership through incomplete exam links rather than a canonical episode identifier."
       ],
       "temporal_qualification": "Episodes occur during the patient's represented timeline; no completeness is implied.",
+      "temporal_semantics": [],
       "domains": [
         "identity",
         "exam",
@@ -3837,10 +3777,13 @@
       },
       "attribution": "Clinical grouping of exams into a breast-imaging episode.",
       "attribution_limitations": [
-        "Open-v2 same-episode links are optional and can be incomplete.",
+        "Profile bindings based on same-episode links can be optional and incomplete.",
         "Unlinked exams may still be clinically related."
       ],
       "temporal_qualification": "Linked accessions identify same-episode exams, not prior or follow-up direction.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "exam",
         "imaging",
@@ -3876,6 +3819,9 @@
         "Release-local identifiers and incomplete longitudinal capture limit portability."
       ],
       "temporal_qualification": "Exams have their own event dates within a patient timeline.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "identity",
         "exam"
@@ -3907,6 +3853,9 @@
         "Unilateral and bilateral exams create different numbers of represented sides."
       ],
       "temporal_qualification": "The side is part of the same exam event.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "exam",
         "breast_side"
@@ -3940,6 +3889,9 @@
         "Synthetic negative findings and non-unique tuples complicate row identity."
       ],
       "temporal_qualification": "The finding is documented in the exam context.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "exam",
         "imaging"
@@ -3973,6 +3925,9 @@
         "Bilateral findings can be represented with null finding side rather than two side links."
       ],
       "temporal_qualification": "The relation is part of the exam interpretation, not a later procedure attribution.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "breast_side",
         "imaging"
@@ -4004,9 +3959,12 @@
       },
       "attribution": "Finding-level association of assessment and recommendation.",
       "attribution_limitations": [
-        "Open-v2 does not identify the interpretation independently of the finding row."
+        "A profile may co-locate the interpretation with a finding rather than identify it independently."
       ],
       "temporal_qualification": "No separate interpretation timestamp is represented.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "imaging",
         "workflow"
@@ -4038,9 +3996,14 @@
       "attribution": "Clinical association between an interpretation or recommendation and a later procedure.",
       "attribution_limitations": [
         "A recommendation does not prove a procedure occurred.",
-        "Open-v2 does not provide a complete direct recommendation-to-procedure key."
+        "A profile may lack a complete direct recommendation-to-procedure key."
       ],
       "temporal_qualification": "The procedure generally occurs after the imaging interpretation, but no universal interval is defined.",
+      "temporal_semantics": [
+        "time.exam-event",
+        "time.procedure-event",
+        "time.downstream-availability"
+      ],
       "domains": [
         "imaging",
         "procedure",
@@ -4078,6 +4041,11 @@
         "A diagnostic-study procedure may not be back-attributed to an earlier screening finding."
       ],
       "temporal_qualification": "The procedure is downstream of the original finding; the represented exam link does not define a universal time window.",
+      "temporal_semantics": [
+        "time.exam-event",
+        "time.procedure-event",
+        "time.downstream-availability"
+      ],
       "domains": [
         "imaging",
         "procedure",
@@ -4116,6 +4084,12 @@
         "Procedure and pathology fields share a physical row but do not have separately proven identities."
       ],
       "temporal_qualification": "Pathology observation is downstream of tissue sampling or surgery.",
+      "temporal_semantics": [
+        "time.procedure-event",
+        "time.specimen-collection",
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "domains": [
         "procedure",
         "pathology",
@@ -4152,6 +4126,10 @@
         "Duplicate slots do not create additional diagnostic weight."
       ],
       "temporal_qualification": "The diagnosis is documented after the associated observation; exact availability is not established.",
+      "temporal_semantics": [
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "domains": [
         "pathology"
       ],
@@ -4183,9 +4161,14 @@
       },
       "attribution": "Patient attribution inherited through represented accession and procedure context.",
       "attribution_limitations": [
-        "Open-v2 does not expose a direct patient column on the pathology surface."
+        "A profile may carry patient attribution indirectly through an exam or accession relationship."
       ],
       "temporal_qualification": "The observation occurs within the patient's represented clinical timeline.",
+      "temporal_semantics": [
+        "time.procedure-event",
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "domains": [
         "identity",
         "pathology"
@@ -4217,6 +4200,12 @@
         "The accession relationship is not an enforced foreign key and does not imply contemporaneous availability."
       ],
       "temporal_qualification": "Pathology may follow the associated imaging exam.",
+      "temporal_semantics": [
+        "time.exam-event",
+        "time.procedure-event",
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "domains": [
         "exam",
         "pathology",
@@ -4227,6 +4216,7 @@
         "accession pathology"
       ],
       "claim_refs": [
+        "open-v2.pathology-procedure-context#imaging-link-tuple",
         "open-v2.temporal-availability-context#date-representation"
       ],
       "caveats": [
@@ -4251,6 +4241,12 @@
         "The registered relationship uses finding side rather than biopsy side and may be incomplete."
       ],
       "temporal_qualification": "The pathology observation is downstream of the exam-side finding context.",
+      "temporal_semantics": [
+        "time.exam-event",
+        "time.procedure-event",
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "domains": [
         "breast_side",
         "pathology"
@@ -4285,6 +4281,12 @@
         "Incomplete tuples and duplicate matches require an explicit analysis reconciliation policy."
       ],
       "temporal_qualification": "Pathology is downstream; attribution does not make it available at imaging time.",
+      "temporal_semantics": [
+        "time.exam-event",
+        "time.procedure-event",
+        "time.pathology-report-documentation",
+        "time.downstream-availability"
+      ],
       "domains": [
         "imaging",
         "pathology",
@@ -4321,6 +4323,9 @@
         "Duplicate natural tuples and missing links can occur."
       ],
       "temporal_qualification": "Report versions document the exam and may evolve after initial interpretation.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "exam",
         "report",
@@ -4356,6 +4361,7 @@
         "The patient-report tuple is not a proven unique clinical key."
       ],
       "temporal_qualification": "Reports occur within the patient's represented imaging timeline.",
+      "temporal_semantics": [],
       "domains": [
         "identity",
         "report"
@@ -4389,6 +4395,7 @@
         "The natural identity and completeness of risk rows remain limited."
       ],
       "temporal_qualification": "Risk outputs were calculated during clinical care, but exact availability time is unresolved.",
+      "temporal_semantics": [],
       "domains": [
         "identity",
         "risk",
@@ -4423,6 +4430,9 @@
         "Not every exam has a risk record and some risk references may not resolve."
       ],
       "temporal_qualification": "The assessment was calculated during care; exact within-episode timing is unresolved.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
       "domains": [
         "exam",
         "risk",
@@ -4529,7 +4539,7 @@
       ],
       "claim_refs": [],
       "caveats": [
-        "Open-v2 has no supported specimen-collection date feature in the registered bindings.",
+        "A selected profile may not bind a specimen-collection date; inspect profile coverage before choosing this time.",
         "Procedure or report date must not be relabeled as specimen time."
       ]
     },
@@ -4596,7 +4606,7 @@
         "open-v2.temporal-availability-context#wide-table-colocation"
       ],
       "caveats": [
-        "Open-v2 does not provide a universal availability timestamp.",
+        "A selected profile may not provide a field-level availability timestamp; inspect profile coverage.",
         "Co-location in a wide row does not establish contemporaneous availability."
       ]
     }
@@ -4609,6 +4619,10 @@
       "target_object": "pathology_diagnosis",
       "source_concept": "pathology.diagnosis_code_slot",
       "result_concept": "pathology.severity",
+      "semantic_relationships": [
+        "clinical.procedure-pathology-observation",
+        "clinical.pathology-observation-diagnosis"
+      ],
       "method": "Select the most severe attached descriptor group across the procedure-associated pathology slots.",
       "ordering": "Inverse severity ordering: lower numeric groups are more severe.",
       "domains": [
@@ -4635,6 +4649,10 @@
       "target_object": "breast_side",
       "source_concept": "pathology.severity",
       "result_concept": "breast_side.pathology_severity_aggregate",
+      "semantic_relationships": [
+        "clinical.pathology-observation-diagnosis",
+        "clinical.side-pathology-observation"
+      ],
       "method": "Take the minimum represented pathology-severity value in the applicable breast-side group.",
       "ordering": "Inverse severity ordering: minimum means most severe.",
       "domains": [
@@ -4660,6 +4678,10 @@
       "target_object": "imaging_exam",
       "source_concept": "pathology.severity",
       "result_concept": "exam.pathology_severity_aggregate",
+      "semantic_relationships": [
+        "clinical.pathology-observation-diagnosis",
+        "clinical.exam-pathology-observation"
+      ],
       "method": "Take the minimum represented pathology-severity value in the applicable exam group.",
       "ordering": "Inverse severity ordering: minimum means most severe.",
       "domains": [
@@ -4685,6 +4707,10 @@
       "target_object": "imaging_finding",
       "source_concept": "pathology.severity",
       "result_concept": null,
+      "semantic_relationships": [
+        "clinical.pathology-observation-diagnosis",
+        "clinical.finding-pathology-observation"
+      ],
       "method": "No supplied finding-level severity aggregation is established.",
       "ordering": "An analyst-defined reconciliation would have to address optional many-to-many attribution.",
       "domains": [
@@ -4710,6 +4736,10 @@
       "target_object": "patient",
       "source_concept": "pathology.severity",
       "result_concept": null,
+      "semantic_relationships": [
+        "clinical.pathology-observation-diagnosis",
+        "clinical.patient-pathology-observation"
+      ],
       "method": "No supplied patient-level diagnosis aggregation is defined; a task-specific policy must select time, recurrence, multiplicity, and state transitions.",
       "ordering": "No universal ordering across a patient's episodes is selected beyond the coded severity ordering within represented groups.",
       "domains": [
@@ -4833,7 +4863,9 @@
         "time.downstream-availability"
       ],
       "aggregations": [],
-      "coverage": [],
+      "coverage": [
+        "coverage.open-v2.downstream-availability-time"
+      ],
       "domains": [
         "imaging",
         "pathology",
@@ -4925,7 +4957,9 @@
         "aggregation.pathology-severity-to-patient"
       ],
       "coverage": [
-        "coverage.open-v2.patient-pathology-aggregate"
+        "coverage.open-v2.patient-pathology-aggregate",
+        "coverage.open-v2.pathology-severity-to-side",
+        "coverage.open-v2.pathology-severity-to-exam"
       ],
       "domains": [
         "identity",
@@ -4975,7 +5009,8 @@
       ],
       "aggregations": [],
       "coverage": [
-        "coverage.open-v2.specimen-time"
+        "coverage.open-v2.specimen-time",
+        "coverage.open-v2.downstream-availability-time"
       ],
       "domains": [
         "exam",
@@ -5022,7 +5057,10 @@
         "aggregation.pathology-severity-to-side",
         "aggregation.pathology-severity-to-exam"
       ],
-      "coverage": [],
+      "coverage": [
+        "coverage.open-v2.pathology-severity-to-side",
+        "coverage.open-v2.pathology-severity-to-exam"
+      ],
       "domains": [
         "pathology"
       ],
@@ -5037,6 +5075,93 @@
       ],
       "caveats": [
         "Null remains an attachment state, not an ordered negative category."
+      ]
+    },
+    "guardrail.attached-pathology-selection": {
+      "title": "Attached pathology conditions on represented tissue sampling",
+      "statement": "Restricting observations to attached pathology also restricts them to represented procedures that produced tissue and must not be treated as a neutral outcome-availability filter.",
+      "rationale": "Tissue sampling occurs downstream of clinical selection and is not performed for every patient, exam, side, or finding, so pathology-observed groups can differ systematically from unsampled groups.",
+      "scope": "embed_general",
+      "profiles": [],
+      "objects": [
+        "patient",
+        "imaging_exam",
+        "imaging_finding",
+        "procedure",
+        "pathology_observation",
+        "pathology_diagnosis"
+      ],
+      "concepts": [
+        "pathology.severity"
+      ],
+      "semantic_relationships": [
+        "clinical.interpretation-procedure",
+        "clinical.finding-procedure",
+        "clinical.procedure-pathology-observation"
+      ],
+      "temporal_semantics": [
+        "time.procedure-event"
+      ],
+      "aggregations": [],
+      "coverage": [
+        "coverage.open-v2.outcome-capture"
+      ],
+      "domains": [
+        "imaging",
+        "procedure",
+        "pathology",
+        "workflow"
+      ],
+      "search_terms": [
+        "attached pathology selection",
+        "tissue sampling selection",
+        "procedure conditioned cohort",
+        "ascertainment bias"
+      ],
+      "claim_refs": [
+        "clinical.screening-diagnostic-pathway#pathology-follows-sampling",
+        "embed.finding-procedure-recording#multiple-procedures"
+      ],
+      "caveats": [
+        "The catalog identifies the selection mechanism but does not prescribe an inclusion, exclusion, weighting, or causal-analysis policy."
+      ]
+    },
+    "guardrail.non-breast-cancer-not-no-malignancy": {
+      "title": "Non-breast cancer is not absence of malignancy",
+      "statement": "The non-breast-cancer pathology-severity state must not be interpreted as benign, healthy, or free of malignancy.",
+      "rationale": "The state distinguishes a malignancy that is not classified as breast cancer from benign pathology and from the separate unattached-pathology state.",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "objects": [
+        "pathology_diagnosis"
+      ],
+      "concepts": [
+        "pathology.severity"
+      ],
+      "semantic_relationships": [
+        "clinical.pathology-observation-diagnosis"
+      ],
+      "temporal_semantics": [],
+      "aggregations": [
+        "aggregation.pathology-observation-severity"
+      ],
+      "coverage": [],
+      "domains": [
+        "pathology"
+      ],
+      "search_terms": [
+        "non breast cancer",
+        "other malignancy",
+        "not healthy control",
+        "pathology severity five"
+      ],
+      "claim_refs": [
+        "open-v2.pathology-procedure-context#severity-meaning"
+      ],
+      "caveats": [
+        "Whether this state is eligible for any task-specific comparison group is an analysis decision outside the catalog."
       ]
     },
     "guardrail.colocation-not-coavailability": {
@@ -5063,7 +5188,9 @@
         "time.downstream-availability"
       ],
       "aggregations": [],
-      "coverage": [],
+      "coverage": [
+        "coverage.open-v2.downstream-availability-time"
+      ],
       "domains": [
         "imaging",
         "pathology",
@@ -5143,9 +5270,42 @@
         "specimen date availability",
         "missing specimen timestamp"
       ],
-      "claim_refs": [],
+      "claim_refs": [
+        "open-v2.temporal-availability-context#unsupported-time-bindings"
+      ],
       "caveats": [
         "Do not substitute procedure date or pathology-report date."
+      ]
+    },
+    "coverage.open-v2.downstream-availability-time": {
+      "subject_kind": "temporal_semantic",
+      "subject": "time.downstream-availability",
+      "status": "unsupported",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "The registered open-v2 bindings contain event and documentation dates but no supported universal timestamp for when each downstream field became available.",
+      "domains": [
+        "imaging",
+        "procedure",
+        "pathology",
+        "report",
+        "temporal"
+      ],
+      "search_terms": [
+        "data availability timestamp",
+        "known at prediction time",
+        "downstream information availability",
+        "temporal leakage boundary"
+      ],
+      "claim_refs": [
+        "open-v2.temporal-availability-context#date-representation",
+        "open-v2.temporal-availability-context#wide-table-colocation",
+        "open-v2.temporal-availability-context#unsupported-time-bindings"
+      ],
+      "caveats": [
+        "Do not infer field availability from wide-row co-location or substitute event and report dates without an analysis-specific justification."
       ]
     },
     "coverage.open-v2.outcome-capture": {
@@ -5169,7 +5329,8 @@
         "cancer ascertainment"
       ],
       "claim_refs": [
-        "embed.finding-procedure-recording#screening-attribution-gap"
+        "embed.finding-procedure-recording#screening-attribution-gap",
+        "open-v2.pathology-procedure-context#outcome-capture-not-established"
       ],
       "caveats": [
         "No empirical capture rate belongs in the portable catalog.",
@@ -5194,9 +5355,59 @@
         "patient aggregate coverage",
         "patient outcome field"
       ],
-      "claim_refs": [],
+      "claim_refs": [
+        "open-v2.pathology-procedure-context#patient-aggregate-absence"
+      ],
       "caveats": [
         "Any patient-level policy remains analysis specific."
+      ]
+    },
+    "coverage.open-v2.pathology-severity-to-side": {
+      "subject_kind": "aggregation",
+      "subject": "aggregation.pathology-severity-to-side",
+      "status": "supported",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Open-v2 supplies a breast-side pathology-severity result concept whose verified rollup takes the minimum represented severity in the applicable side group.",
+      "domains": [
+        "breast_side",
+        "pathology"
+      ],
+      "search_terms": [
+        "open v2 side pathology aggregate",
+        "supported minimum severity by breast"
+      ],
+      "claim_refs": [
+        "open-v2.pathology-procedure-context#severity-aggregation"
+      ],
+      "caveats": [
+        "Support for the rollup does not remove laterality-attribution or unattached-pathology limitations."
+      ]
+    },
+    "coverage.open-v2.pathology-severity-to-exam": {
+      "subject_kind": "aggregation",
+      "subject": "aggregation.pathology-severity-to-exam",
+      "status": "supported",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Open-v2 supplies an exam pathology-severity result concept whose verified rollup takes the minimum represented severity in the applicable exam group.",
+      "domains": [
+        "exam",
+        "pathology"
+      ],
+      "search_terms": [
+        "open v2 exam pathology aggregate",
+        "supported minimum severity by exam"
+      ],
+      "claim_refs": [
+        "open-v2.pathology-procedure-context#severity-aggregation"
+      ],
+      "caveats": [
+        "Support for the rollup does not establish pathology availability at exam time or complete outcome capture."
       ]
     },
     "coverage.open-v2.finding-pathology-attribution": {
@@ -6703,13 +6914,13 @@
       "kind": "supporting_internal",
       "scope": "profile_specific",
       "locator_kind": "repository_path",
-      "locator": "catalog/catalog.json",
-      "version_scope": "Schema-version-3 open-v2 table, key, relationship, and caveat declarations derived during Phase 2.",
+      "locator": "docs/open-v2-linkage-review.md",
+      "version_scope": "Retained open-v2 table, key, projection, relationship, and caveat conclusions derived during the schema-version-3 Phase 2 review.",
       "profiles": [
         "open-v2"
       ],
       "notes": [
-        "This source records reviewed catalog conclusions, including unresolved relationship behavior.",
+        "This versioned record preserves reviewed implementation conclusions, including unresolved relationship behavior, without making the active catalog self-citing.",
         "It is not a substitute for maintainer confirmation of clinical workflow semantics."
       ]
     },
@@ -6717,9 +6928,9 @@
       "title": "Open-v2 maintainer clarification on representation and provenance",
       "kind": "maintainer_confirmed",
       "scope": "profile_specific",
-      "locator_kind": "logical_artifact",
-      "locator": "EMBED maintainer clarification recorded 2026-07-29",
-      "version_scope": "Open-v2 linked-exam, multimodal descriptor, aggregation, pathology, report, risk, demographic, laterality, and date semantics reviewed on 2026-07-29.",
+      "locator_kind": "repository_path",
+      "locator": "docs/manual-review-batches.md",
+      "version_scope": "Open-v2 linked-exam, multimodal descriptor, aggregation, pathology, report, risk, demographic, laterality, and date semantics reviewed on 2026-07-29 and retained in the repository clarification record.",
       "profiles": [
         "open-v2"
       ],
@@ -7551,6 +7762,30 @@
           "caveats": [
             "The inverse ordering means an ordinary numeric maximum would select the least severe value."
           ]
+        },
+        {
+          "id": "patient-aggregate-absence",
+          "statement": "The registered open-v2 bindings expose pathology-severity values and side- and exam-level rollups but no patient-level pathology-severity result field or supplied longitudinal outcome rollup.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "Absence of a supplied field does not prohibit an analyst-defined policy; it means the catalog does not designate one."
+          ]
+        },
+        {
+          "id": "outcome-capture-not-established",
+          "statement": "The registered open-v2 metadata and public pathology-attribution documentation do not establish complete capture of breast-cancer outcomes, outside-system diagnoses, or longitudinal follow-up.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "hitilab.embed.overview.pathology-attribution"
+          ],
+          "caveats": [
+            "This is a limitation of available evidence, not a measured estimate of missing outcomes or follow-up."
+          ]
         }
       ],
       "workflow_steps": [],
@@ -7606,7 +7841,7 @@
       "claims": [
         {
           "id": "separate-report-surface",
-          "statement": "Open-v2 stores anonymized accession-linked radiology report text with the associated report-creation date and MagView report-version sequence.",
+          "statement": "Open-v2 stores anonymized accession-linked radiology report text with the associated imaging-exam study date and MagView report-version sequence.",
           "status": "verified",
           "sources": [
             "open-v2.release-schema",
@@ -7867,11 +8102,34 @@
           "caveats": [
             "The wide table's construction remains unresolved."
           ]
+        },
+        {
+          "id": "wide-object-projection",
+          "statement": "Combined_anon projects patient, exam, finding, procedure, and pathology fields onto wide rows; those projections do not establish that repeated attributes are authoritative, that each clinical object has wide-row identity, or that fields were co-available.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Use canonical or co-located normalized bindings to understand object representation before relying on a wide projection."
+          ]
+        },
+        {
+          "id": "unsupported-time-bindings",
+          "statement": "The registered open-v2 feature bindings contain exam, procedure, and pathology-report dates but no specimen-collection date or universal downstream-availability timestamp.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema"
+          ],
+          "caveats": [
+            "A missing binding does not prove that the clinical event or availability transition did not occur."
+          ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
-        "Task-specific cohort, follow-up, label, and modality-inclusion choices are analysis policies rather than dataset claims; consult a separate analysis pattern when one is available."
+        "Task-specific cohort, follow-up, label, and modality-inclusion choices are analysis policies rather than dataset claims; agents must choose and defend them outside the portable catalog."
       ]
     }
   },
@@ -10658,6 +10916,160 @@
           ],
           "caveats": [
             "Several risk-field definitions and sentinel meanings remain unresolved."
+          ]
+        },
+        {
+          "object": "patient",
+          "table": "combined_anon",
+          "columns": [
+            "empi_anon"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "Wide-row co-location does not establish authority or equality for every repeated patient attribute."
+          ]
+        },
+        {
+          "object": "breast_imaging_episode",
+          "table": "combined_anon",
+          "columns": [
+            "acc_anon",
+            "linkedaccession_anon"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.linked-exam-context#optional-reference",
+            "open-v2.linked-exam-context#link-meaning",
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "The projection carries an optional same-episode reference but no complete episode identity or construction rule."
+          ]
+        },
+        {
+          "object": "imaging_exam",
+          "table": "combined_anon",
+          "columns": [
+            "acc_anon"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "Exam attributes repeat at wide-row grain and do not become finding- or pathology-grain facts."
+          ]
+        },
+        {
+          "object": "breast_side",
+          "table": "combined_anon",
+          "columns": [
+            "acc_anon",
+            "side"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.multimodal-finding-context#finding-side-null",
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "Incomplete tuples and context-dependent null laterality prevent an unconditional side identity."
+          ]
+        },
+        {
+          "object": "imaging_finding",
+          "table": "combined_anon",
+          "columns": [
+            "acc_anon",
+            "side",
+            "numfind"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.multimodal-finding-context#descriptor-families",
+            "open-v2.multimodal-finding-context#synthetic-contralateral-finding",
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "The wide projection can contain rows without a resolving normalized imaging index and does not establish a cross-release finding key."
+          ]
+        },
+        {
+          "object": "imaging_interpretation",
+          "table": "combined_anon",
+          "columns": [
+            "asses",
+            "recc"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.assessment-recommendation-context#separate-fields",
+            "open-v2.assessment-recommendation-context#wide-projection-boundary",
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "Projected assessment and recommendation do not gain an independent interpretation identity, timestamp, or co-availability guarantee."
+          ]
+        },
+        {
+          "object": "procedure",
+          "table": "combined_anon",
+          "columns": [
+            "procdate_anon",
+            "type"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.pathology-procedure-context#separate-pathology-surface",
+            "open-v2.temporal-availability-context#wide-table-colocation",
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "Projected procedure fields do not establish a unique procedure identity or availability at imaging time."
+          ]
+        },
+        {
+          "object": "pathology_observation",
+          "table": "combined_anon",
+          "columns": [
+            "path1",
+            "path2",
+            "path3",
+            "path4",
+            "path5",
+            "path6",
+            "path7",
+            "path8",
+            "path9",
+            "path10"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.pathology-procedure-context#diagnosis-slot-order",
+            "open-v2.temporal-availability-context#wide-table-colocation",
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "Projected descriptor slots retain their procedure association and do not become contemporaneous imaging observations."
+          ]
+        },
+        {
+          "object": "pathology_diagnosis",
+          "table": "combined_anon",
+          "columns": [
+            "path_severity"
+          ],
+          "representation": "projection",
+          "claim_refs": [
+            "open-v2.pathology-procedure-context#severity-meaning",
+            "open-v2.temporal-availability-context#wide-table-colocation",
+            "open-v2.temporal-availability-context#wide-object-projection"
+          ],
+          "caveats": [
+            "Projected severity retains unattached-pathology null semantics and does not establish availability at imaging time."
           ]
         }
       ],

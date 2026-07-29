@@ -140,7 +140,8 @@ Each relationship records:
 - directional `cardinality` as targets per source and sources per target;
 - endpoint `optionality` for both source and target;
 - an `attribution` statement and explicit `attribution_limitations`;
-- a `temporal_qualification`;
+- a human-readable `temporal_qualification` and structured
+  `temporal_semantics` references;
 - domains, search terms, claim references, and caveats.
 
 Cardinality uses `exactly_one`, `zero_or_one`, `one_or_more`, `zero_or_more`,
@@ -160,6 +161,11 @@ universal anchor. Each entry contains:
 - `relative_to` references to other temporal semantics;
 - domains, search terms, claim references, and caveats.
 
+`relative_to` is a comparison/navigation list. It does not assert that one
+time must precede or follow another, establish causality, assign certainty, or
+define an interval. Directional or uncertain timing claims belong in the
+meaning, caveats, and linked semantic relationship's temporal qualification.
+
 Exam study time, procedure time, specimen collection time, pathology report
 time, and data availability answer different questions. A profile can mark a
 clinically meaningful time as unsupported through `coverage`; absence of a
@@ -174,6 +180,7 @@ entry identifies:
 - a controlled `status`;
 - `source_object`, `target_object`, and `source_concept`;
 - a nullable `result_concept`;
+- the semantic relationships that establish grouping or attribution;
 - the `method` and relevant `ordering`; and
 - domains, search terms, claim references, and caveats.
 
@@ -183,6 +190,12 @@ selected representation does not supply the transition. `unresolved` preserves
 insufficient evidence. A null `result_concept` is explicit: it means there is
 no registered result feature for that transition, not that a default should be
 calculated.
+
+Aggregation status describes the registered semantic transition, not support
+in every profile. A selected profile supports a supplied transition only when
+profile-scoped `coverage` says so and the result concept has a feature binding.
+Future profiles may bind the same portable aggregation or explicitly record it
+as unsupported.
 
 ### Reusable guardrails
 
@@ -359,6 +372,12 @@ It does not require a table name or stable identifier. Results expose the
 entity kind and ID, score, matched fields, matched terms, and unmatched query
 terms. Exact getters provide the complete entity after discovery. Profile
 binding lookup is a secondary navigation step.
+
+Portable `search_terms` contain clinical synonyms, not release column aliases.
+When `profile` is selected, discovery may additionally index that profile's
+table and column names and reports those matches as `binding.table` or
+`binding.column`. An unprofiled clinical query therefore does not silently
+promote physical names into the ontology.
 
 Discovery diagnostics distinguish:
 

@@ -41,9 +41,10 @@ risk assessment objects.
 
 The graph does not assert a deterministic workflow. Each semantic relationship
 records direction, cardinality in both directions, endpoint optionality,
-attribution limitations, temporal qualifications, claim references, and
-caveats. Profile bindings separately explain how a release approximates or
-fails to represent that relationship.
+attribution limitations, temporal qualifications, structured time links,
+claim references, and caveats. Aggregations link the semantic relationships
+that establish grouping or attribution. Profile bindings separately explain
+how a release approximates or fails to represent those relationships.
 
 ## Breast-cancer outcome semantics
 
@@ -87,6 +88,8 @@ filters excluded otherwise matching entities, a controlled filter or
 vocabulary value is unknown, a concept is explicitly unsupported in the
 selected profile, or the catalog has no indexed coverage.
 
-Exact getters remain available for follow-up navigation. Profile binding
-queries are explicitly secondary and never presented as the conceptual model.
-
+Exact semantic getters compute `related` navigation from the graph and
+`provenance` from `context#claim` references, including claim status, context
+scope/profiles, and source records. They also expose relevant profile bindings
+without duplicating those links in portable records. Profile binding queries
+remain explicitly secondary and are never presented as the conceptual model.

@@ -48,6 +48,8 @@ row without an independent interpretation identifier or timestamp.
 
 Lower values are more severe. The six codes are not automatically two
 analysis classes, and the catalog does not recommend combining them.
+In particular, `5` represents non-breast cancer; it is not benign pathology,
+a healthy state, or absence of malignancy.
 
 Null severity is the separately modeled `unattached_pathology` state. It means
 that no pathology is attached through the represented field. It is not code
@@ -93,7 +95,10 @@ that anchor when leakage matters.
 
 The represented pathology severity is derived from the most severe attached
 pathology descriptor group. Side- and exam-level severity aggregates use the
-minimum numeric value because the scale is inverse.
+minimum numeric value because the scale is inverse. Open-v2 support for those
+two supplied rollups is recorded through profile-specific coverage and result
+feature bindings; `provided` does not imply that every future profile contains
+the same fields.
 
 No supplied finding-level severity is established because attribution is
 optional and many-to-many. No canonical patient-level outcome rollup is
@@ -107,8 +112,14 @@ outside-system follow-up, a censoring mechanism, an interval-cancer rule, or a
 minimum observation window. Absence of a represented diagnosis is therefore
 not proof of disease absence.
 
+Restricting observations to attached pathology also conditions on a
+represented tissue-sampling procedure. Because not every patient, exam, side,
+or finding proceeds to sampling, pathology-observed groups may differ
+systematically from unsampled groups. The catalog exposes this selection
+mechanism but does not choose an inclusion, exclusion, weighting, or causal
+analysis policy.
+
 Coverage records distinguish a documented unsupported or unresolved surface
 from a failed search. A `no_catalog_coverage` diagnostic means only that the
 portable catalog has no indexed record for the query; it is not evidence that
 the clinical concept is absent from EMBED or clinical care.
-
