@@ -61,6 +61,34 @@ class CheckedInCatalogTests(unittest.TestCase):
                 result = self.catalog.get_relationship(relationship.id)
                 self.assertEqual(result["identifier"], relationship.id)
 
+    def test_open_v2_relationship_inventory_is_complete(self) -> None:
+        expected = {
+            "open-v2.combined_anon.exam_projection",
+            "open-v2.combined_anon.imaging_index_projection",
+            "open-v2.combined_anon.linked_exam",
+            "open-v2.combined_anon.pathology_index_projection",
+            "open-v2.combined_anon.patient_projection",
+            "open-v2.combined_anon.side_projection",
+            "open-v2.exam_level_anon.patient",
+            "open-v2.imaging_findings_anon.exam",
+            "open-v2.imaging_findings_anon.linked_exam",
+            "open-v2.imaging_findings_anon.side",
+            "open-v2.pathology_findings_anon.exam",
+            "open-v2.pathology_findings_anon.imaging_finding",
+            "open-v2.pathology_findings_anon.side",
+            "open-v2.reports_anon.exam",
+            "open-v2.reports_anon.patient",
+            "open-v2.risk_anon.exam",
+            "open-v2.risk_anon.patient",
+            "open-v2.side_level_anon.exam",
+        }
+        actual = {
+            relationship.id
+            for relationship in self.catalog.relationships
+            if relationship.profile == "open-v2"
+        }
+        self.assertEqual(actual, expected)
+
     def test_unreliable_natural_keys_and_wide_hazards_remain_explicit(self) -> None:
         by_table = {table.table: table for table in self.catalog.tables}
         for table_name in (
@@ -90,13 +118,22 @@ class CheckedInCatalogTests(unittest.TestCase):
             all(item["join_hazards"] for item in wide_relationships)
         )
 
-        linked = self.catalog.get_relationship(
-            "open-v2.imaging_findings_anon.linked_exam"
-        )["relationship"]
-        self.assertEqual(linked["source"]["completeness"], "optional")
-        self.assertEqual(
-            linked["cardinality"]["targets_per_source"], "zero_or_one"
-        )
+        for relationship_id in (
+            "open-v2.combined_anon.linked_exam",
+            "open-v2.imaging_findings_anon.linked_exam",
+        ):
+            with self.subTest(relationship=relationship_id):
+                linked = self.catalog.get_relationship(relationship_id)[
+                    "relationship"
+                ]
+                self.assertEqual(
+                    linked["source"]["completeness"], "optional"
+                )
+                self.assertEqual(
+                    linked["cardinality"]["targets_per_source"], "zero_or_one"
+                )
+                self.assertTrue(linked["join_hazards"])
+
 
     def test_domain_only_search_returns_each_matching_concept_once(self) -> None:
         for domain in (
