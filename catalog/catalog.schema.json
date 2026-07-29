@@ -699,7 +699,7 @@
           "$ref": "#/$defs/identifiers"
         },
         "relative_to": {
-          "description": "Other candidate time semantics that should be compared when interpreting this time; membership does not assert order, causality, certainty, or a required interval.",
+          "description": "Reference time semantics that this time is generally downstream of in the represented clinical context; membership does not assert universal ordering, causality, certainty, or a required interval.",
           "$ref": "#/$defs/identifiers"
         },
         "domains": {

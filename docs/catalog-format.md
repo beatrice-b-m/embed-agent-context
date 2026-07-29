@@ -161,10 +161,12 @@ universal anchor. Each entry contains:
 - `relative_to` references to other temporal semantics;
 - domains, search terms, claim references, and caveats.
 
-`relative_to` is a comparison/navigation list. It does not assert that one
-time must precede or follow another, establish causality, assign certainty, or
-define an interval. Directional or uncertain timing claims belong in the
-meaning, caveats, and linked semantic relationship's temporal qualification.
+`relative_to` points from a time to candidate reference times that are
+generally upstream of it in the represented clinical context. It supports
+timeline navigation but does not assert universal ordering, causality,
+certainty, or a required interval. Exceptions and strength of the timing claim
+belong in the meaning, caveats, and linked semantic relationship's temporal
+qualification. Cycles are invalid.
 
 Exam study time, procedure time, specimen collection time, pathology report
 time, and data availability answer different questions. A profile can mark a
