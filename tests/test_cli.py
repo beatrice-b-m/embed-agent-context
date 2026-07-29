@@ -306,6 +306,21 @@ class FakeCatalog:
             "kind": "relationship_binding",
             "identifier": identifier,
             "relationship_binding": self._relationship_binding(identifier),
+            "semantic_relationships": [
+                {
+                    "id": "clinical.exam-patient",
+                    "label": "Exam belongs to patient",
+                }
+            ],
+            "provenance": {
+                "claims": [{"id": "open-v2.exam-context#patient-link"}],
+                "contexts": [{"id": "open-v2.exam-context"}],
+                "sources": {
+                    "open-v2.release-schema": {
+                        "id": "open-v2.release-schema",
+                    }
+                },
+            },
         }
 
     def search_relationship_bindings(
@@ -666,6 +681,25 @@ class CatalogCLITests(unittest.TestCase):
             ],
         )
         self.assertEqual(json.loads(stdout)["data"]["count"], 1)
+
+    def test_relationship_binding_text_preserves_navigation_and_provenance(
+        self,
+    ) -> None:
+        status, stdout, stderr = self.run_cli(
+            "relationship-binding",
+            "exam.patient",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn(
+            "semantic relationships: clinical.exam-patient",
+            stdout,
+        )
+        self.assertIn("provenance:", stdout)
+        self.assertIn("open-v2.exam-context#patient-link", stdout)
+        self.assertIn("open-v2.exam-context", stdout)
+        self.assertIn("open-v2.release-schema", stdout)
 
     def test_legacy_and_ambiguous_commands_are_removed(self) -> None:
         parser = build_parser()

@@ -286,9 +286,7 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
     if command == "profile-table":
         return _format_profile_table(data)
     if command == "relationship-binding":
-        return _format_relationship_binding(
-            _entity_from_result(data, "relationship_binding")
-        )
+        return _format_relationship_binding_result(data)
     if command == "relationship-bindings":
         matches = data.get("matches", ())
         if not matches:
@@ -655,6 +653,18 @@ def _format_relationship_binding(relationship: Mapping[str, Any]) -> str:
     if hazards:
         line += "\n  hazards: " + "; ".join(map(str, hazards))
     return line
+
+
+def _format_relationship_binding_result(data: Mapping[str, Any]) -> str:
+    relationship = _entity_from_result(data, "relationship_binding")
+    lines = [_format_relationship_binding(relationship)]
+    semantic_relationships = _render_references(
+        data.get("semantic_relationships")
+    )
+    if semantic_relationships:
+        lines.append(f"semantic relationships: {semantic_relationships}")
+    _append_navigation_and_provenance(lines, data)
+    return "\n".join(lines)
 
 
 def _reference_identifier(value: Any) -> str:
