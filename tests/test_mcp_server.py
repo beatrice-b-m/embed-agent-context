@@ -278,6 +278,10 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 "limit",
             },
         )
+        self.assertIs(
+            schemas["search_relationships"]["additionalProperties"],
+            False,
+        )
         search_properties = schemas["search_features"]["properties"]
         self.assertIn("pathology_finding", schema_enums(search_properties["grain"]))
         self.assertIn(
@@ -506,6 +510,16 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.is_error)
         self.assertEqual(self.catalog.calls, [])
 
+    async def test_unknown_relationship_filter_is_a_schema_error(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "search_relationships",
+                {"sourceTable": "combined_anon"},
+            )
+
+        self.assertTrue(result.is_error)
+        self.assertEqual(self.catalog.calls, [])
+
     async def test_empty_query_without_filters_is_a_tool_error(self) -> None:
         server = build_server(load_catalog())
         async with Client(server) as client:
@@ -540,6 +554,13 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
             "profiles in this catalog: open-v2",
             relationship_search.description,
         )
+        self.assertIn(
+            "tables in this catalog:",
+            relationship_search.description,
+        )
+        self.assertNotIn("grains:", relationship_search.description)
+        self.assertNotIn("domains:", relationship_search.description)
+        self.assertNotIn("feature kinds:", relationship_search.description)
 
     async def test_all_tools_query_the_checked_in_catalog(self) -> None:
         server = build_server(load_catalog())

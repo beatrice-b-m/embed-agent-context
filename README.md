@@ -122,6 +122,8 @@ controlled feature or relationship filters, while descriptions list the
 profiles and tables present in the loaded catalog. Relationship results are
 descriptive metadata; clients must honor their optionality, cardinality,
 caveats, and join hazards rather than treating them as executable joins.
+`search_relationships` rejects undeclared arguments rather than silently
+broadening a query.
 
 ## Maintainer verification
 

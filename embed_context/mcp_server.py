@@ -75,14 +75,10 @@ def _require_mcp() -> tuple[type[Any], type[Any]]:
     return MCPServer, ToolAnnotations
 
 
-def _catalog_filter_description(catalog: CatalogProtocol) -> str:
-    """Describe controlled and catalog-specific filters without another tool."""
+def _catalog_scope_description(catalog: CatalogProtocol) -> str:
+    """Describe catalog-specific profiles and tables without another tool."""
 
-    parts = [
-        f"grains: {', '.join(GRAINS)}",
-        f"domains: {', '.join(DOMAINS)}",
-        f"feature kinds: {', '.join(FEATURE_KINDS)}",
-    ]
+    parts = []
     profiles = sorted(
         {
             value
@@ -107,6 +103,23 @@ def _catalog_filter_description(catalog: CatalogProtocol) -> str:
     return "; ".join(parts)
 
 
+def _require_exact_tool_arguments(server: Any, tool_name: str) -> None:
+    """Reject undeclared arguments in one pinned-SDK function tool.
+
+    MCP SDK 2.0 function tools derive a Pydantic argument model that ignores
+    extra fields by default. Rebuilding the registered model with ``extra``
+    forbidden keeps the advertised JSON Schema and runtime behavior aligned.
+    """
+
+    tool = server._tool_manager.get_tool(tool_name)
+    if tool is None:  # pragma: no cover - called immediately after registration.
+        raise RuntimeError(f"MCP tool {tool_name!r} was not registered")
+    argument_model = tool.fn_metadata.arg_model
+    argument_model.model_config["extra"] = "forbid"
+    argument_model.model_rebuild(force=True)
+    tool.parameters = argument_model.model_json_schema(by_alias=True)
+
+
 def build_server(catalog: CatalogProtocol) -> Any:
     """Build an MCP server over an already-loaded catalog.
 
@@ -115,7 +128,25 @@ def build_server(catalog: CatalogProtocol) -> Any:
     """
 
     MCPServer, ToolAnnotations = _require_mcp()
-    filter_description = _catalog_filter_description(catalog)
+    catalog_scope = _catalog_scope_description(catalog)
+    feature_filter_description = "; ".join(
+        part
+        for part in (
+            f"grains: {', '.join(GRAINS)}",
+            f"domains: {', '.join(DOMAINS)}",
+            f"feature kinds: {', '.join(FEATURE_KINDS)}",
+            catalog_scope,
+        )
+        if part
+    )
+    relationship_filter_description = "; ".join(
+        part
+        for part in (
+            f"relationship kinds: {', '.join(sorted(RELATIONSHIP_KINDS))}",
+            catalog_scope,
+        )
+        if part
+    )
     server = MCPServer(
         "embed-v2-feature-context",
         description="Read-only EMBED V2 feature and table-linkage metadata lookup",
@@ -126,7 +157,8 @@ def build_server(catalog: CatalogProtocol) -> Any:
             "Relationships are descriptive metadata, not executable joins; honor "
             "their documented optionality, cardinality, and hazards. The catalog "
             "does not provide clinical rows, report text, or clinical advice. "
-            f"Search filters — {filter_description}."
+            f"Feature search filters — {feature_filter_description}. "
+            f"Relationship search filters — {relationship_filter_description}."
         ),
     )
     read_only = ToolAnnotations(
@@ -147,7 +179,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
         structured_output=True,
         description=(
             "Search features by text and/or controlled facets. Valid filters — "
-            f"{filter_description}."
+            f"{feature_filter_description}."
         ),
     )
     def search_features(
@@ -195,8 +227,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
         description=(
             "Filter table relationships by profile, either endpoint table, "
             "directional endpoint table, and/or relationship kind. Valid "
-            f"relationship kinds: {', '.join(sorted(RELATIONSHIP_KINDS))}; "
-            f"catalog filters — {filter_description}."
+            f"filters — {relationship_filter_description}."
         ),
     )
     def search_relationships(
@@ -218,6 +249,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
             limit=limit,
         )
 
+    _require_exact_tool_arguments(server, "search_relationships")
     return server
 
 
