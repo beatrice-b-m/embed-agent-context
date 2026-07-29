@@ -266,17 +266,22 @@ class Vocabulary:
 
 
 @dataclass(frozen=True, slots=True)
-class _SearchDocument:
+class _BindingSearchDocument:
     binding: Binding
+    identifier_text: str
+    auxiliary_text: str
+    all_tokens: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class _ConceptSearchDocument:
     concept: Concept
     vocabulary: Vocabulary | None
-    identifier_text: str
     concept_id_text: str
     label_text: str
     search_terms_text: str
     definition_text: str
-    auxiliary_text: str
-    all_tokens: frozenset[str]
+    bindings: tuple[_BindingSearchDocument, ...]
 
 
 class Catalog:
@@ -657,25 +662,17 @@ class Catalog:
             or not 1 <= limit <= 500
         ):
             raise CatalogValidationError("limit must be an integer from 1 to 500")
-        if filters["profile"] is not None and filters["profile"] not in self.profiles:
-            raise CatalogValidationError(
-                f"unknown profile filter {filters['profile']!r}"
-            )
-        if filters["grain"] is not None and filters["grain"] not in GRAINS:
-            raise CatalogValidationError(
-                f"unknown grain filter {filters['grain']!r}"
-            )
-        if filters["domain"] is not None and filters["domain"] not in DOMAINS:
-            raise CatalogValidationError(
-                f"unknown domain filter {filters['domain']!r}"
-            )
-        if (
-            filters["feature_kind"] is not None
-            and filters["feature_kind"] not in FEATURE_KINDS
-        ):
-            raise CatalogValidationError(
-                f"unknown feature_kind filter {filters['feature_kind']!r}"
-            )
+        controlled_filters = {
+            "profile": self.profiles,
+            "grain": GRAINS,
+            "domain": DOMAINS,
+            "feature_kind": FEATURE_KINDS,
+        }
+        for name, allowed in controlled_filters.items():
+            if filters[name] is not None and filters[name] not in allowed:
+                raise CatalogValidationError(
+                    f"unknown {name} filter {filters[name]!r}"
+                )
 
         query_tokens = frozenset(
             token
@@ -686,81 +683,63 @@ class Catalog:
             raise CatalogValidationError(
                 "query must contain at least one meaningful token"
             )
-        candidates: list[tuple[str, int, int, _SearchDocument]] = []
+        candidates = []
+        has_complete_match = False
         for document in self._search_documents:
-            binding = document.binding
             concept = document.concept
-            if (
-                filters["profile"] is not None
-                and binding.profile != filters["profile"]
-            ):
-                continue
-            if (
-                filters["table"] is not None
-                and binding.table != filters["table"]
-            ):
-                continue
-            if (
-                filters["grain"] is not None
-                and binding.grain != filters["grain"]
-            ):
-                continue
-            if (
-                filters["domain"] is not None
-                and filters["domain"] not in concept.domains
-            ):
-                continue
-            if (
-                filters["feature_kind"] is not None
-                and concept.feature_kind != filters["feature_kind"]
-            ):
-                continue
-            overlap = query_tokens & document.all_tokens
-            if query_tokens and not overlap:
-                continue
-            score = _score_document(document, query_text, query_tokens)
-            if query_tokens:
-                score += round(40 * len(overlap) / len(query_tokens))
-            candidates.append((concept.id, score, len(overlap), document))
+            binding_matches: list[tuple[int, int, _BindingSearchDocument]] = []
+            for binding_document in document.bindings:
+                if not _matches_search_filters(
+                    binding_document.binding, concept, filters
+                ):
+                    continue
+                overlap = query_tokens & binding_document.all_tokens
+                if query_tokens and not overlap:
+                    continue
+                score = _score_document(
+                    document, binding_document, query_text, query_tokens
+                )
+                if query_tokens:
+                    score += round(40 * len(overlap) / len(query_tokens))
+                    has_complete_match |= len(overlap) == len(query_tokens)
+                binding_matches.append((score, len(overlap), binding_document))
 
-        if query_tokens and any(
-            overlap_size == len(query_tokens)
-            for _, _, overlap_size, _ in candidates
-        ):
-            candidates = [
-                candidate
-                for candidate in candidates
-                if candidate[2] == len(query_tokens)
-            ]
+            if binding_matches:
+                candidates.append((document, binding_matches))
 
-        grouped_matches: defaultdict[
-            str, list[tuple[int, _SearchDocument]]
-        ] = defaultdict(list)
-        for concept_id, score, _, document in candidates:
-            grouped_matches[concept_id].append((score, document))
-
-        scored_concepts: list[
-            tuple[int, str, tuple[_SearchDocument, ...]]
-        ] = []
-        for concept_id, entries in grouped_matches.items():
+        scored_concepts = []
+        for document, entries in candidates:
+            if query_tokens and has_complete_match:
+                entries = [
+                    entry for entry in entries if entry[1] == len(query_tokens)
+                ]
+                if not entries:
+                    continue
             entries.sort(
                 key=lambda item: (
                     -item[0],
-                    item[1].binding.qualified_identifier,
+                    item[2].binding.qualified_identifier,
                 )
             )
             score = entries[0][0]
-            documents = tuple(
+            binding_documents = tuple(
                 sorted(
-                    (entry[1] for entry in entries),
+                    (entry[2] for entry in entries),
                     key=lambda item: item.binding.qualified_identifier,
                 )
             )
-            scored_concepts.append((score, concept_id, documents))
+            scored_concepts.append(
+                (
+                    score,
+                    document.concept.id,
+                    document,
+                    binding_documents,
+                )
+            )
         scored_concepts.sort(key=lambda item: (-item[0], item[1]))
         matches = [
-            _search_match(documents, score)
-            for score, _, documents in scored_concepts[:limit]
+            _search_match(document, binding_documents, score)
+            for score, _, document, binding_documents in scored_concepts[:limit]
         ]
         return {
             "query": query,
@@ -801,77 +780,86 @@ class Catalog:
             return None
         return self._vocabularies[concept.vocabulary]
 
-    def _build_search_documents(self) -> tuple[_SearchDocument, ...]:
-        documents: list[_SearchDocument] = []
-        for binding in self._bindings:
-            concept = self._concepts[binding.concept]
+    def _build_search_documents(self) -> tuple[_ConceptSearchDocument, ...]:
+        documents: list[_ConceptSearchDocument] = []
+        for concept in self._concepts.values():
+            bindings = self._bindings_by_concept.get(concept.id, ())
+            if not bindings:
+                continue
             vocabulary = self._vocabulary_for_concept(concept)
-            identifier_text = binding.identifier.casefold()
             concept_id_text = concept.id.casefold()
             label_text = concept.label.casefold()
             search_terms_text = " ".join(concept.search_terms).casefold()
             definition_text = concept.definition.casefold()
-            auxiliary_parts = [
-                binding.profile,
-                binding.table,
-                binding.column,
-                binding.grain,
-                binding.role,
-                binding.physical_type,
-                concept.feature_kind,
-                *concept.domains,
-                *concept.caveats,
-                *concept.evidence,
-                *binding.notes,
-            ]
-            auxiliary_parts.extend(
-                compact
-                for compact in (
-                    _compact_identifier(binding.identifier),
-                    _compact_identifier(binding.column),
-                    _compact_identifier(concept.id),
-                    *(
-                        _compact_identifier(term)
-                        for term in concept.search_terms
-                    ),
-                )
-                if compact
-            )
-            if vocabulary is not None:
+            binding_documents: list[_BindingSearchDocument] = []
+            for binding in bindings:
+                identifier_text = binding.identifier.casefold()
+                auxiliary_parts = [
+                    binding.profile,
+                    binding.table,
+                    binding.column,
+                    binding.grain,
+                    binding.role,
+                    binding.physical_type,
+                    concept.feature_kind,
+                    *concept.domains,
+                    *concept.caveats,
+                    *concept.evidence,
+                    *binding.notes,
+                ]
                 auxiliary_parts.extend(
-                    [
-                        vocabulary.id,
-                        vocabulary.label,
-                        vocabulary.completeness,
-                        vocabulary.parsing,
-                        *vocabulary.caveats,
-                        *(code for code, _ in vocabulary.codes),
-                        *(meaning for _, meaning in vocabulary.codes),
-                    ]
+                    compact
+                    for compact in (
+                        _compact_identifier(binding.identifier),
+                        _compact_identifier(binding.column),
+                        _compact_identifier(concept.id),
+                        *(
+                            _compact_identifier(term)
+                            for term in concept.search_terms
+                        ),
+                    )
+                    if compact
                 )
-            auxiliary_text = " ".join(auxiliary_parts).casefold()
-            all_text = " ".join(
-                (
-                    identifier_text,
-                    concept_id_text,
-                    label_text,
-                    search_terms_text,
-                    definition_text,
-                    auxiliary_text,
+                if vocabulary is not None:
+                    auxiliary_parts.extend(
+                        [
+                            vocabulary.id,
+                            vocabulary.label,
+                            vocabulary.completeness,
+                            vocabulary.parsing,
+                            *vocabulary.caveats,
+                            *(code for code, _ in vocabulary.codes),
+                            *(meaning for _, meaning in vocabulary.codes),
+                        ]
+                    )
+                auxiliary_text = " ".join(auxiliary_parts).casefold()
+                all_text = " ".join(
+                    (
+                        identifier_text,
+                        concept_id_text,
+                        label_text,
+                        search_terms_text,
+                        definition_text,
+                        auxiliary_text,
+                    )
                 )
-            )
+                binding_documents.append(
+                    _BindingSearchDocument(
+                        binding=binding,
+                        identifier_text=identifier_text,
+                        auxiliary_text=auxiliary_text,
+                        all_tokens=frozenset(_tokens(all_text)),
+                    )
+                )
             documents.append(
-                _SearchDocument(
-                    binding=binding,
+                _ConceptSearchDocument(
                     concept=concept,
                     vocabulary=vocabulary,
-                    identifier_text=identifier_text,
                     concept_id_text=concept_id_text,
                     label_text=label_text,
                     search_terms_text=search_terms_text,
                     definition_text=definition_text,
-                    auxiliary_text=auxiliary_text,
-                    all_tokens=frozenset(_tokens(all_text)),
+                    bindings=tuple(binding_documents),
                 )
             )
         return tuple(documents)
@@ -1199,6 +1187,26 @@ def _optional_filter(value: object, name: str) -> str | None:
     return value.strip()
 
 
+def _matches_search_filters(
+    binding: Binding,
+    concept: Concept,
+    filters: Mapping[str, str | None],
+) -> bool:
+    return (
+        (filters["profile"] is None or binding.profile == filters["profile"])
+        and (filters["table"] is None or binding.table == filters["table"])
+        and (filters["grain"] is None or binding.grain == filters["grain"])
+        and (
+            filters["domain"] is None
+            or filters["domain"] in concept.domains
+        )
+        and (
+            filters["feature_kind"] is None
+            or concept.feature_kind == filters["feature_kind"]
+        )
+    )
+
+
 def _tokens(value: str) -> tuple[str, ...]:
     return tuple(
         _normalize_token(token)
@@ -1229,35 +1237,36 @@ def _compact_identifier(value: str) -> str:
 
 
 def _score_document(
-    document: _SearchDocument,
+    document: _ConceptSearchDocument,
+    binding_document: _BindingSearchDocument,
     query_text: str,
     query_tokens: frozenset[str],
 ) -> int:
     if not query_text:
         return 0
     score = 0
-    if query_text == document.identifier_text:
+    if query_text == binding_document.identifier_text:
         score += 1000
     if query_text == document.concept_id_text:
         score += 800
     fields = (
-        (document.identifier_text, 120),
+        (binding_document.identifier_text, 120),
         (document.concept_id_text, 100),
         (document.label_text, 80),
         (document.search_terms_text, 60),
         (document.definition_text, 30),
-        (document.auxiliary_text, 10),
+        (binding_document.auxiliary_text, 10),
     )
     for text, phrase_weight in fields:
         if query_text in text:
             score += phrase_weight
     token_fields = (
-        (frozenset(_tokens(document.identifier_text)), 24),
+        (frozenset(_tokens(binding_document.identifier_text)), 24),
         (frozenset(_tokens(document.concept_id_text)), 20),
         (frozenset(_tokens(document.label_text)), 16),
         (frozenset(_tokens(document.search_terms_text)), 12),
         (frozenset(_tokens(document.definition_text)), 6),
-        (frozenset(_tokens(document.auxiliary_text)), 2),
+        (frozenset(_tokens(binding_document.auxiliary_text)), 2),
     )
     for token in query_tokens:
         for field_tokens, token_weight in token_fields:
@@ -1267,10 +1276,12 @@ def _score_document(
 
 
 def _search_match(
-    documents: tuple[_SearchDocument, ...], score: int
+    document: _ConceptSearchDocument,
+    binding_documents: tuple[_BindingSearchDocument, ...],
+    score: int,
 ) -> dict[str, Any]:
-    concept = documents[0].concept
-    vocabulary = documents[0].vocabulary
+    concept = document.concept
+    vocabulary = document.vocabulary
     return {
         "score": score,
         "identifier": concept.id,
@@ -1281,7 +1292,10 @@ def _search_match(
         "domains": list(concept.domains),
         "evidence": list(concept.evidence),
         "caveats": list(concept.caveats),
-        "bindings": [document.binding.to_dict() for document in documents],
+        "bindings": [
+            binding_document.binding.to_dict()
+            for binding_document in binding_documents
+        ],
         "vocabulary": (
             vocabulary.id if vocabulary is not None else None
         ),
