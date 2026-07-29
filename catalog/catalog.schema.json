@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "catalog.schema.json",
+  "title": "EMBED V2 count-free feature catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "profiles",
+    "grains",
+    "feature_kinds",
+    "domains",
+    "concepts",
+    "bindings",
+    "vocabularies"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "./catalog.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_.-]*$"
+      }
+    },
+    "grains": {
+      "const": [
+        "patient",
+        "exam",
+        "breast_side",
+        "imaging_finding",
+        "pathology_finding",
+        "report",
+        "risk_assessment",
+        "wide_row"
+      ]
+    },
+    "feature_kinds": {
+      "const": [
+        "identifier",
+        "date",
+        "categorical",
+        "coded",
+        "flag",
+        "numeric",
+        "text",
+        "aggregate",
+        "model_output",
+        "technical"
+      ]
+    },
+    "domains": {
+      "const": [
+        "identity",
+        "demographics",
+        "social_determinants_of_health",
+        "exam",
+        "breast_side",
+        "imaging",
+        "mammography",
+        "ultrasound",
+        "mri",
+        "pathology",
+        "procedure",
+        "report",
+        "risk",
+        "temporal",
+        "workflow",
+        "technical"
+      ]
+    },
+    "concepts": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*$": {
+          "$ref": "#/$defs/concept"
+        }
+      },
+      "additionalProperties": false
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/binding"
+      }
+    },
+    "vocabularies": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*$": {
+          "$ref": "#/$defs/vocabulary"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "string",
+      "enum": [
+        "release_schema",
+        "release_legend",
+        "observed_v2_values",
+        "cross_table_check",
+        "maintainer_confirmed",
+        "inference",
+        "unresolved"
+      ]
+    },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "definition",
+        "feature_kind",
+        "domains",
+        "search_terms",
+        "caveats",
+        "evidence"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feature_kind": {
+          "enum": [
+            "identifier",
+            "date",
+            "categorical",
+            "coded",
+            "flag",
+            "numeric",
+            "text",
+            "aggregate",
+            "model_output",
+            "technical"
+          ]
+        },
+        "domains": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "identity",
+              "demographics",
+              "social_determinants_of_health",
+              "exam",
+              "breast_side",
+              "imaging",
+              "mammography",
+              "ultrasound",
+              "mri",
+              "pathology",
+              "procedure",
+              "report",
+              "risk",
+              "temporal",
+              "workflow",
+              "technical"
+            ]
+          }
+        },
+        "search_terms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "vocabulary": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "table",
+        "column",
+        "concept",
+        "grain",
+        "role",
+        "physical_type",
+        "nullable"
+      ],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+        },
+        "column": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+        },
+        "concept": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "grain": {
+          "enum": [
+            "patient",
+            "exam",
+            "breast_side",
+            "imaging_finding",
+            "pathology_finding",
+            "report",
+            "risk_assessment",
+            "wide_row"
+          ]
+        },
+        "role": {
+          "enum": [
+            "canonical",
+            "reference",
+            "wide_projection",
+            "technical"
+          ]
+        },
+        "physical_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "type": "object",
+          "minProperties": 1,
+          "properties": {
+            "slot": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "notes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "vocabulary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "completeness",
+        "parsing",
+        "evidence",
+        "codes"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "completeness": {
+          "enum": [
+            "unknown",
+            "open",
+            "closed"
+          ]
+        },
+        "parsing": {
+          "enum": [
+            "atomic",
+            "comma_composed_undocumented",
+            "shared_slot_dictionary"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "codes": {
+          "type": "object",
+          "minProperties": 1,
+          "patternProperties": {
+            "^.+$": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}
