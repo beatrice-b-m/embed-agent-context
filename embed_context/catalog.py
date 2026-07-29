@@ -1,7 +1,7 @@
-"""Load, validate, and query the count-free EMBED feature catalog.
+"""Load, validate, and query the count-free EMBED clinical-semantic catalog.
 
-The core deliberately uses only the Python standard library. It does not read
-clinical tables, import PyArrow, or depend on any protocol adapter.
+The core uses only the Python standard library.  Portable clinical semantics
+are kept separate from profile-specific tables, columns, and join bindings.
 """
 
 from __future__ import annotations
@@ -17,8 +17,9 @@ from typing import Any
 
 
 SCHEMA_REFERENCE = "./catalog.schema.json"
-SCHEMA_VERSION = 4
-GRAINS = (
+SCHEMA_VERSION = 5
+
+BINDING_GRAINS = (
     "patient",
     "exam",
     "breast_side",
@@ -28,6 +29,9 @@ GRAINS = (
     "risk_assessment",
     "wide_row",
 )
+# Compatibility for callers which used the v4 constant.  Schema-v5 documents
+# use ``binding_grains`` and never treat these values as the clinical ontology.
+GRAINS = BINDING_GRAINS
 FEATURE_KINDS = (
     "identifier",
     "date",
@@ -76,11 +80,7 @@ SOURCE_KINDS = (
     "supporting_internal",
     "public_documentation",
 )
-SOURCE_LOCATOR_KINDS = (
-    "url",
-    "repository_path",
-    "logical_artifact",
-)
+SOURCE_LOCATOR_KINDS = ("url", "repository_path", "logical_artifact")
 CLAIM_STATUSES = (
     "verified",
     "reconciled",
@@ -88,9 +88,42 @@ CLAIM_STATUSES = (
     "unresolved",
     "contradicted",
 )
-ANALYSIS_PATTERN_STATUSES = (
-    "draft",
-    "reviewed",
+SEMANTIC_RELATIONSHIP_KINDS = (
+    "hierarchy",
+    "association",
+    "attribution",
+    "documentation",
+    "derivation",
+)
+TEMPORAL_KINDS = ("event_time", "documentation_time", "availability_time")
+AGGREGATION_STATUSES = (
+    "provided",
+    "analyst_defined",
+    "unsupported",
+    "unresolved",
+)
+COVERAGE_STATUSES = ("supported", "unsupported", "unresolved", "not_cataloged")
+DISCOVERY_KINDS = (
+    "clinical_object",
+    "feature",
+    "semantic_relationship",
+    "temporal_semantic",
+    "aggregation",
+    "guardrail",
+    "coverage",
+    "context",
+)
+RELATIONSHIP_BINDING_KINDS = frozenset(
+    {"hierarchy", "reference", "projection"}
+)
+# Compatibility name used by older adapters.
+RELATIONSHIP_KINDS = RELATIONSHIP_BINDING_KINDS
+OBJECT_BINDING_REPRESENTATIONS = frozenset(
+    {"canonical", "partial", "co_located", "projection", "reference"}
+)
+OPTIONALITY_VALUES = frozenset({"required", "optional", "unknown"})
+CARDINALITY_VALUES = frozenset(
+    {"exactly_one", "zero_or_one", "one_or_more", "zero_or_more", "unknown"}
 )
 EVIDENCE_VALUES = frozenset(
     {
@@ -111,42 +144,61 @@ VOCABULARY_PARSING = frozenset(
 KEY_KINDS = frozenset({"natural", "technical"})
 KEY_UNIQUENESS = frozenset({"unique", "not_unique", "unknown"})
 KEY_COMPLETENESS = frozenset({"complete", "incomplete", "unknown"})
-RELATIONSHIP_KINDS = frozenset({"hierarchy", "reference", "projection"})
 ENDPOINT_COMPLETENESS = frozenset({"required", "optional", "unknown"})
-CARDINALITY_VALUES = frozenset(
-    {"exactly_one", "zero_or_one", "one_or_more", "zero_or_more", "unknown"}
+COVERAGE_SUBJECT_KINDS = frozenset(
+    {
+        "clinical_object",
+        "concept",
+        "semantic_relationship",
+        "temporal_semantic",
+        "aggregation",
+        "guardrail",
+        "topic",
+    }
 )
+
+BINDING_PARAMETER_KEYS = frozenset({"slot"})
 
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]*$")
 _TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
+_CLAIM_REF_PATTERN = re.compile(
+    r"^(?P<context>[a-z][a-z0-9_.-]*)#(?P<claim>[a-z][a-z0-9_.-]*)$"
+)
 _SEARCH_STOPWORDS = frozenset(
     {
         "a",
         "all",
         "an",
         "and",
+        "anon",
         "everything",
         "feature",
         "features",
         "find",
         "for",
+        "how",
         "in",
+        "is",
+        "it",
+        "known",
         "of",
         "on",
         "or",
         "relevant",
+        "represented",
         "show",
         "the",
         "to",
         "with",
     }
 )
+
 _TOP_LEVEL_KEYS = frozenset(
     {
         "$schema",
         "schema_version",
         "profiles",
-        "grains",
+        "binding_grains",
         "feature_kinds",
         "domains",
         "context_kinds",
@@ -154,81 +206,146 @@ _TOP_LEVEL_KEYS = frozenset(
         "source_kinds",
         "source_locator_kinds",
         "claim_statuses",
-        "analysis_pattern_statuses",
+        "semantic_relationship_kinds",
+        "temporal_kinds",
+        "aggregation_statuses",
+        "coverage_statuses",
+        "clinical_objects",
         "concepts",
-        "bindings",
+        "semantic_relationships",
+        "temporal_semantics",
+        "aggregations",
+        "guardrails",
+        "coverage",
         "vocabularies",
-        "tables",
-        "relationships",
         "sources",
         "contexts",
-        "analysis_patterns",
+        "profile_bindings",
     }
 )
-_CATALOG_ENVELOPE_KEYS = frozenset({"$schema", "schema_version"})
+_CLINICAL_OBJECT_KEYS = frozenset(
+    {"label", "definition", "grain", "domains", "search_terms", "claim_refs", "caveats"}
+)
 _CONCEPT_KEYS = frozenset(
     {
         "label",
         "definition",
         "feature_kind",
         "domains",
+        "objects",
         "search_terms",
         "caveats",
         "evidence",
         "vocabulary",
+        "claim_refs",
+        "missing_states",
+        "temporal_semantics",
+        "aggregations",
     }
 )
-_CONCEPT_REQUIRED_KEYS = _CONCEPT_KEYS - {"vocabulary"}
-_BINDING_KEYS = frozenset(
+_CONCEPT_REQUIRED_KEYS = frozenset(
     {
-        "profile",
-        "table",
-        "column",
-        "concept",
-        "grain",
-        "role",
-        "physical_type",
-        "nullable",
-        "parameters",
-        "notes",
+        "label",
+        "definition",
+        "feature_kind",
+        "domains",
+        "objects",
+        "search_terms",
+        "caveats",
+        "evidence",
     }
 )
-_BINDING_REQUIRED_KEYS = _BINDING_KEYS - {"parameters", "notes"}
-BINDING_PARAMETER_KEYS = frozenset({"slot"})
+_MISSING_STATE_KEYS = frozenset(
+    {"id", "representation", "meaning", "claim_refs", "caveats"}
+)
+_SEMANTIC_RELATIONSHIP_KEYS = frozenset(
+    {
+        "label",
+        "kind",
+        "source_object",
+        "target_object",
+        "cardinality",
+        "optionality",
+        "attribution",
+        "attribution_limitations",
+        "temporal_qualification",
+        "temporal_semantics",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats",
+    }
+)
+_CARDINALITY_KEYS = frozenset({"targets_per_source", "sources_per_target"})
+_OPTIONALITY_KEYS = frozenset({"source", "target"})
+_TEMPORAL_KEYS = frozenset(
+    {
+        "label",
+        "kind",
+        "meaning",
+        "objects",
+        "feature_refs",
+        "relative_to",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats",
+    }
+)
+_AGGREGATION_KEYS = frozenset(
+    {
+        "label",
+        "status",
+        "source_object",
+        "target_object",
+        "source_concept",
+        "result_concept",
+        "semantic_relationships",
+        "method",
+        "ordering",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats",
+    }
+)
+_GUARDRAIL_KEYS = frozenset(
+    {
+        "title",
+        "statement",
+        "rationale",
+        "scope",
+        "profiles",
+        "objects",
+        "concepts",
+        "semantic_relationships",
+        "temporal_semantics",
+        "aggregations",
+        "coverage",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats",
+    }
+)
+_COVERAGE_KEYS = frozenset(
+    {
+        "subject_kind",
+        "subject",
+        "status",
+        "scope",
+        "profiles",
+        "summary",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats",
+    }
+)
 _VOCABULARY_KEYS = frozenset(
     {"label", "completeness", "parsing", "evidence", "caveats", "codes"}
 )
 _VOCABULARY_REQUIRED_KEYS = _VOCABULARY_KEYS - {"caveats"}
-_TABLE_KEYS = frozenset({"profile", "table", "grain", "keys", "caveats"})
-_KEY_KEYS = frozenset(
-    {
-        "id",
-        "columns",
-        "kind",
-        "uniqueness",
-        "completeness",
-        "evidence",
-        "caveats",
-    }
-)
-_RELATIONSHIP_KEYS = frozenset(
-    {
-        "id",
-        "profile",
-        "kind",
-        "source",
-        "target",
-        "cardinality",
-        "evidence",
-        "caveats",
-        "join_hazards",
-    }
-)
-_SOURCE_ENDPOINT_KEYS = frozenset({"table", "columns", "completeness"})
-_TARGET_ENDPOINT_KEYS = frozenset({"table", "columns"})
-_CARDINALITY_KEYS = frozenset(
-    {"targets_per_source", "sources_per_target"}
-)
 _CONTEXT_SOURCE_KEYS = frozenset(
     {
         "title",
@@ -263,35 +380,58 @@ _CONTEXT_CLAIM_KEYS = frozenset(
     {"id", "statement", "status", "sources", "caveats"}
 )
 _WORKFLOW_STEP_KEYS = frozenset({"id", "label", "claims"})
-_ANALYSIS_PATTERN_KEYS = frozenset(
+_PROFILE_BINDING_KEYS = frozenset(
+    {"feature_bindings", "object_bindings", "tables", "relationship_bindings"}
+)
+_BINDING_KEYS = frozenset(
     {
-        "title",
-        "status",
-        "scope",
-        "profiles",
-        "summary",
-        "domains",
-        "search_terms",
-        "applicable_grains",
-        "related_concepts",
-        "related_tables",
-        "related_relationships",
-        "related_contexts",
-        "alternatives",
-        "required_decisions",
-        "prohibited_shortcuts",
+        "table",
+        "column",
+        "concept",
+        "grain",
+        "role",
+        "physical_type",
+        "nullable",
+        "parameters",
+        "notes",
+    }
+)
+_BINDING_REQUIRED_KEYS = _BINDING_KEYS - {"parameters", "notes"}
+_OBJECT_BINDING_KEYS = frozenset(
+    {"object", "table", "columns", "representation", "claim_refs", "caveats"}
+)
+_TABLE_KEYS = frozenset({"table", "grain", "keys", "caveats"})
+_KEY_KEYS = frozenset(
+    {
+        "id",
+        "columns",
+        "kind",
+        "uniqueness",
+        "completeness",
+        "evidence",
         "caveats",
     }
 )
-_ANALYSIS_ALTERNATIVE_KEYS = frozenset(
-    {"id", "label", "description", "appropriate_when", "limitations"}
+_RELATIONSHIP_BINDING_KEYS = frozenset(
+    {
+        "id",
+        "kind",
+        "semantic_relationships",
+        "source",
+        "target",
+        "cardinality",
+        "evidence",
+        "claim_refs",
+        "caveats",
+        "join_hazards",
+    }
 )
-_ANALYSIS_DECISION_KEYS = frozenset({"id", "question", "rationale"})
-_PROHIBITED_SHORTCUT_KEYS = frozenset({"id", "statement", "reason"})
+_SOURCE_ENDPOINT_KEYS = frozenset({"table", "columns", "completeness"})
+_TARGET_ENDPOINT_KEYS = frozenset({"table", "columns"})
 
 
 class CatalogError(Exception):
-    """Base class for catalog failures safe to present to a caller."""
+    """Base class for catalog failures safe to present to callers."""
 
 
 class CatalogLoadError(CatalogError):
@@ -299,29 +439,74 @@ class CatalogLoadError(CatalogError):
 
 
 class CatalogValidationError(CatalogError):
-    """The decoded catalog violates the supported schema or references."""
+    """The decoded catalog violates schema-v5 semantics."""
 
 
 class CatalogNotFoundError(CatalogError):
-    """An exact feature, vocabulary, or code lookup failed."""
+    """An exact entity, binding, vocabulary, or code lookup failed."""
 
 
 class CatalogAmbiguousError(CatalogError):
-    """An unqualified physical identifier resolves to different concepts."""
+    """An unqualified physical identifier resolves to different features."""
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicalObject:
+    id: str
+    label: str
+    definition: str
+    grain: str
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "definition": self.definition,
+            "grain": self.grain,
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class MissingState:
+    id: str
+    representation: str
+    meaning: str
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "representation": self.representation,
+            "meaning": self.meaning,
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
 
 
 @dataclass(frozen=True, slots=True)
 class Concept:
-    """One reusable semantic concept."""
-
     id: str
     label: str
     definition: str
     feature_kind: str
     domains: tuple[str, ...]
+    objects: tuple[str, ...]
     search_terms: tuple[str, ...]
     caveats: tuple[str, ...]
     evidence: tuple[str, ...]
+    claim_refs: tuple[str, ...] = ()
+    missing_states: tuple[MissingState, ...] = ()
+    temporal_semantics: tuple[str, ...] = ()
+    aggregations: tuple[str, ...] = ()
     vocabulary: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -331,9 +516,14 @@ class Concept:
             "definition": self.definition,
             "feature_kind": self.feature_kind,
             "domains": list(self.domains),
+            "objects": list(self.objects),
             "search_terms": list(self.search_terms),
             "caveats": list(self.caveats),
             "evidence": list(self.evidence),
+            "claim_refs": list(self.claim_refs),
+            "missing_states": [state.to_dict() for state in self.missing_states],
+            "temporal_semantics": list(self.temporal_semantics),
+            "aggregations": list(self.aggregations),
         }
         if self.vocabulary is not None:
             result["vocabulary"] = self.vocabulary
@@ -341,9 +531,316 @@ class Concept:
 
 
 @dataclass(frozen=True, slots=True)
-class Binding:
-    """One physical table-column occurrence bound to a concept."""
+class SemanticRelationship:
+    id: str
+    label: str
+    kind: str
+    source_object: str
+    target_object: str
+    targets_per_source: str
+    sources_per_target: str
+    source_optionality: str
+    target_optionality: str
+    attribution: str
+    attribution_limitations: tuple[str, ...]
+    temporal_qualification: str
+    temporal_semantics: tuple[str, ...]
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "kind": self.kind,
+            "source_object": self.source_object,
+            "target_object": self.target_object,
+            "cardinality": {
+                "targets_per_source": self.targets_per_source,
+                "sources_per_target": self.sources_per_target,
+            },
+            "optionality": {
+                "source": self.source_optionality,
+                "target": self.target_optionality,
+            },
+            "attribution": self.attribution,
+            "attribution_limitations": list(self.attribution_limitations),
+            "temporal_qualification": self.temporal_qualification,
+            "temporal_semantics": list(self.temporal_semantics),
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class TemporalSemantic:
+    id: str
+    label: str
+    kind: str
+    meaning: str
+    objects: tuple[str, ...]
+    feature_refs: tuple[str, ...]
+    relative_to: tuple[str, ...]
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "kind": self.kind,
+            "meaning": self.meaning,
+            "objects": list(self.objects),
+            "feature_refs": list(self.feature_refs),
+            "relative_to": list(self.relative_to),
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class Aggregation:
+    id: str
+    label: str
+    status: str
+    source_object: str
+    target_object: str
+    source_concept: str
+    result_concept: str | None
+    semantic_relationships: tuple[str, ...]
+    method: str
+    ordering: str
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "status": self.status,
+            "source_object": self.source_object,
+            "target_object": self.target_object,
+            "source_concept": self.source_concept,
+            "result_concept": self.result_concept,
+            "semantic_relationships": list(self.semantic_relationships),
+            "method": self.method,
+            "ordering": self.ordering,
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class Guardrail:
+    id: str
+    title: str
+    statement: str
+    rationale: str
+    scope: str
+    profiles: tuple[str, ...]
+    objects: tuple[str, ...]
+    concepts: tuple[str, ...]
+    semantic_relationships: tuple[str, ...]
+    temporal_semantics: tuple[str, ...]
+    aggregations: tuple[str, ...]
+    coverage: tuple[str, ...]
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "statement": self.statement,
+            "rationale": self.rationale,
+            "scope": self.scope,
+            "profiles": list(self.profiles),
+            "objects": list(self.objects),
+            "concepts": list(self.concepts),
+            "semantic_relationships": list(self.semantic_relationships),
+            "temporal_semantics": list(self.temporal_semantics),
+            "aggregations": list(self.aggregations),
+            "coverage": list(self.coverage),
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class Coverage:
+    id: str
+    subject_kind: str
+    subject: str
+    status: str
+    scope: str
+    profiles: tuple[str, ...]
+    summary: str
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "subject_kind": self.subject_kind,
+            "subject": self.subject,
+            "status": self.status,
+            "scope": self.scope,
+            "profiles": list(self.profiles),
+            "summary": self.summary,
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class Vocabulary:
+    id: str
+    label: str
+    completeness: str
+    parsing: str
+    evidence: tuple[str, ...]
+    codes: tuple[tuple[str, str], ...]
+    caveats: tuple[str, ...] = ()
+
+    def to_dict(self, *, include_codes: bool = True) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "id": self.id,
+            "label": self.label,
+            "completeness": self.completeness,
+            "parsing": self.parsing,
+            "evidence": list(self.evidence),
+            "caveats": list(self.caveats),
+        }
+        if include_codes:
+            result["codes"] = dict(self.codes)
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class ContextSource:
+    id: str
+    title: str
+    kind: str
+    scope: str
+    locator_kind: str
+    locator: str
+    version_scope: str
+    profiles: tuple[str, ...]
+    notes: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "kind": self.kind,
+            "scope": self.scope,
+            "locator_kind": self.locator_kind,
+            "locator": self.locator,
+            "version_scope": self.version_scope,
+            "profiles": list(self.profiles),
+            "notes": list(self.notes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ContextTableReference:
+    profile: str
+    table: str
+
+    @property
+    def identifier(self) -> str:
+        return f"{self.profile}:{self.table}"
+
+    def to_dict(self) -> dict[str, str]:
+        return {"profile": self.profile, "table": self.table}
+
+
+@dataclass(frozen=True, slots=True)
+class ContextClaim:
+    id: str
+    statement: str
+    status: str
+    sources: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "statement": self.statement,
+            "status": self.status,
+            "sources": list(self.sources),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowStep:
+    id: str
+    label: str
+    claims: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"id": self.id, "label": self.label, "claims": list(self.claims)}
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicalContext:
+    id: str
+    title: str
+    kind: str
+    scope: str
+    profiles: tuple[str, ...]
+    summary: str
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    related_concepts: tuple[str, ...]
+    related_tables: tuple[ContextTableReference, ...]
+    related_relationships: tuple[str, ...]
+    claims: tuple[ContextClaim, ...]
+    workflow_steps: tuple[WorkflowStep, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "kind": self.kind,
+            "scope": self.scope,
+            "profiles": list(self.profiles),
+            "summary": self.summary,
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "related_concepts": list(self.related_concepts),
+            "related_tables": [item.to_dict() for item in self.related_tables],
+            "related_relationships": list(self.related_relationships),
+            "claims": [item.to_dict() for item in self.claims],
+            "workflow_steps": [item.to_dict() for item in self.workflow_steps],
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class Binding:
     profile: str
     table: str
     column: str
@@ -384,35 +881,29 @@ class Binding:
 
 
 @dataclass(frozen=True, slots=True)
-class Vocabulary:
-    """A code-to-meaning map and its interpretation boundary."""
+class ObjectBinding:
+    profile: str
+    object: str
+    table: str
+    columns: tuple[str, ...]
+    representation: str
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
 
-    id: str
-    label: str
-    completeness: str
-    parsing: str
-    evidence: tuple[str, ...]
-    codes: tuple[tuple[str, str], ...]
-    caveats: tuple[str, ...] = ()
-
-    def to_dict(self, *, include_codes: bool = True) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "id": self.id,
-            "label": self.label,
-            "completeness": self.completeness,
-            "parsing": self.parsing,
-            "evidence": list(self.evidence),
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "profile": self.profile,
+            "object": self.object,
+            "table": self.table,
+            "columns": list(self.columns),
+            "representation": self.representation,
+            "claim_refs": list(self.claim_refs),
             "caveats": list(self.caveats),
         }
-        if include_codes:
-            result["codes"] = dict(self.codes)
-        return result
 
 
 @dataclass(frozen=True, slots=True)
 class KeyCandidate:
-    """A documented candidate key or explicitly non-key column tuple."""
-
     id: str
     columns: tuple[str, ...]
     kind: str
@@ -435,8 +926,6 @@ class KeyCandidate:
 
 @dataclass(frozen=True, slots=True)
 class TableSpec:
-    """One profile-specific table grain and its documented key candidates."""
-
     profile: str
     table: str
     grain: str
@@ -460,8 +949,6 @@ class TableSpec:
 
 @dataclass(frozen=True, slots=True)
 class RelationshipEndpoint:
-    """One ordered physical-column endpoint in a table relationship."""
-
     table: str
     columns: tuple[str, ...]
     completeness: str | None = None
@@ -477,17 +964,17 @@ class RelationshipEndpoint:
 
 
 @dataclass(frozen=True, slots=True)
-class Relationship:
-    """A count-free, profile-scoped linkage claim between physical tables."""
-
+class RelationshipBinding:
     id: str
     profile: str
     kind: str
+    semantic_relationships: tuple[str, ...]
     source: RelationshipEndpoint
     target: RelationshipEndpoint
     targets_per_source: str
     sources_per_target: str
     evidence: tuple[str, ...]
+    claim_refs: tuple[str, ...]
     caveats: tuple[str, ...]
     join_hazards: tuple[str, ...]
 
@@ -496,6 +983,7 @@ class Relationship:
             "id": self.id,
             "profile": self.profile,
             "kind": self.kind,
+            "semantic_relationships": list(self.semantic_relationships),
             "source": self.source.to_dict(),
             "target": self.target.to_dict(),
             "cardinality": {
@@ -503,344 +991,170 @@ class Relationship:
                 "sources_per_target": self.sources_per_target,
             },
             "evidence": list(self.evidence),
+            "claim_refs": list(self.claim_refs),
             "caveats": list(self.caveats),
             "join_hazards": list(self.join_hazards),
         }
 
 
-@dataclass(frozen=True, slots=True)
-class ContextSource:
-    """One traceable source with an explicit version and profile boundary."""
+# Compatibility alias: a v5 relationship is always explicitly a physical
+# relationship binding when this type name is used.
+Relationship = RelationshipBinding
 
-    id: str
-    title: str
-    kind: str
-    scope: str
-    locator_kind: str
-    locator: str
-    version_scope: str
-    profiles: tuple[str, ...]
-    notes: tuple[str, ...]
+
+@dataclass(frozen=True, slots=True)
+class ProfileBinding:
+    profile: str
+    feature_bindings: tuple[Binding, ...]
+    object_bindings: tuple[ObjectBinding, ...]
+    tables: tuple[TableSpec, ...]
+    relationship_bindings: tuple[RelationshipBinding, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "title": self.title,
-            "kind": self.kind,
-            "scope": self.scope,
-            "locator_kind": self.locator_kind,
-            "locator": self.locator,
-            "version_scope": self.version_scope,
-            "profiles": list(self.profiles),
-            "notes": list(self.notes),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class ContextTableReference:
-    """One profile-qualified physical table related to a context record."""
-
-    profile: str
-    table: str
-
-    @property
-    def identifier(self) -> str:
-        return f"{self.profile}:{self.table}"
-
-    def to_dict(self) -> dict[str, str]:
         return {
             "profile": self.profile,
-            "table": self.table,
+            "feature_bindings": [item.to_dict() for item in self.feature_bindings],
+            "object_bindings": [item.to_dict() for item in self.object_bindings],
+            "tables": [item.to_dict() for item in self.tables],
+            "relationship_bindings": [
+                item.to_dict() for item in self.relationship_bindings
+            ],
         }
 
 
 @dataclass(frozen=True, slots=True)
-class ContextClaim:
-    """One reviewable clinical or procedural statement and its provenance."""
-
-    id: str
-    statement: str
-    status: str
-    sources: tuple[str, ...]
-    caveats: tuple[str, ...]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "statement": self.statement,
-            "status": self.status,
-            "sources": list(self.sources),
-            "caveats": list(self.caveats),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowStep:
-    """One ordered workflow stage backed by one or more context claims."""
-
-    id: str
-    label: str
-    claims: tuple[str, ...]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "label": self.label,
-            "claims": list(self.claims),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class ClinicalContext:
-    """A sourced context record kept distinct from feature definitions."""
-
-    id: str
-    title: str
+class _DiscoveryDocument:
     kind: str
-    scope: str
-    profiles: tuple[str, ...]
-    summary: str
-    domains: tuple[str, ...]
-    search_terms: tuple[str, ...]
-    related_concepts: tuple[str, ...]
-    related_tables: tuple[ContextTableReference, ...]
-    related_relationships: tuple[str, ...]
-    claims: tuple[ContextClaim, ...]
-    workflow_steps: tuple[WorkflowStep, ...]
-    caveats: tuple[str, ...]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "title": self.title,
-            "kind": self.kind,
-            "scope": self.scope,
-            "profiles": list(self.profiles),
-            "summary": self.summary,
-            "domains": list(self.domains),
-            "search_terms": list(self.search_terms),
-            "related_concepts": list(self.related_concepts),
-            "related_tables": [
-                table.to_dict() for table in self.related_tables
-            ],
-            "related_relationships": list(self.related_relationships),
-            "claims": [claim.to_dict() for claim in self.claims],
-            "workflow_steps": [
-                step.to_dict() for step in self.workflow_steps
-            ],
-            "caveats": list(self.caveats),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class AnalysisAlternative:
-    """One non-executable policy alternative for an analysis pattern."""
-
-    id: str
+    identifier: str
     label: str
-    description: str
-    appropriate_when: str
-    limitations: tuple[str, ...]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "label": self.label,
-            "description": self.description,
-            "appropriate_when": self.appropriate_when,
-            "limitations": list(self.limitations),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class AnalysisDecision:
-    """One decision an analyst must make rather than inherit as a default."""
-
-    id: str
-    question: str
-    rationale: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "id": self.id,
-            "question": self.question,
-            "rationale": self.rationale,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class ProhibitedShortcut:
-    """One tempting shortcut that the catalog explicitly disallows."""
-
-    id: str
-    statement: str
-    reason: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "id": self.id,
-            "statement": self.statement,
-            "reason": self.reason,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class AnalysisPattern:
-    """Non-executable guidance for translating metadata into analysis policy."""
-
-    id: str
-    title: str
-    status: str
-    scope: str
-    profiles: tuple[str, ...]
-    summary: str
+    entity: Any
+    fields: tuple[tuple[str, str], ...]
+    profile_fields: tuple[tuple[str, str, str], ...]
     domains: tuple[str, ...]
-    search_terms: tuple[str, ...]
-    applicable_grains: tuple[str, ...]
-    related_concepts: tuple[str, ...]
-    related_tables: tuple[ContextTableReference, ...]
-    related_relationships: tuple[str, ...]
-    related_contexts: tuple[str, ...]
-    alternatives: tuple[AnalysisAlternative, ...]
-    required_decisions: tuple[AnalysisDecision, ...]
-    prohibited_shortcuts: tuple[ProhibitedShortcut, ...]
-    caveats: tuple[str, ...]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "title": self.title,
-            "status": self.status,
-            "scope": self.scope,
-            "profiles": list(self.profiles),
-            "summary": self.summary,
-            "domains": list(self.domains),
-            "search_terms": list(self.search_terms),
-            "applicable_grains": list(self.applicable_grains),
-            "related_concepts": list(self.related_concepts),
-            "related_tables": [
-                table.to_dict() for table in self.related_tables
-            ],
-            "related_relationships": list(self.related_relationships),
-            "related_contexts": list(self.related_contexts),
-            "alternatives": [
-                alternative.to_dict() for alternative in self.alternatives
-            ],
-            "required_decisions": [
-                decision.to_dict() for decision in self.required_decisions
-            ],
-            "prohibited_shortcuts": [
-                shortcut.to_dict() for shortcut in self.prohibited_shortcuts
-            ],
-            "caveats": list(self.caveats),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class _BindingSearchDocument:
-    binding: Binding
-    identifier_text: str
-    auxiliary_text: str
-    all_tokens: frozenset[str]
-
-
-@dataclass(frozen=True, slots=True)
-class _ConceptSearchDocument:
-    concept: Concept
-    vocabulary: Vocabulary | None
-    concept_id_text: str
-    label_text: str
-    search_terms_text: str
-    definition_text: str
-    bindings: tuple[_BindingSearchDocument, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class _ContextClaimSearchDocument:
-    claim: ContextClaim
-    all_tokens: frozenset[str]
-
-
-@dataclass(frozen=True, slots=True)
-class _ContextSearchDocument:
-    context: ClinicalContext
-    identifier_text: str
-    title_text: str
-    search_terms_text: str
-    summary_text: str
-    all_tokens: frozenset[str]
-    claims: tuple[_ContextClaimSearchDocument, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class _AnalysisPatternSearchDocument:
-    pattern: AnalysisPattern
+    profiles: tuple[str, ...]
     all_tokens: frozenset[str]
 
 
 class Catalog:
-    """Validated immutable catalog with deterministic lookup indexes."""
+    """Validated immutable schema-v5 catalog with deterministic indexes."""
 
     __slots__ = (
         "_schema_version",
-        "_profiles",
+        "_clinical_objects",
         "_concepts",
-        "_bindings",
+        "_semantic_relationships",
+        "_temporal_semantics",
+        "_aggregations",
+        "_guardrails",
+        "_coverage",
         "_vocabularies",
-        "_tables",
-        "_relationships",
         "_sources",
         "_contexts",
-        "_analysis_patterns",
+        "_profile_bindings",
+        "_bindings",
+        "_object_bindings",
+        "_tables",
+        "_relationship_bindings",
         "_tables_by_qualified",
-        "_relationships_by_id",
-        "_by_physical",
-        "_by_qualified",
+        "_relationship_bindings_by_id",
         "_bindings_by_concept",
-        "_search_documents",
-        "_context_search_documents",
-        "_analysis_pattern_search_documents",
+        "_bindings_by_physical",
+        "_bindings_by_qualified",
+        "_claims_by_ref",
+        "_discovery_documents",
         "_sealed",
     )
 
     def __init__(
         self,
         *,
-        schema_version: int,
-        profiles: tuple[str, ...],
+        clinical_objects: Mapping[str, ClinicalObject],
         concepts: Mapping[str, Concept],
-        bindings: tuple[Binding, ...],
+        semantic_relationships: Mapping[str, SemanticRelationship],
+        temporal_semantics: Mapping[str, TemporalSemantic],
+        aggregations: Mapping[str, Aggregation],
+        guardrails: Mapping[str, Guardrail],
+        coverage: Mapping[str, Coverage],
         vocabularies: Mapping[str, Vocabulary],
-        tables: tuple[TableSpec, ...],
-        relationships: tuple[Relationship, ...],
         sources: Mapping[str, ContextSource],
         contexts: Mapping[str, ClinicalContext],
-        analysis_patterns: Mapping[str, AnalysisPattern],
+        profile_bindings: Mapping[str, ProfileBinding],
     ) -> None:
-        object.__setattr__(self, "_schema_version", schema_version)
-        object.__setattr__(self, "_profiles", profiles)
-        object.__setattr__(
-            self, "_concepts", MappingProxyType(dict(sorted(concepts.items())))
+        object.__setattr__(self, "_schema_version", SCHEMA_VERSION)
+        for slot, values in (
+            ("_clinical_objects", clinical_objects),
+            ("_concepts", concepts),
+            ("_semantic_relationships", semantic_relationships),
+            ("_temporal_semantics", temporal_semantics),
+            ("_aggregations", aggregations),
+            ("_guardrails", guardrails),
+            ("_coverage", coverage),
+            ("_vocabularies", vocabularies),
+            ("_sources", sources),
+            ("_contexts", contexts),
+            ("_profile_bindings", profile_bindings),
+        ):
+            object.__setattr__(
+                self, slot, MappingProxyType(dict(sorted(values.items())))
+            )
+
+        profiles = tuple(sorted(profile_bindings))
+        bindings = tuple(
+            sorted(
+                (
+                    binding
+                    for profile in profiles
+                    for binding in profile_bindings[profile].feature_bindings
+                ),
+                key=lambda item: (
+                    item.profile,
+                    item.table,
+                    item.column,
+                    item.concept,
+                ),
+            )
+        )
+        object_bindings = tuple(
+            sorted(
+                (
+                    binding
+                    for profile in profiles
+                    for binding in profile_bindings[profile].object_bindings
+                ),
+                key=lambda item: (
+                    item.profile,
+                    item.table,
+                    item.object,
+                    item.columns,
+                ),
+            )
+        )
+        tables = tuple(
+            sorted(
+                (
+                    table
+                    for profile in profiles
+                    for table in profile_bindings[profile].tables
+                ),
+                key=lambda item: (item.profile, item.table),
+            )
+        )
+        relationships = tuple(
+            sorted(
+                (
+                    relationship
+                    for profile in profiles
+                    for relationship in profile_bindings[
+                        profile
+                    ].relationship_bindings
+                ),
+                key=lambda item: item.id,
+            )
         )
         object.__setattr__(self, "_bindings", bindings)
-        object.__setattr__(
-            self,
-            "_vocabularies",
-            MappingProxyType(dict(sorted(vocabularies.items()))),
-        )
+        object.__setattr__(self, "_object_bindings", object_bindings)
         object.__setattr__(self, "_tables", tables)
-        object.__setattr__(self, "_relationships", relationships)
-        object.__setattr__(
-            self, "_sources", MappingProxyType(dict(sorted(sources.items())))
-        )
-        object.__setattr__(
-            self, "_contexts", MappingProxyType(dict(sorted(contexts.items())))
-        )
-        object.__setattr__(
-            self,
-            "_analysis_patterns",
-            MappingProxyType(dict(sorted(analysis_patterns.items()))),
-        )
+        object.__setattr__(self, "_relationship_bindings", relationships)
         object.__setattr__(
             self,
             "_tables_by_qualified",
@@ -848,50 +1162,54 @@ class Catalog:
         )
         object.__setattr__(
             self,
-            "_relationships_by_id",
+            "_relationship_bindings_by_id",
+            MappingProxyType({item.id: item for item in relationships}),
+        )
+
+        grouped_concepts: defaultdict[str, list[Binding]] = defaultdict(list)
+        grouped_physical: defaultdict[str, list[Binding]] = defaultdict(list)
+        qualified: dict[str, Binding] = {}
+        for binding in bindings:
+            grouped_concepts[binding.concept].append(binding)
+            grouped_physical[binding.identifier].append(binding)
+            qualified[binding.qualified_identifier] = binding
+        object.__setattr__(
+            self,
+            "_bindings_by_concept",
             MappingProxyType(
-                {relationship.id: relationship for relationship in relationships}
+                {
+                    key: tuple(
+                        sorted(value, key=lambda item: item.qualified_identifier)
+                    )
+                    for key, value in sorted(grouped_concepts.items())
+                }
             ),
         )
-
-        physical_groups: defaultdict[str, list[Binding]] = defaultdict(list)
-        by_qualified: dict[str, Binding] = {}
-        for binding in bindings:
-            physical_groups[binding.identifier].append(binding)
-            by_qualified[binding.qualified_identifier] = binding
-        by_physical = {
-            identifier: tuple(
-                sorted(items, key=lambda item: item.qualified_identifier)
-            )
-            for identifier, items in sorted(physical_groups.items())
-        }
-        object.__setattr__(self, "_by_physical", MappingProxyType(by_physical))
-        object.__setattr__(
-            self, "_by_qualified", MappingProxyType(by_qualified)
-        )
-
-        grouped: defaultdict[str, list[Binding]] = defaultdict(list)
-        for binding in bindings:
-            grouped[binding.concept].append(binding)
-        by_concept = {
-            concept_id: tuple(
-                sorted(items, key=lambda item: (item.profile, item.identifier))
-            )
-            for concept_id, items in sorted(grouped.items())
-        }
-        object.__setattr__(
-            self, "_bindings_by_concept", MappingProxyType(by_concept)
-        )
-        object.__setattr__(self, "_search_documents", self._build_search_documents())
         object.__setattr__(
             self,
-            "_context_search_documents",
-            self._build_context_search_documents(),
+            "_bindings_by_physical",
+            MappingProxyType(
+                {
+                    key: tuple(
+                        sorted(value, key=lambda item: item.qualified_identifier)
+                    )
+                    for key, value in sorted(grouped_physical.items())
+                }
+            ),
         )
         object.__setattr__(
-            self,
-            "_analysis_pattern_search_documents",
-            self._build_analysis_pattern_search_documents(),
+            self, "_bindings_by_qualified", MappingProxyType(qualified)
+        )
+        claims_by_ref = {
+            f"{context.id}#{claim.id}": claim
+            for context in contexts.values()
+            for claim in context.claims
+        }
+        object.__setattr__(
+            self, "_claims_by_ref", MappingProxyType(claims_by_ref)
+        )
+        object.__setattr__(
+            self, "_discovery_documents", self._build_discovery_documents()
         )
         object.__setattr__(self, "_sealed", True)
 
@@ -906,11 +1224,15 @@ class Catalog:
 
     @property
     def profiles(self) -> tuple[str, ...]:
-        return self._profiles
+        return tuple(self.profile_bindings)
+
+    @property
+    def binding_grains(self) -> tuple[str, ...]:
+        return BINDING_GRAINS
 
     @property
     def grains(self) -> tuple[str, ...]:
-        return GRAINS
+        return BINDING_GRAINS
 
     @property
     def feature_kinds(self) -> tuple[str, ...]:
@@ -941,28 +1263,56 @@ class Catalog:
         return CLAIM_STATUSES
 
     @property
-    def analysis_pattern_statuses(self) -> tuple[str, ...]:
-        return ANALYSIS_PATTERN_STATUSES
+    def semantic_relationship_kinds(self) -> tuple[str, ...]:
+        return SEMANTIC_RELATIONSHIP_KINDS
+
+    @property
+    def temporal_kinds(self) -> tuple[str, ...]:
+        return TEMPORAL_KINDS
+
+    @property
+    def aggregation_statuses(self) -> tuple[str, ...]:
+        return AGGREGATION_STATUSES
+
+    @property
+    def coverage_statuses(self) -> tuple[str, ...]:
+        return COVERAGE_STATUSES
+
+    @property
+    def relationship_binding_kinds(self) -> tuple[str, ...]:
+        return tuple(sorted(RELATIONSHIP_BINDING_KINDS))
+
+    @property
+    def clinical_objects(self) -> Mapping[str, ClinicalObject]:
+        return self._clinical_objects
 
     @property
     def concepts(self) -> Mapping[str, Concept]:
         return self._concepts
 
     @property
-    def bindings(self) -> tuple[Binding, ...]:
-        return self._bindings
+    def semantic_relationships(self) -> Mapping[str, SemanticRelationship]:
+        return self._semantic_relationships
+
+    @property
+    def temporal_semantics(self) -> Mapping[str, TemporalSemantic]:
+        return self._temporal_semantics
+
+    @property
+    def aggregations(self) -> Mapping[str, Aggregation]:
+        return self._aggregations
+
+    @property
+    def guardrails(self) -> Mapping[str, Guardrail]:
+        return self._guardrails
+
+    @property
+    def coverage(self) -> Mapping[str, Coverage]:
+        return self._coverage
 
     @property
     def vocabularies(self) -> Mapping[str, Vocabulary]:
         return self._vocabularies
-
-    @property
-    def tables(self) -> tuple[TableSpec, ...]:
-        return self._tables
-
-    @property
-    def relationships(self) -> tuple[Relationship, ...]:
-        return self._relationships
 
     @property
     def sources(self) -> Mapping[str, ContextSource]:
@@ -973,35 +1323,60 @@ class Catalog:
         return self._contexts
 
     @property
-    def analysis_patterns(self) -> Mapping[str, AnalysisPattern]:
-        return self._analysis_patterns
+    def profile_bindings(self) -> Mapping[str, ProfileBinding]:
+        return self._profile_bindings
+
+    @property
+    def bindings(self) -> tuple[Binding, ...]:
+        """Flattened compatibility view of all profile feature bindings."""
+
+        return self._bindings
+
+    @property
+    def object_bindings(self) -> tuple[ObjectBinding, ...]:
+        return self._object_bindings
+
+    @property
+    def tables(self) -> tuple[TableSpec, ...]:
+        return self._tables
+
+    @property
+    def relationship_bindings(self) -> tuple[RelationshipBinding, ...]:
+        return self._relationship_bindings
+
+    @property
+    def relationships(self) -> tuple[RelationshipBinding, ...]:
+        """Compatibility view; these are physical relationship bindings."""
+
+        return self._relationship_bindings
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> Catalog:
-        """Validate an already-decoded mapping and freeze its contents."""
-
         data = _expect_mapping(value, "$")
-        _require_keys(data, _CATALOG_ENVELOPE_KEYS, "$")
-
+        _require_keys(data, frozenset({"$schema", "schema_version"}), "$")
+        version = data["schema_version"]
+        if version == 4:
+            raise CatalogValidationError(
+                "catalog schema_version 4 requires explicit migration to "
+                "schema version 5; see docs/migration-v4-to-v5.md"
+            )
         if (
-            not isinstance(data["schema_version"], int)
-            or isinstance(data["schema_version"], bool)
-            or data["schema_version"] != SCHEMA_VERSION
+            not isinstance(version, int)
+            or isinstance(version, bool)
+            or version != SCHEMA_VERSION
         ):
             raise CatalogValidationError(
-                "unsupported catalog schema_version "
-                f"{data['schema_version']!r}; expected integer {SCHEMA_VERSION}"
+                f"unsupported catalog schema_version {version!r}; "
+                f"expected integer {SCHEMA_VERSION}"
             )
         if data["$schema"] != SCHEMA_REFERENCE:
             raise CatalogValidationError(
                 f"$.$schema must equal {SCHEMA_REFERENCE!r}"
             )
         _require_exact_keys(data, _TOP_LEVEL_KEYS, _TOP_LEVEL_KEYS, "$")
-
-        profiles = _string_array(
-            data["profiles"], "$.profiles", minimum=1, identifier=True
+        _require_constant_array(
+            data["binding_grains"], BINDING_GRAINS, "$.binding_grains"
         )
-        _require_constant_array(data["grains"], GRAINS, "$.grains")
         _require_constant_array(
             data["feature_kinds"], FEATURE_KINDS, "$.feature_kinds"
         )
@@ -1024,303 +1399,122 @@ class Catalog:
             data["claim_statuses"], CLAIM_STATUSES, "$.claim_statuses"
         )
         _require_constant_array(
-            data["analysis_pattern_statuses"],
-            ANALYSIS_PATTERN_STATUSES,
-            "$.analysis_pattern_statuses",
+            data["semantic_relationship_kinds"],
+            SEMANTIC_RELATIONSHIP_KINDS,
+            "$.semantic_relationship_kinds",
+        )
+        _require_constant_array(
+            data["temporal_kinds"], TEMPORAL_KINDS, "$.temporal_kinds"
+        )
+        _require_constant_array(
+            data["aggregation_statuses"],
+            AGGREGATION_STATUSES,
+            "$.aggregation_statuses",
+        )
+        _require_constant_array(
+            data["coverage_statuses"],
+            COVERAGE_STATUSES,
+            "$.coverage_statuses",
         )
 
-        raw_concepts = _expect_mapping(data["concepts"], "$.concepts")
-        if not raw_concepts:
+        raw_profiles = _expect_mapping(
+            data["profile_bindings"], "$.profile_bindings"
+        )
+        if not raw_profiles:
+            raise CatalogValidationError("$.profile_bindings must not be empty")
+        profile_ids = frozenset(raw_profiles)
+        for profile in profile_ids:
+            _require_identifier(profile, f"$.profile_bindings key {profile!r}")
+        declared_profiles = _identifier_array(
+            data["profiles"], "$.profiles", minimum=1
+        )
+        if set(declared_profiles) != set(profile_ids):
+            missing_bindings = sorted(set(declared_profiles) - profile_ids)
+            undeclared_bindings = sorted(profile_ids - set(declared_profiles))
+            raise CatalogValidationError(
+                "$.profiles and $.profile_bindings keys must agree; "
+                f"missing_bindings={missing_bindings}, "
+                f"undeclared_bindings={undeclared_bindings}"
+            )
+
+        sources = _parse_map(
+            data["sources"], "$.sources", _parse_context_source, profile_ids
+        )
+        contexts = _parse_map(
+            data["contexts"], "$.contexts", _parse_clinical_context, profile_ids
+        )
+        clinical_objects = _parse_map(
+            data["clinical_objects"],
+            "$.clinical_objects",
+            _parse_clinical_object,
+        )
+        if not clinical_objects:
+            raise CatalogValidationError("$.clinical_objects must not be empty")
+        concepts = _parse_map(data["concepts"], "$.concepts", _parse_concept)
+        if not concepts:
             raise CatalogValidationError("$.concepts must not be empty")
-        concepts: dict[str, Concept] = {}
-        for concept_id, raw_concept in raw_concepts.items():
-            _require_identifier(concept_id, f"$.concepts key {concept_id!r}")
-            concepts[concept_id] = _parse_concept(concept_id, raw_concept)
-
-        raw_vocabularies = _expect_mapping(
-            data["vocabularies"], "$.vocabularies"
+        semantic_relationships = _parse_map(
+            data["semantic_relationships"],
+            "$.semantic_relationships",
+            _parse_semantic_relationship,
         )
-        vocabularies: dict[str, Vocabulary] = {}
-        for vocabulary_id, raw_vocabulary in raw_vocabularies.items():
-            _require_identifier(
-                vocabulary_id, f"$.vocabularies key {vocabulary_id!r}"
-            )
-            vocabularies[vocabulary_id] = _parse_vocabulary(
-                vocabulary_id, raw_vocabulary
-            )
-
-        raw_bindings = _expect_list(data["bindings"], "$.bindings")
-        if not raw_bindings:
-            raise CatalogValidationError("$.bindings must not be empty")
-        bindings = [
-            _parse_binding(raw, index, frozenset(profiles))
-            for index, raw in enumerate(raw_bindings)
-        ]
-        raw_tables = _expect_list(data["tables"], "$.tables")
-        if not raw_tables:
-            raise CatalogValidationError("$.tables must not be empty")
-        tables = [
-            _parse_table(raw, index, frozenset(profiles))
-            for index, raw in enumerate(raw_tables)
-        ]
-        raw_relationships = _expect_list(
-            data["relationships"], "$.relationships"
+        temporal_semantics = _parse_map(
+            data["temporal_semantics"],
+            "$.temporal_semantics",
+            _parse_temporal_semantic,
         )
-        relationships = [
-            _parse_relationship(raw, index, frozenset(profiles))
-            for index, raw in enumerate(raw_relationships)
-        ]
-        raw_sources = _expect_mapping(data["sources"], "$.sources")
-        sources: dict[str, ContextSource] = {}
-        for source_id, raw_source in raw_sources.items():
-            _require_identifier(source_id, f"$.sources key {source_id!r}")
-            sources[source_id] = _parse_context_source(
-                source_id, raw_source, frozenset(profiles)
-            )
-        raw_contexts = _expect_mapping(data["contexts"], "$.contexts")
-        contexts: dict[str, ClinicalContext] = {}
-        for context_id, raw_context in raw_contexts.items():
-            _require_identifier(context_id, f"$.contexts key {context_id!r}")
-            contexts[context_id] = _parse_clinical_context(
-                context_id, raw_context, frozenset(profiles)
-            )
-        raw_patterns = _expect_mapping(
-            data["analysis_patterns"], "$.analysis_patterns"
+        aggregations = _parse_map(
+            data["aggregations"], "$.aggregations", _parse_aggregation
         )
-        analysis_patterns: dict[str, AnalysisPattern] = {}
-        for pattern_id, raw_pattern in raw_patterns.items():
-            _require_identifier(
-                pattern_id, f"$.analysis_patterns key {pattern_id!r}"
-            )
-            analysis_patterns[pattern_id] = _parse_analysis_pattern(
-                pattern_id, raw_pattern, frozenset(profiles)
-            )
-
-        for concept in concepts.values():
-            if (
-                concept.vocabulary is not None
-                and concept.vocabulary not in vocabularies
-            ):
-                raise CatalogValidationError(
-                    f"concept {concept.id!r} references unknown vocabulary "
-                    f"{concept.vocabulary!r}"
-                )
-        mismatched_shared_ids = sorted(
-            identifier
-            for identifier in set(concepts) & set(vocabularies)
-            if concepts[identifier].vocabulary != identifier
+        guardrails = _parse_map(
+            data["guardrails"],
+            "$.guardrails",
+            _parse_guardrail,
+            profile_ids,
         )
-        if mismatched_shared_ids:
-            raise CatalogValidationError(
-                "concept/vocabulary IDs may overlap only when each concept "
-                "references the same-ID vocabulary: "
-                + ", ".join(mismatched_shared_ids)
-            )
-
-        seen_qualified: set[str] = set()
-        unqualified: set[str] = set()
-        bound_profiles: set[str] = set()
-        for binding in bindings:
-            if binding.concept not in concepts:
-                raise CatalogValidationError(
-                    f"binding {binding.identifier!r} references unknown concept "
-                    f"{binding.concept!r}"
-                )
-            if binding.qualified_identifier in seen_qualified:
-                raise CatalogValidationError(
-                    "duplicate physical binding "
-                    f"{binding.qualified_identifier!r}"
-                )
-            seen_qualified.add(binding.qualified_identifier)
-            unqualified.add(binding.identifier)
-            bound_profiles.add(binding.profile)
-
-        empty_profiles = sorted(set(profiles) - bound_profiles)
-        if empty_profiles:
-            raise CatalogValidationError(
-                "catalog profiles have no physical bindings: "
-                + ", ".join(empty_profiles)
-            )
-
-        collisions = sorted(set(concepts) & (seen_qualified | unqualified))
-        if collisions:
-            raise CatalogValidationError(
-                "concept IDs collide with physical identifiers: "
-                + ", ".join(collisions)
-            )
-        vocabulary_collisions = sorted(
-            set(vocabularies) & (seen_qualified | unqualified)
+        coverage = _parse_map(
+            data["coverage"], "$.coverage", _parse_coverage, profile_ids
         )
-        if vocabulary_collisions:
-            raise CatalogValidationError(
-                "vocabulary IDs collide with physical identifiers: "
-                + ", ".join(vocabulary_collisions)
-            )
-
-        bindings_by_table: defaultdict[
-            tuple[str, str], dict[str, Binding]
-        ] = defaultdict(dict)
-        grains_by_table: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
-        for binding in bindings:
-            table_key = (binding.profile, binding.table)
-            bindings_by_table[table_key][binding.column] = binding
-            grains_by_table[table_key].add(binding.grain)
-
-        table_specs: dict[tuple[str, str], TableSpec] = {}
-        for table in tables:
-            table_key = (table.profile, table.table)
-            if table_key in table_specs:
-                raise CatalogValidationError(
-                    f"duplicate table specification {table.identifier!r}"
-                )
-            table_specs[table_key] = table
-            columns = bindings_by_table.get(table_key)
-            if columns is None:
-                raise CatalogValidationError(
-                    f"table specification {table.identifier!r} has no bindings"
-                )
-            binding_grains = grains_by_table[table_key]
-            if binding_grains != {table.grain}:
-                raise CatalogValidationError(
-                    f"table specification {table.identifier!r} grain "
-                    f"{table.grain!r} does not match binding grains "
-                    f"{sorted(binding_grains)!r}"
-                )
-            seen_key_ids: set[str] = set()
-            keys_by_columns: dict[tuple[str, ...], KeyCandidate] = {}
-            for key in table.keys:
-                if key.id in seen_key_ids:
-                    raise CatalogValidationError(
-                        f"table {table.identifier!r} has duplicate key ID "
-                        f"{key.id!r}"
-                    )
-                seen_key_ids.add(key.id)
-                previous_key = keys_by_columns.get(key.columns)
-                if previous_key is not None and (
-                    previous_key.kind,
-                    previous_key.uniqueness,
-                    previous_key.completeness,
-                ) != (
-                    key.kind,
-                    key.uniqueness,
-                    key.completeness,
-                ):
-                    raise CatalogValidationError(
-                        f"table {table.identifier!r} has conflicting key "
-                        f"declarations {previous_key.id!r} and {key.id!r} "
-                        f"for columns {list(key.columns)!r}"
-                    )
-                keys_by_columns.setdefault(key.columns, key)
-                missing_columns = sorted(set(key.columns) - set(columns))
-                if missing_columns:
-                    raise CatalogValidationError(
-                        f"table {table.identifier!r} key {key.id!r} references "
-                        "unknown columns: " + ", ".join(missing_columns)
-                    )
-
-        missing_table_specs = sorted(set(bindings_by_table) - set(table_specs))
-        if missing_table_specs:
-            formatted = ", ".join(
-                f"{profile}:{table}" for profile, table in missing_table_specs
-            )
-            raise CatalogValidationError(
-                "physical tables have no table specification: " + formatted
-            )
-
-        relationship_ids: set[str] = set()
-        for relationship in relationships:
-            if relationship.id in relationship_ids:
-                raise CatalogValidationError(
-                    f"duplicate relationship ID {relationship.id!r}"
-                )
-            relationship_ids.add(relationship.id)
-            _validate_relationship(
-                relationship, bindings_by_table, table_specs
-            )
-        _validate_hierarchy_acyclic(relationships)
-        context_collisions = sorted(
-            set(contexts)
-            & (
-                set(concepts)
-                | set(vocabularies)
-                | relationship_ids
-                | set(sources)
-            )
+        vocabularies = _parse_map(
+            data["vocabularies"], "$.vocabularies", _parse_vocabulary
         )
-        if context_collisions:
-            raise CatalogValidationError(
-                "context IDs collide with another catalog namespace: "
-                + ", ".join(context_collisions)
-            )
-        pattern_collisions = sorted(
-            set(analysis_patterns)
-            & (
-                set(concepts)
-                | set(vocabularies)
-                | relationship_ids
-                | set(sources)
-                | set(contexts)
-            )
-        )
-        if pattern_collisions:
-            raise CatalogValidationError(
-                "analysis pattern IDs collide with another catalog namespace: "
-                + ", ".join(pattern_collisions)
-            )
-        _validate_context_references(
-            contexts=contexts,
+
+        profiles: dict[str, ProfileBinding] = {}
+        for profile, raw in raw_profiles.items():
+            profiles[profile] = _parse_profile_binding(profile, raw)
+
+        _validate_catalog(
+            clinical_objects=clinical_objects,
+            concepts=concepts,
+            semantic_relationships=semantic_relationships,
+            temporal_semantics=temporal_semantics,
+            aggregations=aggregations,
+            guardrails=guardrails,
+            coverage=coverage,
+            vocabularies=vocabularies,
             sources=sources,
-            concepts=concepts,
-            bindings=bindings,
-            table_specs=table_specs,
-            relationships={
-                relationship.id: relationship for relationship in relationships
-            },
-        )
-        _validate_analysis_pattern_references(
-            patterns=analysis_patterns,
-            concepts=concepts,
-            bindings=bindings,
-            table_specs=table_specs,
-            relationships={
-                relationship.id: relationship for relationship in relationships
-            },
             contexts=contexts,
-        )
-
-        ordered_bindings = tuple(
-            sorted(
-                bindings,
-                key=lambda item: (
-                    item.profile,
-                    item.table,
-                    item.column,
-                    item.concept,
-                ),
-            )
+            profile_bindings=profiles,
         )
         return cls(
-            schema_version=SCHEMA_VERSION,
-            profiles=tuple(sorted(profiles)),
+            clinical_objects=clinical_objects,
             concepts=concepts,
-            bindings=ordered_bindings,
+            semantic_relationships=semantic_relationships,
+            temporal_semantics=temporal_semantics,
+            aggregations=aggregations,
+            guardrails=guardrails,
+            coverage=coverage,
             vocabularies=vocabularies,
-            tables=tuple(
-                sorted(tables, key=lambda item: (item.profile, item.table))
-            ),
-            relationships=tuple(
-                sorted(relationships, key=lambda item: item.id)
-            ),
             sources=sources,
             contexts=contexts,
-            analysis_patterns=analysis_patterns,
+            profile_bindings=profiles,
         )
 
     def summary(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "profiles": list(self.profiles),
-            "grains": list(self.grains),
+            "binding_grains": list(self.binding_grains),
             "feature_kinds": list(self.feature_kinds),
             "domains": list(self.domains),
             "context_kinds": list(self.context_kinds),
@@ -1328,567 +1522,420 @@ class Catalog:
             "source_kinds": list(self.source_kinds),
             "source_locator_kinds": list(self.source_locator_kinds),
             "claim_statuses": list(self.claim_statuses),
-            "analysis_pattern_statuses": list(
-                self.analysis_pattern_statuses
+            "semantic_relationship_kinds": list(
+                self.semantic_relationship_kinds
             ),
+            "temporal_kinds": list(self.temporal_kinds),
+            "aggregation_statuses": list(self.aggregation_statuses),
+            "coverage_statuses": list(self.coverage_statuses),
+            "relationship_binding_kinds": list(
+                self.relationship_binding_kinds
+            ),
+            "discovery_kinds": list(DISCOVERY_KINDS),
+            "clinical_objects": len(self.clinical_objects),
             "concepts": len(self.concepts),
-            "bindings": len(self.bindings),
+            "semantic_relationships": len(self.semantic_relationships),
+            "temporal_semantics": len(self.temporal_semantics),
+            "aggregations": len(self.aggregations),
+            "guardrails": len(self.guardrails),
+            "coverage": len(self.coverage),
             "vocabularies": len(self.vocabularies),
-            "tables": len(self.tables),
-            "relationships": len(self.relationships),
             "sources": len(self.sources),
             "contexts": len(self.contexts),
-            "analysis_patterns": len(self.analysis_patterns),
+            "profile_bindings": len(self.profile_bindings),
+            "feature_bindings": len(self.bindings),
+            "object_bindings": len(self.object_bindings),
+            "tables": len(self.tables),
+            "relationship_bindings": len(self.relationship_bindings),
         }
 
-    def get_table(self, profile: str, table: str) -> dict[str, Any]:
-        """Get one profile-specific table and its incident relationships."""
-
-        normalized_profile = _lookup_identifier(profile, "profile")
-        normalized_table = _lookup_identifier(table, "table")
-        identifier = f"{normalized_profile}:{normalized_table}"
-        table_spec = self._tables_by_qualified.get(identifier)
-        if table_spec is None:
-            raise CatalogNotFoundError(f"table {identifier!r} was not found")
-
-        outgoing = []
-        incoming = []
-        for relationship in self.relationships:
-            if relationship.profile != normalized_profile:
-                continue
-            if relationship.source.table == normalized_table:
-                outgoing.append(relationship.to_dict())
-            if relationship.target.table == normalized_table:
-                incoming.append(relationship.to_dict())
-        return {
-            "kind": "table",
-            "identifier": identifier,
-            "table": table_spec.to_dict(),
-            "relationships": {
-                "outgoing": outgoing,
-                "incoming": incoming,
-            },
-        }
-
-    def get_relationship(self, identifier: str) -> dict[str, Any]:
-        """Get one relationship by its stable identifier."""
-
+    def get_clinical_object(self, identifier: str) -> dict[str, Any]:
         normalized = _lookup_identifier(identifier, "identifier")
-        relationship = self._relationships_by_id.get(normalized)
-        if relationship is None:
+        entity = self.clinical_objects.get(normalized)
+        if entity is None:
             raise CatalogNotFoundError(
-                f"relationship {normalized!r} was not found"
+                f"clinical object {normalized!r} was not found"
             )
         return {
-            "kind": "relationship",
+            "kind": "clinical_object",
             "identifier": normalized,
-            "relationship": relationship.to_dict(),
-        }
-
-    def search_relationships(
-        self,
-        *,
-        profile: str | None = None,
-        table: str | None = None,
-        source_table: str | None = None,
-        target_table: str | None = None,
-        kind: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        """Filter relationships by profile, endpoint table, and kind."""
-
-        filters = {
-            "profile": _optional_filter(profile, "profile"),
-            "table": _optional_filter(table, "table"),
-            "source_table": _optional_filter(source_table, "source_table"),
-            "target_table": _optional_filter(target_table, "target_table"),
-            "kind": _optional_filter(kind, "kind"),
-        }
-        if (
-            not isinstance(limit, int)
-            or isinstance(limit, bool)
-            or not 1 <= limit <= 500
-        ):
-            raise CatalogValidationError("limit must be an integer from 1 to 500")
-        controlled_filters = {
-            "profile": self.profiles,
-            "kind": RELATIONSHIP_KINDS,
-        }
-        for name, allowed in controlled_filters.items():
-            if filters[name] is not None and filters[name] not in allowed:
-                raise CatalogValidationError(
-                    f"unknown {name} filter {filters[name]!r}"
-                )
-
-        matches = []
-        for relationship in self.relationships:
-            if (
-                filters["profile"] is not None
-                and relationship.profile != filters["profile"]
-            ):
-                continue
-            if (
-                filters["table"] is not None
-                and filters["table"]
-                not in (relationship.source.table, relationship.target.table)
-            ):
-                continue
-            if (
-                filters["source_table"] is not None
-                and relationship.source.table != filters["source_table"]
-            ):
-                continue
-            if (
-                filters["target_table"] is not None
-                and relationship.target.table != filters["target_table"]
-            ):
-                continue
-            if (
-                filters["kind"] is not None
-                and relationship.kind != filters["kind"]
-            ):
-                continue
-            matches.append(relationship)
-
-        return {
-            "filters": filters,
-            "count": min(len(matches), limit),
-            "total": len(matches),
-            "matches": [
-                relationship.to_dict() for relationship in matches[:limit]
-            ],
-        }
-
-    def get_context(self, identifier: str) -> dict[str, Any]:
-        """Get one clinical context and the sources cited by its claims."""
-
-        normalized = _lookup_identifier(identifier, "identifier")
-        context = self._contexts.get(normalized)
-        if context is None:
-            raise CatalogNotFoundError(
-                f"context {normalized!r} was not found"
-            )
-        source_ids = sorted(
-            {
-                source_id
-                for claim in context.claims
-                for source_id in claim.sources
-            }
-        )
-        return {
-            "kind": "context",
-            "identifier": normalized,
-            "context": context.to_dict(),
-            "sources": {
-                source_id: self.sources[source_id].to_dict()
-                for source_id in source_ids
-            },
-        }
-
-    def search_contexts(
-        self,
-        query: str = "",
-        *,
-        kind: str | None = None,
-        scope: str | None = None,
-        profile: str | None = None,
-        domain: str | None = None,
-        concept: str | None = None,
-        table: str | None = None,
-        relationship: str | None = None,
-        status: str | None = None,
-        source: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        """Search contexts and return only claims matching the query filters."""
-
-        if not isinstance(query, str):
-            raise CatalogValidationError("query must be a string")
-        query_text = query.strip().casefold()
-        filters = {
-            "kind": _optional_filter(kind, "kind"),
-            "scope": _optional_filter(scope, "scope"),
-            "profile": _optional_filter(profile, "profile"),
-            "domain": _optional_filter(domain, "domain"),
-            "concept": _optional_filter(concept, "concept"),
-            "table": _optional_filter(table, "table"),
-            "relationship": _optional_filter(
-                relationship, "relationship"
+            "clinical_object": entity.to_dict(),
+            "related": self._related_entities(
+                "clinical_object", normalized, entity
             ),
-            "status": _optional_filter(status, "status"),
-            "source": _optional_filter(source, "source"),
-        }
-        if not query_text and not any(filters.values()):
-            raise CatalogValidationError(
-                "provide a query or at least one context search filter"
-            )
-        if (
-            not isinstance(limit, int)
-            or isinstance(limit, bool)
-            or not 1 <= limit <= 500
-        ):
-            raise CatalogValidationError("limit must be an integer from 1 to 500")
-        controlled_filters = {
-            "kind": CONTEXT_KINDS,
-            "scope": CONTEXT_SCOPES,
-            "profile": self.profiles,
-            "domain": DOMAINS,
-            "status": CLAIM_STATUSES,
-        }
-        for name, allowed in controlled_filters.items():
-            if filters[name] is not None and filters[name] not in allowed:
-                raise CatalogValidationError(
-                    f"unknown {name} filter {filters[name]!r}"
-                )
-        reference_filters = {
-            "concept": self.concepts,
-            "relationship": self._relationships_by_id,
-            "source": self.sources,
-        }
-        for name, allowed in reference_filters.items():
-            if filters[name] is not None and filters[name] not in allowed:
-                raise CatalogValidationError(
-                    f"unknown {name} filter {filters[name]!r}"
-                )
-        if filters["table"] is not None:
-            _physical_component(filters["table"], "table")
-
-        query_tokens = frozenset(
-            token
-            for token in _tokens(query_text)
-            if token not in _SEARCH_STOPWORDS
-        )
-        if query_text and not query_tokens and not any(filters.values()):
-            raise CatalogValidationError(
-                "query must contain at least one meaningful token"
-            )
-
-        candidates: list[
-            tuple[
-                int,
-                str,
-                _ContextSearchDocument,
-                tuple[_ContextClaimSearchDocument, ...],
-                frozenset[str],
-            ]
-        ] = []
-        has_complete_match = False
-        for document in self._context_search_documents:
-            context = document.context
-            if (
-                filters["kind"] is not None
-                and context.kind != filters["kind"]
-            ):
-                continue
-            if (
-                filters["scope"] is not None
-                and context.scope != filters["scope"]
-            ):
-                continue
-            if (
-                filters["profile"] is not None
-                and filters["profile"] not in context.profiles
-            ):
-                continue
-            if (
-                filters["domain"] is not None
-                and filters["domain"] not in context.domains
-            ):
-                continue
-            if (
-                filters["concept"] is not None
-                and filters["concept"] not in context.related_concepts
-            ):
-                continue
-            if filters["table"] is not None and not any(
-                table_reference.table == filters["table"]
-                for table_reference in context.related_tables
-            ):
-                continue
-            if (
-                filters["relationship"] is not None
-                and filters["relationship"]
-                not in context.related_relationships
-            ):
-                continue
-
-            eligible_claims = tuple(
-                claim_document
-                for claim_document in document.claims
-                if (
-                    filters["status"] is None
-                    or claim_document.claim.status == filters["status"]
-                )
-                and (
-                    filters["source"] is None
-                    or filters["source"] in claim_document.claim.sources
-                )
-            )
-            if not eligible_claims:
-                continue
-
-            context_overlap = query_tokens & document.all_tokens
-            claim_overlaps = tuple(
-                (
-                    claim_document,
-                    query_tokens & claim_document.all_tokens,
-                )
-                for claim_document in eligible_claims
-            )
-            matched_tokens = frozenset(context_overlap).union(
-                *(
-                    overlap
-                    for _, overlap in claim_overlaps
-                    if overlap
-                )
-            )
-            if query_tokens and not matched_tokens:
-                continue
-            matching_claims = (
-                eligible_claims
-                if not query_tokens
-                else tuple(
-                    claim_document
-                    for claim_document, overlap in claim_overlaps
-                    if overlap
-                )
-            )
-            score = _score_context_document(
-                document,
-                matching_claims,
-                query_text,
-                query_tokens,
-                matched_tokens,
-            )
-            has_complete_match |= (
-                bool(query_tokens)
-                and len(matched_tokens) == len(query_tokens)
-            )
-            candidates.append(
-                (
-                    score,
-                    context.id,
-                    document,
-                    matching_claims,
-                    matched_tokens,
-                )
-            )
-
-        if query_tokens and has_complete_match:
-            candidates = [
-                candidate
-                for candidate in candidates
-                if len(candidate[4]) == len(query_tokens)
-            ]
-        candidates.sort(key=lambda item: (-item[0], item[1]))
-        selected = candidates[:limit]
-        matches = [
-            _context_search_match(document.context, claims, score)
-            for score, _, document, claims, _ in selected
-        ]
-        selected_source_ids = sorted(
-            {
-                source_id
-                for _, _, _, claim_documents, _ in selected
-                for claim_document in claim_documents
-                for source_id in claim_document.claim.sources
-            }
-        )
-        return {
-            "query": query,
-            "filters": filters,
-            "count": len(matches),
-            "total": len(candidates),
-            "matches": matches,
-            "sources": {
-                source_id: self.sources[source_id].to_dict()
-                for source_id in selected_source_ids
-            },
-        }
-
-    def get_analysis_pattern(self, identifier: str) -> dict[str, Any]:
-        """Get one non-executable analysis guidance pattern."""
-
-        normalized = _lookup_identifier(identifier, "identifier")
-        pattern = self._analysis_patterns.get(normalized)
-        if pattern is None:
-            raise CatalogNotFoundError(
-                f"analysis pattern {normalized!r} was not found"
-            )
-        return {
-            "kind": "analysis_pattern",
-            "identifier": normalized,
-            "pattern": pattern.to_dict(),
-        }
-
-    def search_analysis_patterns(
-        self,
-        query: str = "",
-        *,
-        status: str | None = None,
-        scope: str | None = None,
-        profile: str | None = None,
-        domain: str | None = None,
-        grain: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        """Search non-executable analysis guidance by text and facets."""
-
-        if not isinstance(query, str):
-            raise CatalogValidationError("query must be a string")
-        query_text = query.strip().casefold()
-        filters = {
-            "status": _optional_filter(status, "status"),
-            "scope": _optional_filter(scope, "scope"),
-            "profile": _optional_filter(profile, "profile"),
-            "domain": _optional_filter(domain, "domain"),
-            "grain": _optional_filter(grain, "grain"),
-        }
-        if not query_text and not any(filters.values()):
-            raise CatalogValidationError(
-                "provide a query or at least one analysis-pattern search filter"
-            )
-        if (
-            not isinstance(limit, int)
-            or isinstance(limit, bool)
-            or not 1 <= limit <= 500
-        ):
-            raise CatalogValidationError("limit must be an integer from 1 to 500")
-        for name, allowed in {
-            "status": ANALYSIS_PATTERN_STATUSES,
-            "scope": CONTEXT_SCOPES,
-            "profile": self.profiles,
-            "domain": DOMAINS,
-            "grain": GRAINS,
-        }.items():
-            if filters[name] is not None and filters[name] not in allowed:
-                raise CatalogValidationError(
-                    f"unknown {name} filter {filters[name]!r}"
-                )
-        query_tokens = frozenset(
-            token
-            for token in _tokens(query_text)
-            if token not in _SEARCH_STOPWORDS
-        )
-        if query_text and not query_tokens and not any(filters.values()):
-            raise CatalogValidationError(
-                "query must contain at least one meaningful token"
-            )
-
-        candidates: list[tuple[int, str, AnalysisPattern]] = []
-        for document in self._analysis_pattern_search_documents:
-            pattern = document.pattern
-            if filters["status"] and pattern.status != filters["status"]:
-                continue
-            if filters["scope"] and pattern.scope != filters["scope"]:
-                continue
-            if filters["profile"] and filters["profile"] not in pattern.profiles:
-                continue
-            if filters["domain"] and filters["domain"] not in pattern.domains:
-                continue
-            if (
-                filters["grain"]
-                and filters["grain"] not in pattern.applicable_grains
-            ):
-                continue
-            overlap = query_tokens & document.all_tokens
-            if query_tokens and not overlap:
-                continue
-            score = (
-                100
-                if query_tokens and len(overlap) == len(query_tokens)
-                else round(100 * len(overlap) / len(query_tokens))
-                if query_tokens
-                else 0
-            )
-            candidates.append((score, pattern.id, pattern))
-        candidates.sort(key=lambda item: (-item[0], item[1]))
-        selected = candidates[:limit]
-        return {
-            "query": query,
-            "filters": filters,
-            "count": len(selected),
-            "total": len(candidates),
-            "matches": [
-                {"score": score, **pattern.to_dict()}
-                for score, _, pattern in selected
-            ],
+            "provenance": self._provenance(entity.claim_refs),
         }
 
     def get_feature(
         self, identifier: str, include_codes: bool = False
     ) -> dict[str, Any]:
-        """Get a concept ID, ``table.column``, or ``profile:table.column``."""
-
         normalized = _lookup_identifier(identifier, "identifier")
-        concept = self._concepts.get(normalized)
-        if concept is not None:
-            vocabulary = self._vocabulary_for_concept(concept)
+        feature = self.concepts.get(normalized)
+        if feature is not None:
+            vocabulary = self._vocabulary_for_feature(feature)
+            claim_refs = tuple(
+                dict.fromkeys(
+                    (
+                        *feature.claim_refs,
+                        *(
+                            reference
+                            for state in feature.missing_states
+                            for reference in state.claim_refs
+                        ),
+                    )
+                )
+            )
             return {
-                "kind": "concept",
-                "identifier": concept.id,
-                "concept": concept.to_dict(),
+                "kind": "feature",
+                "identifier": feature.id,
+                "feature": feature.to_dict(),
                 "bindings": [
-                    binding.to_dict()
-                    for binding in self._bindings_by_concept.get(concept.id, ())
+                    item.to_dict()
+                    for item in self._bindings_by_concept.get(feature.id, ())
                 ],
                 "vocabulary": (
                     vocabulary.to_dict(include_codes=include_codes)
-                    if vocabulary is not None
+                    if vocabulary
                     else None
                 ),
+                "related": self._related_entities(
+                    "feature", feature.id, feature
+                ),
+                "provenance": self._provenance(claim_refs),
             }
 
         bindings = self._resolve_physical(normalized)
-        concept = self._concepts[bindings[0].concept]
-        vocabulary = self._vocabulary_for_concept(concept)
-        result = {
-            "kind": "binding" if len(bindings) == 1 else "binding_set",
+        feature = self.concepts[bindings[0].concept]
+        vocabulary = self._vocabulary_for_feature(feature)
+        result: dict[str, Any] = {
+            "kind": "feature_binding" if len(bindings) == 1 else "feature_binding_set",
             "identifier": normalized,
-            "bindings": [binding.to_dict() for binding in bindings],
-            "concept": concept.to_dict(),
+            "feature": feature.to_dict(),
+            "bindings": [item.to_dict() for item in bindings],
             "vocabulary": (
                 vocabulary.to_dict(include_codes=include_codes)
-                if vocabulary is not None
+                if vocabulary
                 else None
+            ),
+            "related": self._related_entities(
+                "feature", feature.id, feature
+            ),
+            "provenance": self._provenance(
+                tuple(
+                    dict.fromkeys(
+                        (
+                            *feature.claim_refs,
+                            *(
+                                reference
+                                for state in feature.missing_states
+                                for reference in state.claim_refs
+                            ),
+                        )
+                    )
+                )
             ),
         }
         if len(bindings) == 1:
             result["binding"] = bindings[0].to_dict()
         return result
 
+    def get_semantic_relationship(self, identifier: str) -> dict[str, Any]:
+        return self._exact_semantic_result(
+            identifier,
+            "semantic_relationship",
+            self.semantic_relationships,
+        )
+
+    def get_temporal_semantic(self, identifier: str) -> dict[str, Any]:
+        return self._exact_semantic_result(
+            identifier, "temporal_semantic", self.temporal_semantics
+        )
+
+    def get_aggregation(self, identifier: str) -> dict[str, Any]:
+        return self._exact_semantic_result(
+            identifier, "aggregation", self.aggregations
+        )
+
+    def get_guardrail(self, identifier: str) -> dict[str, Any]:
+        return self._exact_semantic_result(
+            identifier, "guardrail", self.guardrails
+        )
+
+    def get_coverage(self, identifier: str) -> dict[str, Any]:
+        return self._exact_semantic_result(
+            identifier, "coverage", self.coverage
+        )
+
+    def _exact_semantic_result(
+        self, identifier: str, kind: str, entities: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        normalized = _lookup_identifier(identifier, "identifier")
+        entity = entities.get(normalized)
+        if entity is None:
+            raise CatalogNotFoundError(
+                f"{kind.replace('_', ' ')} {normalized!r} was not found"
+            )
+        return {
+            "kind": kind,
+            "identifier": normalized,
+            kind: entity.to_dict(),
+            "related": self._related_entities(kind, normalized, entity),
+            "provenance": self._provenance(entity.claim_refs),
+        }
+
+    def _related_entities(
+        self, kind: str, identifier: str, entity: Any
+    ) -> dict[str, Any]:
+        """Compute semantic navigation instead of duplicating link indexes."""
+
+        if kind == "clinical_object":
+            return {
+                "features": sorted(
+                    item.id
+                    for item in self.concepts.values()
+                    if identifier in item.objects
+                ),
+                "semantic_relationships": sorted(
+                    item.id
+                    for item in self.semantic_relationships.values()
+                    if identifier
+                    in {item.source_object, item.target_object}
+                ),
+                "temporal_semantics": sorted(
+                    item.id
+                    for item in self.temporal_semantics.values()
+                    if identifier in item.objects
+                ),
+                "aggregations": sorted(
+                    item.id
+                    for item in self.aggregations.values()
+                    if identifier
+                    in {item.source_object, item.target_object}
+                ),
+                "guardrails": sorted(
+                    item.id
+                    for item in self.guardrails.values()
+                    if identifier in item.objects
+                ),
+                "coverage": sorted(
+                    item.id
+                    for item in self.coverage.values()
+                    if item.subject_kind == "clinical_object"
+                    and item.subject == identifier
+                ),
+                "object_bindings": [
+                    item.to_dict()
+                    for item in self.object_bindings
+                    if item.object == identifier
+                ],
+            }
+        if kind == "feature":
+            return {
+                "clinical_objects": list(entity.objects),
+                "temporal_semantics": sorted(
+                    {
+                        *entity.temporal_semantics,
+                        *(
+                            item.id
+                            for item in self.temporal_semantics.values()
+                            if identifier in item.feature_refs
+                        ),
+                    }
+                ),
+                "aggregations": sorted(
+                    {
+                        *entity.aggregations,
+                        *(
+                            item.id
+                            for item in self.aggregations.values()
+                            if identifier
+                            in {item.source_concept, item.result_concept}
+                        ),
+                    }
+                ),
+                "guardrails": sorted(
+                    item.id
+                    for item in self.guardrails.values()
+                    if identifier in item.concepts
+                ),
+                "coverage": sorted(
+                    item.id
+                    for item in self.coverage.values()
+                    if item.subject_kind == "concept"
+                    and item.subject == identifier
+                ),
+            }
+        if kind == "semantic_relationship":
+            return {
+                "clinical_objects": [
+                    entity.source_object,
+                    entity.target_object,
+                ],
+                "temporal_semantics": list(entity.temporal_semantics),
+                "guardrails": sorted(
+                    item.id
+                    for item in self.guardrails.values()
+                    if identifier in item.semantic_relationships
+                ),
+                "coverage": sorted(
+                    item.id
+                    for item in self.coverage.values()
+                    if item.subject_kind == kind
+                    and item.subject == identifier
+                ),
+                "relationship_bindings": [
+                    item.to_dict()
+                    for item in self.relationship_bindings
+                    if identifier in item.semantic_relationships
+                ],
+            }
+        if kind == "temporal_semantic":
+            return {
+                "clinical_objects": list(entity.objects),
+                "features": list(entity.feature_refs),
+                "semantic_relationships": sorted(
+                    item.id
+                    for item in self.semantic_relationships.values()
+                    if identifier in item.temporal_semantics
+                ),
+                "relative_to": list(entity.relative_to),
+                "referenced_by": sorted(
+                    item.id
+                    for item in self.temporal_semantics.values()
+                    if identifier in item.relative_to
+                ),
+                "guardrails": sorted(
+                    item.id
+                    for item in self.guardrails.values()
+                    if identifier in item.temporal_semantics
+                ),
+                "coverage": sorted(
+                    item.id
+                    for item in self.coverage.values()
+                    if item.subject_kind == kind
+                    and item.subject == identifier
+                ),
+            }
+        if kind == "aggregation":
+            features = [entity.source_concept]
+            if entity.result_concept is not None:
+                features.append(entity.result_concept)
+            return {
+                "clinical_objects": [
+                    entity.source_object,
+                    entity.target_object,
+                ],
+                "features": list(dict.fromkeys(features)),
+                "semantic_relationships": list(
+                    entity.semantic_relationships
+                ),
+                "guardrails": sorted(
+                    item.id
+                    for item in self.guardrails.values()
+                    if identifier in item.aggregations
+                ),
+                "coverage": sorted(
+                    item.id
+                    for item in self.coverage.values()
+                    if item.subject_kind == kind
+                    and item.subject == identifier
+                ),
+            }
+        if kind == "guardrail":
+            return {
+                "clinical_objects": list(entity.objects),
+                "features": list(entity.concepts),
+                "semantic_relationships": list(
+                    entity.semantic_relationships
+                ),
+                "temporal_semantics": list(entity.temporal_semantics),
+                "aggregations": list(entity.aggregations),
+                "coverage": list(entity.coverage),
+            }
+        if kind == "coverage":
+            return {
+                "subject": {
+                    "kind": entity.subject_kind,
+                    "identifier": entity.subject,
+                },
+                "guardrails": sorted(
+                    item.id
+                    for item in self.guardrails.values()
+                    if identifier in item.coverage
+                ),
+            }
+        return {}
+
+    def _provenance(
+        self, claim_refs: Sequence[str]
+    ) -> dict[str, Any]:
+        if not claim_refs:
+            return {}
+        claim_items: list[dict[str, Any]] = []
+        context_ids: list[str] = []
+        source_ids: list[str] = []
+        for reference in dict.fromkeys(claim_refs):
+            context_id, _ = reference.split("#", 1)
+            context = self.contexts[context_id]
+            claim = self._claims_by_ref[reference]
+            context_ids.append(context_id)
+            source_ids.extend(claim.sources)
+            claim_items.append(
+                {
+                    "id": reference,
+                    "context": context_id,
+                    "claim_id": claim.id,
+                    "statement": claim.statement,
+                    "status": claim.status,
+                    "sources": list(claim.sources),
+                    "caveats": list(claim.caveats),
+                }
+            )
+        return {
+            "claims": claim_items,
+            "contexts": [
+                {
+                    "id": context_id,
+                    "title": self.contexts[context_id].title,
+                    "scope": self.contexts[context_id].scope,
+                    "profiles": list(self.contexts[context_id].profiles),
+                }
+                for context_id in dict.fromkeys(context_ids)
+            ],
+            "sources": {
+                source_id: self.sources[source_id].to_dict()
+                for source_id in dict.fromkeys(source_ids)
+            },
+        }
+
     def lookup_code(
         self, feature_or_vocabulary: str, code: str
     ) -> dict[str, Any]:
-        """Look up an exact code through a vocabulary, concept, or binding."""
-
         target = _lookup_identifier(
             feature_or_vocabulary, "feature_or_vocabulary"
         )
         if not isinstance(code, str) or code == "":
             raise CatalogValidationError("code must be a non-empty string")
-
-        concept = self._concepts.get(target)
-        concept_id: str | None = None
-        if concept is not None:
-            concept_id = concept.id
-            vocabulary = self._vocabulary_for_concept(concept)
+        feature = self.concepts.get(target)
+        feature_id: str | None = None
+        if feature is not None:
+            feature_id = feature.id
+            vocabulary = self._vocabulary_for_feature(feature)
             if vocabulary is None:
                 raise CatalogNotFoundError(
                     f"feature {target!r} has no vocabulary"
                 )
         else:
-            vocabulary = self._vocabularies.get(target)
+            vocabulary = self.vocabularies.get(target)
             if vocabulary is None:
                 bindings = self._resolve_physical(target)
-                concept = self._concepts[bindings[0].concept]
-                concept_id = concept.id
-                vocabulary = self._vocabulary_for_concept(concept)
+                feature = self.concepts[bindings[0].concept]
+                feature_id = feature.id
+                vocabulary = self._vocabulary_for_feature(feature)
                 if vocabulary is None:
                     raise CatalogNotFoundError(
                         f"feature {target!r} has no vocabulary"
                     )
-
         meanings = dict(vocabulary.codes)
         if code not in meanings:
             raise CatalogNotFoundError(
@@ -1896,7 +1943,7 @@ class Catalog:
             )
         return {
             "feature_or_vocabulary": target,
-            "concept": concept_id,
+            "feature": feature_id,
             "vocabulary": vocabulary.id,
             "code": code,
             "meaning": meanings[code],
@@ -1906,380 +1953,2453 @@ class Catalog:
             "caveats": list(vocabulary.caveats),
         }
 
-    def search_features(
+    def get_profile_table(self, profile: str, table: str) -> dict[str, Any]:
+        normalized_profile = _lookup_identifier(profile, "profile")
+        normalized_table = _lookup_identifier(table, "table")
+        identifier = f"{normalized_profile}:{normalized_table}"
+        table_spec = self._tables_by_qualified.get(identifier)
+        if table_spec is None:
+            raise CatalogNotFoundError(
+                f"profile table {identifier!r} was not found"
+            )
+        outgoing = []
+        incoming = []
+        for relationship in self.relationship_bindings:
+            if relationship.profile != normalized_profile:
+                continue
+            if relationship.source.table == normalized_table:
+                outgoing.append(relationship.to_dict())
+            if relationship.target.table == normalized_table:
+                incoming.append(relationship.to_dict())
+        return {
+            "kind": "profile_table",
+            "identifier": identifier,
+            "table": table_spec.to_dict(),
+            "feature_bindings": [
+                item.to_dict()
+                for item in self.bindings
+                if item.profile == normalized_profile
+                and item.table == normalized_table
+            ],
+            "object_bindings": [
+                item.to_dict()
+                for item in self.object_bindings
+                if item.profile == normalized_profile
+                and item.table == normalized_table
+            ],
+            "relationship_bindings": {
+                "outgoing": outgoing,
+                "incoming": incoming,
+            },
+        }
+
+    # Compatibility with the v4 method name; the envelope names the v5 layer.
+    def get_table(self, profile: str, table: str) -> dict[str, Any]:
+        return self.get_profile_table(profile, table)
+
+    def get_relationship_binding(self, identifier: str) -> dict[str, Any]:
+        normalized = _lookup_identifier(identifier, "identifier")
+        entity = self._relationship_bindings_by_id.get(normalized)
+        if entity is None:
+            raise CatalogNotFoundError(
+                f"relationship binding {normalized!r} was not found"
+            )
+        return {
+            "kind": "relationship_binding",
+            "identifier": normalized,
+            "relationship_binding": entity.to_dict(),
+            "semantic_relationships": [
+                self.semantic_relationships[item].to_dict()
+                for item in entity.semantic_relationships
+            ],
+            "provenance": self._provenance(entity.claim_refs),
+        }
+
+    def get_relationship(self, identifier: str) -> dict[str, Any]:
+        return self.get_relationship_binding(identifier)
+
+    def search_relationship_bindings(
+        self,
+        *,
+        profile: str | None = None,
+        table: str | None = None,
+        source_table: str | None = None,
+        target_table: str | None = None,
+        kind: str | None = None,
+        semantic_relationship: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        filters = {
+            "profile": _optional_filter(profile, "profile"),
+            "table": _optional_filter(table, "table"),
+            "source_table": _optional_filter(source_table, "source_table"),
+            "target_table": _optional_filter(target_table, "target_table"),
+            "kind": _optional_filter(kind, "kind"),
+            "semantic_relationship": _optional_filter(
+                semantic_relationship, "semantic_relationship"
+            ),
+        }
+        _validate_limit(limit)
+        if filters["profile"] and filters["profile"] not in self.profile_bindings:
+            raise CatalogValidationError(
+                f"unknown profile filter {filters['profile']!r}"
+            )
+        if filters["kind"] and filters["kind"] not in RELATIONSHIP_BINDING_KINDS:
+            raise CatalogValidationError(
+                f"unknown kind filter {filters['kind']!r}"
+            )
+        if (
+            filters["semantic_relationship"]
+            and filters["semantic_relationship"] not in self.semantic_relationships
+        ):
+            raise CatalogValidationError(
+                "unknown semantic_relationship filter "
+                f"{filters['semantic_relationship']!r}"
+            )
+        for name in ("table", "source_table", "target_table"):
+            if filters[name]:
+                _physical_component(filters[name], name)
+        matches = []
+        for item in self.relationship_bindings:
+            if filters["profile"] and item.profile != filters["profile"]:
+                continue
+            if filters["table"] and filters["table"] not in {
+                item.source.table,
+                item.target.table,
+            }:
+                continue
+            if (
+                filters["source_table"]
+                and item.source.table != filters["source_table"]
+            ):
+                continue
+            if (
+                filters["target_table"]
+                and item.target.table != filters["target_table"]
+            ):
+                continue
+            if filters["kind"] and item.kind != filters["kind"]:
+                continue
+            if (
+                filters["semantic_relationship"]
+                and filters["semantic_relationship"]
+                not in item.semantic_relationships
+            ):
+                continue
+            matches.append(item)
+        return {
+            "filters": filters,
+            "count": min(len(matches), limit),
+            "total": len(matches),
+            "matches": [item.to_dict() for item in matches[:limit]],
+        }
+
+    def search_relationships(self, **kwargs: Any) -> dict[str, Any]:
+        return self.search_relationship_bindings(**kwargs)
+
+    def get_context(self, identifier: str) -> dict[str, Any]:
+        normalized = _lookup_identifier(identifier, "identifier")
+        context = self.contexts.get(normalized)
+        if context is None:
+            raise CatalogNotFoundError(f"context {normalized!r} was not found")
+        source_ids = sorted(
+            {
+                source
+                for claim in context.claims
+                for source in claim.sources
+            }
+        )
+        return {
+            "kind": "context",
+            "identifier": normalized,
+            "context": context.to_dict(),
+            "sources": {
+                source: self.sources[source].to_dict() for source in source_ids
+            },
+        }
+
+    def discover(
         self,
         query: str,
         *,
         profile: str | None = None,
-        table: str | None = None,
-        grain: str | None = None,
+        kinds: Sequence[str] | None = None,
         domain: str | None = None,
-        feature_kind: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        """Search concepts with deterministic weighted token matching."""
+        """Discover portable semantics from a clinical-language question."""
 
         if not isinstance(query, str):
             raise CatalogValidationError("query must be a string")
+        _validate_limit(limit)
         query_text = query.strip().casefold()
-        filters = {
-            "profile": _optional_filter(profile, "profile"),
-            "table": _optional_filter(table, "table"),
-            "grain": _optional_filter(grain, "grain"),
-            "domain": _optional_filter(domain, "domain"),
-            "feature_kind": _optional_filter(feature_kind, "feature_kind"),
-        }
-        if not query_text and not any(filters.values()):
-            raise CatalogValidationError(
-                "provide a query or at least one search filter"
-            )
-        if (
-            not isinstance(limit, int)
-            or isinstance(limit, bool)
-            or not 1 <= limit <= 500
-        ):
-            raise CatalogValidationError("limit must be an integer from 1 to 500")
-        controlled_filters = {
-            "profile": self.profiles,
-            "grain": GRAINS,
-            "domain": DOMAINS,
-            "feature_kind": FEATURE_KINDS,
-        }
-        for name, allowed in controlled_filters.items():
-            if filters[name] is not None and filters[name] not in allowed:
-                raise CatalogValidationError(
-                    f"unknown {name} filter {filters[name]!r}"
-                )
-
         query_tokens = frozenset(
             token
             for token in _tokens(query_text)
             if token not in _SEARCH_STOPWORDS
         )
-        if query_text and not query_tokens and not any(filters.values()):
+        filters = {
+            "profile": _optional_filter(profile, "profile"),
+            "kinds": None,
+            "domain": _optional_filter(domain, "domain"),
+        }
+        diagnostics: list[dict[str, Any]] = []
+        normalized_kinds: tuple[str, ...] | None = None
+        unknown_filters: dict[str, Any] = {}
+        if kinds is not None:
+            if isinstance(kinds, (str, bytes)) or not isinstance(kinds, Sequence):
+                unknown_filters["kinds"] = kinds
+            else:
+                parsed = tuple(
+                    _nonempty_string(item, "kinds item") for item in kinds
+                )
+                unknown = sorted(set(parsed) - set(DISCOVERY_KINDS))
+                if unknown:
+                    unknown_filters["kinds"] = unknown
+                else:
+                    normalized_kinds = tuple(dict.fromkeys(parsed))
+                    filters["kinds"] = list(normalized_kinds)
+        if (
+            filters["profile"] is not None
+            and filters["profile"] not in self.profile_bindings
+        ):
+            unknown_filters["profile"] = filters["profile"]
+        if filters["domain"] is not None and filters["domain"] not in DOMAINS:
+            unknown_filters["domain"] = filters["domain"]
+        if unknown_filters:
+            diagnostics.append(
+                {
+                    "category": "unknown_filter",
+                    "message": "One or more discovery filters are not catalog values.",
+                    "values": unknown_filters,
+                }
+            )
+            return {
+                "query": query,
+                "filters": filters,
+                "count": 0,
+                "total": 0,
+                "matches": [],
+                "matched_terms": [],
+                "unmatched_terms": sorted(query_tokens),
+                "diagnostics": diagnostics,
+            }
+        if not query_tokens and not any(
+            (filters["profile"], normalized_kinds, filters["domain"])
+        ):
             raise CatalogValidationError(
-                "query must contain at least one meaningful token"
+                "provide a query with meaningful terms or at least one filter"
             )
-        candidates = []
-        has_complete_match = False
-        for document in self._search_documents:
-            concept = document.concept
-            binding_matches: list[tuple[int, int, _BindingSearchDocument]] = []
-            for binding_document in document.bindings:
-                if not _matches_search_filters(
-                    binding_document.binding, concept, filters
-                ):
-                    continue
-                overlap = query_tokens & binding_document.all_tokens
-                if query_tokens and not overlap:
-                    continue
-                score = _score_document(
-                    document, binding_document, query_text, query_tokens
-                )
-                if query_tokens:
-                    score += round(40 * len(overlap) / len(query_tokens))
-                    has_complete_match |= len(overlap) == len(query_tokens)
-                binding_matches.append((score, len(overlap), binding_document))
 
-            if binding_matches:
-                candidates.append((document, binding_matches))
+        text_candidates: list[
+            tuple[int, _DiscoveryDocument, list[dict[str, Any]], frozenset[str]]
+        ] = []
+        for document in self._discovery_documents:
+            active_tokens = set(document.all_tokens)
+            if filters["profile"]:
+                active_tokens.update(
+                    token
+                    for field_profile, _, text in document.profile_fields
+                    if field_profile == filters["profile"]
+                    for token in _tokens(text)
+                )
+            matched = query_tokens & frozenset(active_tokens)
+            if query_tokens and not matched:
+                continue
+            reasons = _discovery_reasons(
+                document,
+                query_text,
+                query_tokens,
+                profile=filters["profile"],
+            )
+            score = _discovery_score(document, query_text, matched, reasons)
+            text_candidates.append((score, document, reasons, matched))
 
-        scored_concepts = []
-        for document, entries in candidates:
-            if query_tokens and has_complete_match:
-                entries = [
-                    entry for entry in entries if entry[1] == len(query_tokens)
-                ]
-                if not entries:
+        selected_candidates = []
+        filtered_out = 0
+        unsupported_candidates = 0
+        for candidate in text_candidates:
+            _, document, _, _ = candidate
+            if normalized_kinds and document.kind not in normalized_kinds:
+                filtered_out += 1
+                continue
+            if filters["domain"] and filters["domain"] not in document.domains:
+                filtered_out += 1
+                continue
+            if filters["profile"]:
+                profile_match, unsupported = self._document_profile_state(
+                    document, filters["profile"]
+                )
+                if not profile_match:
+                    filtered_out += 1
                     continue
-            entries.sort(
-                key=lambda item: (
-                    -item[0],
-                    item[2].binding.qualified_identifier,
-                )
-            )
-            score = entries[0][0]
-            binding_documents = tuple(
-                sorted(
-                    (entry[2] for entry in entries),
-                    key=lambda item: item.binding.qualified_identifier,
-                )
-            )
-            scored_concepts.append(
-                (
-                    score,
-                    document.concept.id,
-                    document,
-                    binding_documents,
-                )
-            )
-        scored_concepts.sort(key=lambda item: (-item[0], item[1]))
+                if unsupported:
+                    unsupported_candidates += 1
+            selected_candidates.append(candidate)
+
+        selected_candidates.sort(
+            key=lambda item: (-item[0], item[1].kind, item[1].identifier)
+        )
+        total = len(selected_candidates)
         matches = [
-            _search_match(document, binding_documents, score)
-            for score, _, document, binding_documents in scored_concepts[:limit]
+            self._discovery_match(
+                document,
+                score,
+                reasons,
+                matched,
+                query_tokens,
+                profile=filters["profile"],
+            )
+            for score, document, reasons, matched in selected_candidates[:limit]
         ]
+        matched_terms = sorted(
+            set().union(
+                *(set(item["matched_terms"]) for item in matches)
+            )
+            if matches
+            else set()
+        )
+        unmatched_terms = sorted(query_tokens - set(matched_terms))
+
+        if filtered_out and not selected_candidates:
+            diagnostics.append(
+                {
+                    "category": "filters_excluded_matches",
+                    "message": (
+                        "The query matched indexed catalog entities before "
+                        "the selected filters were applied."
+                    ),
+                    "excluded_count": filtered_out,
+                }
+            )
+        if unsupported_candidates:
+            diagnostics.append(
+                {
+                    "category": "unsupported_in_profile",
+                    "message": (
+                        "At least one matched semantic subject is explicitly "
+                        "unsupported or unresolved in the selected profile."
+                    ),
+                    "count": unsupported_candidates,
+                }
+            )
+        vocabulary = (
+            self._vocabulary_mismatch(query_tokens)
+            if query_tokens
+            else []
+        )
+        if vocabulary and unmatched_terms and selected_candidates:
+            diagnostics.append(
+                {
+                    "category": "vocabulary_mismatch",
+                    "message": (
+                        "The query reached a known vocabulary, but some "
+                        "terms did not match an indexed code or meaning."
+                    ),
+                    "vocabularies": vocabulary,
+                    "unmatched_terms": unmatched_terms,
+                }
+            )
+        if not text_candidates and query_tokens:
+            if vocabulary:
+                diagnostics.append(
+                    {
+                        "category": "vocabulary_mismatch",
+                        "message": (
+                            "The query refers to a known vocabulary but no "
+                            "indexed code or semantic meaning matched."
+                        ),
+                        "vocabularies": vocabulary,
+                    }
+                )
+            else:
+                diagnostics.append(
+                    {
+                        "category": "no_catalog_coverage",
+                        "message": (
+                            "No indexed catalog entity covers the supplied "
+                            "terms; this does not establish absence from EMBED."
+                        ),
+                    }
+                )
         return {
             "query": query,
             "filters": filters,
             "count": len(matches),
-            "total": len(scored_concepts),
+            "total": total,
             "matches": matches,
+            "matched_terms": matched_terms,
+            "unmatched_terms": unmatched_terms,
+            "diagnostics": diagnostics,
         }
 
     def _resolve_physical(self, identifier: str) -> tuple[Binding, ...]:
         if ":" in identifier:
-            binding = self._by_qualified.get(identifier)
+            binding = self._bindings_by_qualified.get(identifier)
             if binding is None:
                 raise CatalogNotFoundError(
-                    f"feature {identifier!r} was not found"
+                    f"feature binding {identifier!r} was not found"
                 )
             return (binding,)
-
-        bindings = self._by_physical.get(identifier)
+        bindings = self._bindings_by_physical.get(identifier)
         if not bindings:
             raise CatalogNotFoundError(
                 f"feature or vocabulary {identifier!r} was not found"
             )
-        concepts = {binding.concept for binding in bindings}
+        concepts = {item.concept for item in bindings}
         if len(concepts) > 1:
             choices = ", ".join(
-                binding.qualified_identifier for binding in bindings
+                item.qualified_identifier for item in bindings
             )
             raise CatalogAmbiguousError(
                 f"feature {identifier!r} is ambiguous; use one of: {choices}"
             )
         return bindings
 
-    def _vocabulary_for_concept(
-        self, concept: Concept
+    def _vocabulary_for_feature(
+        self, feature: Concept
     ) -> Vocabulary | None:
-        if concept.vocabulary is None:
+        if feature.vocabulary is None:
             return None
-        return self._vocabularies[concept.vocabulary]
+        return self.vocabularies[feature.vocabulary]
 
-    def _build_search_documents(self) -> tuple[_ConceptSearchDocument, ...]:
-        documents: list[_ConceptSearchDocument] = []
-        for concept in self._concepts.values():
-            bindings = self._bindings_by_concept.get(concept.id, ())
-            if not bindings:
-                continue
-            vocabulary = self._vocabulary_for_concept(concept)
-            concept_id_text = concept.id.casefold()
-            label_text = concept.label.casefold()
-            search_terms_text = " ".join(concept.search_terms).casefold()
-            definition_text = concept.definition.casefold()
-            binding_documents: list[_BindingSearchDocument] = []
-            for binding in bindings:
-                identifier_text = binding.identifier.casefold()
-                auxiliary_parts = [
-                    binding.profile,
-                    binding.table,
-                    binding.column,
-                    binding.grain,
-                    binding.role,
-                    binding.physical_type,
-                    concept.feature_kind,
-                    *concept.domains,
-                    *concept.caveats,
-                    *concept.evidence,
-                    *binding.notes,
-                ]
-                auxiliary_parts.extend(
-                    compact
-                    for compact in (
-                        _compact_identifier(binding.identifier),
-                        _compact_identifier(binding.column),
-                        _compact_identifier(concept.id),
-                        *(
-                            _compact_identifier(term)
-                            for term in concept.search_terms
-                        ),
-                    )
-                    if compact
+    def _claim_text(self, claim_refs: Sequence[str]) -> str:
+        parts: list[str] = []
+        for reference in claim_refs:
+            claim = self._claims_by_ref[reference]
+            parts.extend((reference, claim.statement, *claim.caveats))
+            for source_id in claim.sources:
+                source = self.sources[source_id]
+                parts.extend((source.title, source.version_scope))
+        return " ".join(parts)
+
+    def _build_discovery_documents(self) -> tuple[_DiscoveryDocument, ...]:
+        documents: list[_DiscoveryDocument] = []
+        concept_profiles: defaultdict[str, set[str]] = defaultdict(set)
+        object_profiles: defaultdict[str, set[str]] = defaultdict(set)
+        semantic_relationship_profiles: defaultdict[str, set[str]] = (
+            defaultdict(set)
+        )
+        for binding in self.bindings:
+            concept_profiles[binding.concept].add(binding.profile)
+        for binding in self.object_bindings:
+            object_profiles[binding.object].add(binding.profile)
+        for binding in self.relationship_bindings:
+            for identifier in binding.semantic_relationships:
+                semantic_relationship_profiles[identifier].add(
+                    binding.profile
                 )
-                if vocabulary is not None:
-                    auxiliary_parts.extend(
-                        [
-                            vocabulary.id,
-                            vocabulary.label,
-                            vocabulary.completeness,
-                            vocabulary.parsing,
-                            *vocabulary.caveats,
-                            *(code for code, _ in vocabulary.codes),
-                            *(meaning for _, meaning in vocabulary.codes),
-                        ]
-                    )
-                auxiliary_text = " ".join(auxiliary_parts).casefold()
-                all_text = " ".join(
-                    (
-                        identifier_text,
-                        concept_id_text,
-                        label_text,
-                        search_terms_text,
-                        definition_text,
-                        auxiliary_text,
-                    )
-                )
-                binding_documents.append(
-                    _BindingSearchDocument(
-                        binding=binding,
-                        identifier_text=identifier_text,
-                        auxiliary_text=auxiliary_text,
-                        all_tokens=frozenset(_tokens(all_text)),
-                    )
-                )
-            documents.append(
-                _ConceptSearchDocument(
-                    concept=concept,
-                    vocabulary=vocabulary,
-                    concept_id_text=concept_id_text,
-                    label_text=label_text,
-                    search_terms_text=search_terms_text,
-                    definition_text=definition_text,
-                    bindings=tuple(binding_documents),
-                )
+
+        def add(
+            *,
+            kind: str,
+            identifier: str,
+            label: str,
+            entity: Any,
+            fields: Sequence[tuple[str, str]],
+            domains: Sequence[str],
+            profiles: Sequence[str] = (),
+            profile_fields: Sequence[tuple[str, str, str]] = (),
+        ) -> None:
+            normalized_fields = tuple(
+                (name, text.casefold())
+                for name, text in fields
+                if isinstance(text, str) and text.strip()
             )
-        return tuple(documents)
-
-    def _build_context_search_documents(
-        self,
-    ) -> tuple[_ContextSearchDocument, ...]:
-        documents: list[_ContextSearchDocument] = []
-        for context in self.contexts.values():
-            identifier_text = context.id.casefold()
-            title_text = context.title.casefold()
-            search_terms_text = " ".join(context.search_terms).casefold()
-            summary_text = context.summary.casefold()
-            auxiliary_text = " ".join(
-                (
-                    context.kind,
-                    context.scope,
-                    *context.profiles,
-                    *context.domains,
-                    *context.caveats,
-                    *context.related_concepts,
-                    *(
-                        table.identifier for table in context.related_tables
-                    ),
-                    *context.related_relationships,
-                    *(
-                        part
-                        for step in context.workflow_steps
-                        for part in (step.id, step.label)
-                    ),
-                    _compact_identifier(context.id),
-                    *(
-                        _compact_identifier(term)
-                        for term in context.search_terms
-                    ),
-                )
-            ).casefold()
-            claim_documents: list[_ContextClaimSearchDocument] = []
-            for claim in context.claims:
-                claim_sources = [
-                    self.sources[source_id] for source_id in claim.sources
-                ]
-                claim_text = " ".join(
-                    (
-                        claim.id,
-                        claim.statement,
-                        claim.status,
-                        *claim.caveats,
-                        *claim.sources,
-                        *(source.title for source in claim_sources),
-                        *(source.version_scope for source in claim_sources),
-                    )
-                ).casefold()
-                claim_documents.append(
-                    _ContextClaimSearchDocument(
-                        claim=claim,
-                        all_tokens=frozenset(_tokens(claim_text)),
-                    )
-                )
+            all_text = " ".join(
+                (identifier, label, *(text for _, text in normalized_fields))
+            )
             documents.append(
-                _ContextSearchDocument(
-                    context=context,
-                    identifier_text=identifier_text,
-                    title_text=title_text,
-                    search_terms_text=search_terms_text,
-                    summary_text=summary_text,
-                    all_tokens=frozenset(
-                        _tokens(
-                            " ".join(
-                                (
-                                    identifier_text,
-                                    title_text,
-                                    search_terms_text,
-                                    summary_text,
-                                    auxiliary_text,
-                                )
+                _DiscoveryDocument(
+                    kind=kind,
+                    identifier=identifier,
+                    label=label,
+                    entity=entity,
+                    fields=normalized_fields,
+                    profile_fields=tuple(
+                        dict.fromkeys(
+                            (
+                                profile,
+                                field,
+                                text.casefold(),
                             )
+                            for profile, field, text in profile_fields
+                            if isinstance(text, str) and text.strip()
                         )
                     ),
-                    claims=tuple(claim_documents),
+                    domains=tuple(domains),
+                    profiles=tuple(sorted(set(profiles))),
+                    all_tokens=frozenset(_tokens(all_text.casefold())),
                 )
             )
-        return tuple(documents)
 
-    def _build_analysis_pattern_search_documents(
-        self,
-    ) -> tuple[_AnalysisPatternSearchDocument, ...]:
-        documents = []
-        for pattern in self.analysis_patterns.values():
-            text = " ".join(
+        for identifier, item in self.clinical_objects.items():
+            add(
+                kind="clinical_object",
+                identifier=identifier,
+                label=item.label,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("label", item.label),
+                    ("definition", item.definition),
+                    ("grain", item.grain),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("caveats", " ".join(item.caveats)),
+                    ("claims", self._claim_text(item.claim_refs)),
+                ),
+                domains=item.domains,
+                profiles=object_profiles[identifier],
+            )
+        for identifier, item in self.concepts.items():
+            vocabulary = self._vocabulary_for_feature(item)
+            vocabulary_text = ""
+            if vocabulary is not None:
+                vocabulary_text = " ".join(
+                    (
+                        vocabulary.id,
+                        vocabulary.label,
+                        *(code for code, _ in vocabulary.codes),
+                        *(meaning for _, meaning in vocabulary.codes),
+                        *vocabulary.caveats,
+                    )
+                )
+            binding_fields = tuple(
+                field
+                for binding in self._bindings_by_concept.get(identifier, ())
+                for field in (
+                    (binding.profile, "binding.table", binding.table),
+                    (binding.profile, "binding.column", binding.column),
+                )
+            )
+            missing_text = " ".join(
+                part
+                for state in item.missing_states
+                for part in (
+                    state.id,
+                    state.representation,
+                    state.meaning,
+                    *state.caveats,
+                    self._claim_text(state.claim_refs),
+                )
+            )
+            add(
+                kind="feature",
+                identifier=identifier,
+                label=item.label,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("label", item.label),
+                    ("definition", item.definition),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("objects", " ".join(item.objects)),
+                    ("missing_states", missing_text),
+                    ("vocabulary", vocabulary_text),
+                    ("caveats", " ".join(item.caveats)),
+                    ("claims", self._claim_text(item.claim_refs)),
+                ),
+                domains=item.domains,
+                profiles=concept_profiles[identifier],
+                profile_fields=binding_fields,
+            )
+        for identifier, item in self.semantic_relationships.items():
+            add(
+                kind="semantic_relationship",
+                identifier=identifier,
+                label=item.label,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("label", item.label),
+                    ("objects", f"{item.source_object} {item.target_object}"),
+                    ("attribution", item.attribution),
+                    (
+                        "attribution_limitations",
+                        " ".join(item.attribution_limitations),
+                    ),
+                    ("temporal_qualification", item.temporal_qualification),
+                    (
+                        "temporal_semantics",
+                        " ".join(item.temporal_semantics),
+                    ),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("caveats", " ".join(item.caveats)),
+                    ("claims", self._claim_text(item.claim_refs)),
+                ),
+                domains=item.domains,
+                profiles=semantic_relationship_profiles[identifier],
+            )
+        for identifier, item in self.temporal_semantics.items():
+            profiles = {
+                binding.profile
+                for feature in item.feature_refs
+                for binding in self._bindings_by_concept.get(feature, ())
+            }
+            profiles.update(
+                profile
+                for record in self.coverage.values()
+                if record.subject_kind == "temporal_semantic"
+                and record.subject == identifier
+                for profile in record.profiles
+            )
+            add(
+                kind="temporal_semantic",
+                identifier=identifier,
+                label=item.label,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("label", item.label),
+                    ("meaning", item.meaning),
+                    ("objects", " ".join(item.objects)),
+                    ("features", " ".join(item.feature_refs)),
+                    ("relative_to", " ".join(item.relative_to)),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("caveats", " ".join(item.caveats)),
+                    ("claims", self._claim_text(item.claim_refs)),
+                ),
+                domains=item.domains,
+                profiles=profiles,
+            )
+        for identifier, item in self.aggregations.items():
+            add(
+                kind="aggregation",
+                identifier=identifier,
+                label=item.label,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("label", item.label),
+                    ("status", item.status),
+                    (
+                        "objects",
+                        f"{item.source_object} {item.target_object}",
+                    ),
+                    (
+                        "features",
+                        " ".join(
+                            part
+                            for part in (
+                                item.source_concept,
+                                item.result_concept,
+                            )
+                            if part
+                        ),
+                    ),
+                    (
+                        "semantic_relationships",
+                        " ".join(item.semantic_relationships),
+                    ),
+                    ("method", item.method),
+                    ("ordering", item.ordering),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("caveats", " ".join(item.caveats)),
+                    ("claims", self._claim_text(item.claim_refs)),
+                ),
+                domains=item.domains,
+                profiles=concept_profiles[item.source_concept],
+            )
+        for identifier, item in self.guardrails.items():
+            add(
+                kind="guardrail",
+                identifier=identifier,
+                label=item.title,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("title", item.title),
+                    ("statement", item.statement),
+                    ("rationale", item.rationale),
+                    ("objects", " ".join(item.objects)),
+                    ("features", " ".join(item.concepts)),
+                    (
+                        "semantic_relationships",
+                        " ".join(item.semantic_relationships),
+                    ),
+                    ("temporal_semantics", " ".join(item.temporal_semantics)),
+                    ("aggregations", " ".join(item.aggregations)),
+                    ("coverage", " ".join(item.coverage)),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("caveats", " ".join(item.caveats)),
+                    ("claims", self._claim_text(item.claim_refs)),
+                ),
+                domains=item.domains,
+                profiles=item.profiles,
+            )
+        for identifier, item in self.coverage.items():
+            add(
+                kind="coverage",
+                identifier=identifier,
+                label=item.summary,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("subject", f"{item.subject_kind} {item.subject}"),
+                    ("status", item.status),
+                    ("summary", item.summary),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("caveats", " ".join(item.caveats)),
+                    ("claims", self._claim_text(item.claim_refs)),
+                ),
+                domains=item.domains,
+                profiles=item.profiles,
+            )
+        for identifier, item in self.contexts.items():
+            claim_text = " ".join(
+                part
+                for claim in item.claims
+                for part in (
+                    claim.id,
+                    claim.statement,
+                    claim.status,
+                    *claim.caveats,
+                    *(self.sources[source].title for source in claim.sources),
+                )
+            )
+            add(
+                kind="context",
+                identifier=identifier,
+                label=item.title,
+                entity=item,
+                fields=(
+                    ("identifier", identifier),
+                    ("title", item.title),
+                    ("summary", item.summary),
+                    ("search_terms", " ".join(item.search_terms)),
+                    ("claims", claim_text),
+                    ("caveats", " ".join(item.caveats)),
+                ),
+                domains=item.domains,
+                profiles=item.profiles,
+            )
+        return tuple(
+            sorted(documents, key=lambda item: (item.kind, item.identifier))
+        )
+
+    def _document_profile_state(
+        self, document: _DiscoveryDocument, profile: str
+    ) -> tuple[bool, bool]:
+        if document.kind in {"guardrail", "coverage", "context"}:
+            entity_scope = getattr(document.entity, "scope", None)
+            if (
+                entity_scope == "profile_specific"
+                and profile not in document.profiles
+            ):
+                return False, False
+        unsupported = any(
+            record.status in {"unsupported", "unresolved"}
+            and (
+                record.scope != "profile_specific"
+                or profile in record.profiles
+            )
+            and (
                 (
-                    pattern.id,
-                    pattern.title,
-                    pattern.summary,
-                    pattern.status,
-                    pattern.scope,
-                    *pattern.profiles,
-                    *pattern.domains,
-                    *pattern.search_terms,
-                    *pattern.applicable_grains,
-                    *pattern.related_concepts,
-                    *pattern.related_relationships,
-                    *pattern.related_contexts,
-                    *(table.identifier for table in pattern.related_tables),
-                    *(
-                        part
-                        for alternative in pattern.alternatives
-                        for part in (
-                            alternative.id,
-                            alternative.label,
-                            alternative.description,
-                            alternative.appropriate_when,
-                            *alternative.limitations,
-                        )
-                    ),
-                    *(
-                        part
-                        for decision in pattern.required_decisions
-                        for part in (
-                            decision.id,
-                            decision.question,
-                            decision.rationale,
-                        )
-                    ),
-                    *(
-                        part
-                        for shortcut in pattern.prohibited_shortcuts
-                        for part in (
-                            shortcut.id,
-                            shortcut.statement,
-                            shortcut.reason,
-                        )
-                    ),
-                    *pattern.caveats,
+                    record.subject_kind == "concept"
+                    and document.kind == "feature"
+                )
+                or record.subject_kind == document.kind
+                or (
+                    record.subject_kind == "topic"
+                    and document.kind == "context"
                 )
             )
-            documents.append(
-                _AnalysisPatternSearchDocument(
-                    pattern=pattern,
-                    all_tokens=frozenset(_tokens(text)),
-                )
+            and record.subject == document.identifier
+            for record in self.coverage.values()
+        )
+        return True, unsupported
+
+    def _discovery_match(
+        self,
+        document: _DiscoveryDocument,
+        score: int,
+        reasons: list[dict[str, Any]],
+        matched: frozenset[str],
+        query_tokens: frozenset[str],
+        *,
+        profile: str | None,
+    ) -> dict[str, Any]:
+        result = {
+            "kind": document.kind,
+            "identifier": document.identifier,
+            "score": score,
+            "label": document.label,
+            "entity": document.entity.to_dict(),
+            "match_reasons": reasons,
+            "matched_terms": sorted(matched),
+            "unmatched_terms": sorted(query_tokens - matched),
+        }
+        if profile is not None:
+            result["implementation_bindings"] = (
+                self._discovery_implementation_bindings(document, profile)
             )
-        return tuple(documents)
+            result["profile_coverage"] = [
+                item.to_dict()
+                for item in self.coverage.values()
+                if (
+                    item.scope != "profile_specific"
+                    or profile in item.profiles
+                )
+                and (
+                    (
+                        item.subject_kind == "concept"
+                        and document.kind == "feature"
+                    )
+                    or item.subject_kind == document.kind
+                    or (
+                        item.subject_kind == "topic"
+                        and document.kind == "context"
+                    )
+                )
+                and item.subject == document.identifier
+            ]
+        return result
+
+    def _discovery_implementation_bindings(
+        self, document: _DiscoveryDocument, profile: str
+    ) -> dict[str, Any]:
+        feature_ids: set[str] = set()
+        object_ids: set[str] = set()
+        relationship_ids: set[str] = set()
+        if document.kind == "feature":
+            feature_ids.add(document.identifier)
+        elif document.kind == "clinical_object":
+            object_ids.add(document.identifier)
+        elif document.kind == "semantic_relationship":
+            relationship_ids.add(document.identifier)
+        elif document.kind == "temporal_semantic":
+            feature_ids.update(document.entity.feature_refs)
+        elif document.kind == "aggregation":
+            feature_ids.add(document.entity.source_concept)
+            if document.entity.result_concept is not None:
+                feature_ids.add(document.entity.result_concept)
+            relationship_ids.update(
+                document.entity.semantic_relationships
+            )
+        return {
+            "profile": profile,
+            "feature_bindings": [
+                item.to_dict()
+                for item in self.bindings
+                if item.profile == profile and item.concept in feature_ids
+            ],
+            "object_bindings": [
+                item.to_dict()
+                for item in self.object_bindings
+                if item.profile == profile and item.object in object_ids
+            ],
+            "relationship_bindings": [
+                item.to_dict()
+                for item in self.relationship_bindings
+                if item.profile == profile
+                and relationship_ids.intersection(
+                    item.semantic_relationships
+                )
+            ],
+        }
+
+    def _vocabulary_mismatch(
+        self, query_tokens: frozenset[str]
+    ) -> list[str]:
+        matches = []
+        for identifier, vocabulary in self.vocabularies.items():
+            navigation_tokens = frozenset(
+                _tokens(f"{identifier} {vocabulary.label}".casefold())
+            )
+            if query_tokens & navigation_tokens:
+                matches.append(identifier)
+        return sorted(matches)
+
+
+def _parse_map(
+    value: object,
+    path: str,
+    parser: Any,
+    *parser_args: Any,
+) -> dict[str, Any]:
+    data = _expect_mapping(value, path)
+    parsed: dict[str, Any] = {}
+    for identifier, raw in data.items():
+        _require_identifier(identifier, f"{path} key {identifier!r}")
+        parsed[identifier] = parser(identifier, raw, *parser_args)
+    return parsed
+
+
+def _parse_clinical_object(
+    identifier: str, value: object
+) -> ClinicalObject:
+    path = f"$.clinical_objects.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _CLINICAL_OBJECT_KEYS, _CLINICAL_OBJECT_KEYS, path
+    )
+    return ClinicalObject(
+        id=identifier,
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        definition=_nonempty_string(
+            data["definition"], f"{path}.definition"
+        ),
+        grain=_nonempty_string(data["grain"], f"{path}.grain"),
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_concept(identifier: str, value: object) -> Concept:
+    path = f"$.concepts.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _CONCEPT_REQUIRED_KEYS, _CONCEPT_KEYS, path)
+    feature_kind = _controlled_string(
+        data["feature_kind"], f"{path}.feature_kind", FEATURE_KINDS
+    )
+    objects = _identifier_array(data["objects"], f"{path}.objects")
+    if feature_kind != "technical" and not objects:
+        raise CatalogValidationError(
+            f"{path}.objects must not be empty for nontechnical features"
+        )
+    raw_missing = _expect_list(
+        data.get("missing_states", []), f"{path}.missing_states"
+    )
+    missing_states = tuple(
+        _parse_missing_state(raw, f"{path}.missing_states[{index}]")
+        for index, raw in enumerate(raw_missing)
+    )
+    state_ids = [state.id for state in missing_states]
+    if len(state_ids) != len(set(state_ids)):
+        raise CatalogValidationError(
+            f"{path}.missing_states contains duplicate IDs"
+        )
+    vocabulary_raw = data.get("vocabulary")
+    vocabulary = (
+        _identifier(vocabulary_raw, f"{path}.vocabulary")
+        if vocabulary_raw is not None
+        else None
+    )
+    return Concept(
+        id=identifier,
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        definition=_nonempty_string(
+            data["definition"], f"{path}.definition"
+        ),
+        feature_kind=feature_kind,
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        objects=objects,
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
+        claim_refs=_claim_ref_array(
+            data.get("claim_refs", []), f"{path}.claim_refs"
+        ),
+        missing_states=missing_states,
+        temporal_semantics=_identifier_array(
+            data.get("temporal_semantics", []),
+            f"{path}.temporal_semantics",
+        ),
+        aggregations=_identifier_array(
+            data.get("aggregations", []), f"{path}.aggregations"
+        ),
+        vocabulary=vocabulary,
+    )
+
+
+def _parse_missing_state(value: object, path: str) -> MissingState:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _MISSING_STATE_KEYS, _MISSING_STATE_KEYS, path)
+    return MissingState(
+        id=_identifier(data["id"], f"{path}.id"),
+        representation=_nonempty_string(
+            data["representation"], f"{path}.representation"
+        ),
+        meaning=_nonempty_string(data["meaning"], f"{path}.meaning"),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_semantic_relationship(
+    identifier: str, value: object
+) -> SemanticRelationship:
+    path = f"$.semantic_relationships.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data,
+        _SEMANTIC_RELATIONSHIP_KEYS,
+        _SEMANTIC_RELATIONSHIP_KEYS,
+        path,
+    )
+    cardinality = _expect_mapping(
+        data["cardinality"], f"{path}.cardinality"
+    )
+    _require_exact_keys(
+        cardinality,
+        _CARDINALITY_KEYS,
+        _CARDINALITY_KEYS,
+        f"{path}.cardinality",
+    )
+    optionality = _expect_mapping(
+        data["optionality"], f"{path}.optionality"
+    )
+    _require_exact_keys(
+        optionality,
+        _OPTIONALITY_KEYS,
+        _OPTIONALITY_KEYS,
+        f"{path}.optionality",
+    )
+    return SemanticRelationship(
+        id=identifier,
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        kind=_controlled_string(
+            data["kind"],
+            f"{path}.kind",
+            SEMANTIC_RELATIONSHIP_KINDS,
+        ),
+        source_object=_identifier(
+            data["source_object"], f"{path}.source_object"
+        ),
+        target_object=_identifier(
+            data["target_object"], f"{path}.target_object"
+        ),
+        targets_per_source=_controlled_string(
+            cardinality["targets_per_source"],
+            f"{path}.cardinality.targets_per_source",
+            CARDINALITY_VALUES,
+        ),
+        sources_per_target=_controlled_string(
+            cardinality["sources_per_target"],
+            f"{path}.cardinality.sources_per_target",
+            CARDINALITY_VALUES,
+        ),
+        source_optionality=_controlled_string(
+            optionality["source"],
+            f"{path}.optionality.source",
+            OPTIONALITY_VALUES,
+        ),
+        target_optionality=_controlled_string(
+            optionality["target"],
+            f"{path}.optionality.target",
+            OPTIONALITY_VALUES,
+        ),
+        attribution=_nonempty_string(
+            data["attribution"], f"{path}.attribution"
+        ),
+        attribution_limitations=_string_array(
+            data["attribution_limitations"],
+            f"{path}.attribution_limitations",
+        ),
+        temporal_qualification=_nonempty_string(
+            data["temporal_qualification"],
+            f"{path}.temporal_qualification",
+        ),
+        temporal_semantics=_identifier_array(
+            data["temporal_semantics"],
+            f"{path}.temporal_semantics",
+        ),
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_temporal_semantic(
+    identifier: str, value: object
+) -> TemporalSemantic:
+    path = f"$.temporal_semantics.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _TEMPORAL_KEYS, _TEMPORAL_KEYS, path)
+    return TemporalSemantic(
+        id=identifier,
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        kind=_controlled_string(
+            data["kind"], f"{path}.kind", TEMPORAL_KINDS
+        ),
+        meaning=_nonempty_string(data["meaning"], f"{path}.meaning"),
+        objects=_identifier_array(
+            data["objects"], f"{path}.objects", minimum=1
+        ),
+        feature_refs=_identifier_array(
+            data["feature_refs"], f"{path}.feature_refs"
+        ),
+        relative_to=_identifier_array(
+            data["relative_to"], f"{path}.relative_to"
+        ),
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_aggregation(identifier: str, value: object) -> Aggregation:
+    path = f"$.aggregations.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _AGGREGATION_KEYS, _AGGREGATION_KEYS, path)
+    raw_result = data["result_concept"]
+    if raw_result is not None:
+        result_concept = _identifier(
+            raw_result, f"{path}.result_concept"
+        )
+    else:
+        result_concept = None
+    return Aggregation(
+        id=identifier,
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        status=_controlled_string(
+            data["status"], f"{path}.status", AGGREGATION_STATUSES
+        ),
+        source_object=_identifier(
+            data["source_object"], f"{path}.source_object"
+        ),
+        target_object=_identifier(
+            data["target_object"], f"{path}.target_object"
+        ),
+        source_concept=_identifier(
+            data["source_concept"], f"{path}.source_concept"
+        ),
+        result_concept=result_concept,
+        semantic_relationships=_identifier_array(
+            data["semantic_relationships"],
+            f"{path}.semantic_relationships",
+        ),
+        method=_nonempty_string(data["method"], f"{path}.method"),
+        ordering=_nonempty_string(data["ordering"], f"{path}.ordering"),
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_guardrail(
+    identifier: str, value: object, profiles: frozenset[str]
+) -> Guardrail:
+    path = f"$.guardrails.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _GUARDRAIL_KEYS, _GUARDRAIL_KEYS, path)
+    scope, selected_profiles = _scope_and_profiles(data, path, profiles)
+    links = {
+        name: _identifier_array(data[name], f"{path}.{name}")
+        for name in (
+            "objects",
+            "concepts",
+            "semantic_relationships",
+            "temporal_semantics",
+            "aggregations",
+            "coverage",
+        )
+    }
+    if not any(links.values()):
+        raise CatalogValidationError(
+            f"{path} must reference at least one semantic entity"
+        )
+    return Guardrail(
+        id=identifier,
+        title=_nonempty_string(data["title"], f"{path}.title"),
+        statement=_nonempty_string(
+            data["statement"], f"{path}.statement"
+        ),
+        rationale=_nonempty_string(
+            data["rationale"], f"{path}.rationale"
+        ),
+        scope=scope,
+        profiles=selected_profiles,
+        objects=links["objects"],
+        concepts=links["concepts"],
+        semantic_relationships=links["semantic_relationships"],
+        temporal_semantics=links["temporal_semantics"],
+        aggregations=links["aggregations"],
+        coverage=links["coverage"],
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs", minimum=1
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_coverage(
+    identifier: str, value: object, profiles: frozenset[str]
+) -> Coverage:
+    path = f"$.coverage.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _COVERAGE_KEYS, _COVERAGE_KEYS, path)
+    scope, selected_profiles = _scope_and_profiles(data, path, profiles)
+    return Coverage(
+        id=identifier,
+        subject_kind=_controlled_string(
+            data["subject_kind"],
+            f"{path}.subject_kind",
+            COVERAGE_SUBJECT_KINDS,
+        ),
+        subject=_identifier(data["subject"], f"{path}.subject"),
+        status=_controlled_string(
+            data["status"], f"{path}.status", COVERAGE_STATUSES
+        ),
+        scope=scope,
+        profiles=selected_profiles,
+        summary=_nonempty_string(data["summary"], f"{path}.summary"),
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs", minimum=1
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_vocabulary(identifier: str, value: object) -> Vocabulary:
+    path = f"$.vocabularies.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _VOCABULARY_REQUIRED_KEYS, _VOCABULARY_KEYS, path
+    )
+    raw_codes = _expect_mapping(data["codes"], f"{path}.codes")
+    codes: list[tuple[str, str]] = []
+    for code, meaning in raw_codes.items():
+        if not isinstance(code, str) or code == "":
+            raise CatalogValidationError(
+                f"{path}.codes keys must be non-empty strings"
+            )
+        codes.append(
+            (code, _nonempty_string(meaning, f"{path}.codes[{code!r}]"))
+        )
+    return Vocabulary(
+        id=identifier,
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        completeness=_controlled_string(
+            data["completeness"],
+            f"{path}.completeness",
+            VOCABULARY_COMPLETENESS,
+        ),
+        parsing=_controlled_string(
+            data["parsing"], f"{path}.parsing", VOCABULARY_PARSING
+        ),
+        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
+        codes=tuple(codes),
+        caveats=_string_array(
+            data.get("caveats", []), f"{path}.caveats"
+        ),
+    )
+
+
+def _parse_context_source(
+    identifier: str, value: object, profiles: frozenset[str]
+) -> ContextSource:
+    path = f"$.sources.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _CONTEXT_SOURCE_KEYS, _CONTEXT_SOURCE_KEYS, path
+    )
+    scope, selected_profiles = _scope_and_profiles(data, path, profiles)
+    kind = _controlled_string(
+        data["kind"], f"{path}.kind", SOURCE_KINDS
+    )
+    if kind in {"release_schema", "release_legend"} and not selected_profiles:
+        raise CatalogValidationError(
+            f"{path}.profiles must identify a release profile for {kind!r}"
+        )
+    locator_kind = _controlled_string(
+        data["locator_kind"],
+        f"{path}.locator_kind",
+        SOURCE_LOCATOR_KINDS,
+    )
+    locator = _nonempty_string(data["locator"], f"{path}.locator")
+    if locator_kind == "url" and not locator.startswith("https://"):
+        raise CatalogValidationError(
+            f"{path}.locator must be an https URL for locator kind 'url'"
+        )
+    if locator_kind == "repository_path":
+        locator_path = Path(locator)
+        if locator_path.is_absolute() or ".." in locator_path.parts:
+            raise CatalogValidationError(
+                f"{path}.locator must be a repository-relative path "
+                "without parent traversal"
+            )
+    return ContextSource(
+        id=identifier,
+        title=_nonempty_string(data["title"], f"{path}.title"),
+        kind=kind,
+        scope=scope,
+        locator_kind=locator_kind,
+        locator=locator,
+        version_scope=_nonempty_string(
+            data["version_scope"], f"{path}.version_scope"
+        ),
+        profiles=selected_profiles,
+        notes=_string_array(data["notes"], f"{path}.notes"),
+    )
+
+
+def _parse_clinical_context(
+    identifier: str, value: object, profiles: frozenset[str]
+) -> ClinicalContext:
+    path = f"$.contexts.{identifier}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _CLINICAL_CONTEXT_KEYS, _CLINICAL_CONTEXT_KEYS, path
+    )
+    scope, selected_profiles = _scope_and_profiles(data, path, profiles)
+    raw_tables = _expect_list(
+        data["related_tables"], f"{path}.related_tables"
+    )
+    table_refs: list[ContextTableReference] = []
+    seen_tables: set[str] = set()
+    for index, raw in enumerate(raw_tables):
+        table_path = f"{path}.related_tables[{index}]"
+        table_data = _expect_mapping(raw, table_path)
+        _require_exact_keys(
+            table_data,
+            _CONTEXT_TABLE_REFERENCE_KEYS,
+            _CONTEXT_TABLE_REFERENCE_KEYS,
+            table_path,
+        )
+        reference = ContextTableReference(
+            profile=_controlled_identifier(
+                table_data["profile"],
+                f"{table_path}.profile",
+                profiles,
+            ),
+            table=_physical_component(
+                table_data["table"], f"{table_path}.table"
+            ),
+        )
+        if reference.identifier in seen_tables:
+            raise CatalogValidationError(
+                f"{path}.related_tables contains duplicate "
+                f"{reference.identifier!r}"
+            )
+        seen_tables.add(reference.identifier)
+        table_refs.append(reference)
+
+    raw_claims = _expect_list(data["claims"], f"{path}.claims")
+    if not raw_claims:
+        raise CatalogValidationError(f"{path}.claims must not be empty")
+    claims: list[ContextClaim] = []
+    seen_claims: set[str] = set()
+    for index, raw in enumerate(raw_claims):
+        claim_path = f"{path}.claims[{index}]"
+        claim_data = _expect_mapping(raw, claim_path)
+        _require_exact_keys(
+            claim_data,
+            _CONTEXT_CLAIM_KEYS,
+            _CONTEXT_CLAIM_KEYS,
+            claim_path,
+        )
+        claim_id = _identifier(claim_data["id"], f"{claim_path}.id")
+        if claim_id in seen_claims:
+            raise CatalogValidationError(
+                f"{path}.claims contains duplicate ID {claim_id!r}"
+            )
+        seen_claims.add(claim_id)
+        claims.append(
+            ContextClaim(
+                id=claim_id,
+                statement=_nonempty_string(
+                    claim_data["statement"], f"{claim_path}.statement"
+                ),
+                status=_controlled_string(
+                    claim_data["status"],
+                    f"{claim_path}.status",
+                    CLAIM_STATUSES,
+                ),
+                sources=_identifier_array(
+                    claim_data["sources"],
+                    f"{claim_path}.sources",
+                    minimum=1,
+                ),
+                caveats=_string_array(
+                    claim_data["caveats"], f"{claim_path}.caveats"
+                ),
+            )
+        )
+    raw_steps = _expect_list(
+        data["workflow_steps"], f"{path}.workflow_steps"
+    )
+    steps: list[WorkflowStep] = []
+    seen_steps: set[str] = set()
+    for index, raw in enumerate(raw_steps):
+        step_path = f"{path}.workflow_steps[{index}]"
+        step_data = _expect_mapping(raw, step_path)
+        _require_exact_keys(
+            step_data, _WORKFLOW_STEP_KEYS, _WORKFLOW_STEP_KEYS, step_path
+        )
+        step_id = _identifier(step_data["id"], f"{step_path}.id")
+        if step_id in seen_steps:
+            raise CatalogValidationError(
+                f"{path}.workflow_steps contains duplicate ID {step_id!r}"
+            )
+        seen_steps.add(step_id)
+        claim_ids = _identifier_array(
+            step_data["claims"], f"{step_path}.claims", minimum=1
+        )
+        unknown = sorted(set(claim_ids) - seen_claims)
+        if unknown:
+            raise CatalogValidationError(
+                f"{step_path}.claims references unknown claim IDs: "
+                + ", ".join(unknown)
+            )
+        steps.append(
+            WorkflowStep(
+                id=step_id,
+                label=_nonempty_string(
+                    step_data["label"], f"{step_path}.label"
+                ),
+                claims=claim_ids,
+            )
+        )
+    kind = _controlled_string(
+        data["kind"], f"{path}.kind", CONTEXT_KINDS
+    )
+    if kind == "clinical_workflow":
+        if len(steps) < 2:
+            raise CatalogValidationError(
+                f"{path}.workflow_steps must contain at least two steps"
+            )
+        placed = {claim for step in steps for claim in step.claims}
+        missing = sorted(seen_claims - placed)
+        if missing:
+            raise CatalogValidationError(
+                f"{path}.workflow_steps does not place claims: "
+                + ", ".join(missing)
+            )
+    elif steps:
+        raise CatalogValidationError(
+            f"{path}.workflow_steps must be empty for non-workflow context"
+        )
+    if scope != "profile_specific" and (table_refs or data["related_relationships"]):
+        raise CatalogValidationError(
+            f"{path} may reference physical metadata only when profile_specific"
+        )
+    return ClinicalContext(
+        id=identifier,
+        title=_nonempty_string(data["title"], f"{path}.title"),
+        kind=kind,
+        scope=scope,
+        profiles=selected_profiles,
+        summary=_nonempty_string(data["summary"], f"{path}.summary"),
+        domains=_domain_array(data["domains"], f"{path}.domains"),
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        related_concepts=_identifier_array(
+            data["related_concepts"], f"{path}.related_concepts"
+        ),
+        related_tables=tuple(table_refs),
+        related_relationships=_identifier_array(
+            data["related_relationships"],
+            f"{path}.related_relationships",
+        ),
+        claims=tuple(claims),
+        workflow_steps=tuple(steps),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_profile_binding(
+    profile: str, value: object
+) -> ProfileBinding:
+    path = f"$.profile_bindings.{profile}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _PROFILE_BINDING_KEYS, _PROFILE_BINDING_KEYS, path
+    )
+    raw_features = _expect_list(
+        data["feature_bindings"], f"{path}.feature_bindings"
+    )
+    feature_bindings = tuple(
+        _parse_binding(profile, raw, f"{path}.feature_bindings[{index}]")
+        for index, raw in enumerate(raw_features)
+    )
+    object_bindings = tuple(
+        _parse_object_binding(
+            profile, raw, f"{path}.object_bindings[{index}]"
+        )
+        for index, raw in enumerate(
+            _expect_list(data["object_bindings"], f"{path}.object_bindings")
+        )
+    )
+    tables = tuple(
+        _parse_table(profile, raw, f"{path}.tables[{index}]")
+        for index, raw in enumerate(
+            _expect_list(data["tables"], f"{path}.tables")
+        )
+    )
+    relationships = tuple(
+        _parse_relationship_binding(
+            profile,
+            raw,
+            f"{path}.relationship_bindings[{index}]",
+        )
+        for index, raw in enumerate(
+            _expect_list(
+                data["relationship_bindings"],
+                f"{path}.relationship_bindings",
+            )
+        )
+    )
+    return ProfileBinding(
+        profile=profile,
+        feature_bindings=feature_bindings,
+        object_bindings=object_bindings,
+        tables=tables,
+        relationship_bindings=relationships,
+    )
+
+
+def _parse_binding(profile: str, value: object, path: str) -> Binding:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _BINDING_REQUIRED_KEYS, _BINDING_KEYS, path)
+    raw_parameters = data.get("parameters", {})
+    parameters_data = _expect_mapping(
+        raw_parameters, f"{path}.parameters"
+    )
+    unexpected = sorted(set(parameters_data) - BINDING_PARAMETER_KEYS)
+    if unexpected:
+        raise CatalogValidationError(
+            f"{path}.parameters has unexpected fields: "
+            + ", ".join(unexpected)
+        )
+    parameters: list[tuple[str, int]] = []
+    for key, raw in parameters_data.items():
+        if not isinstance(raw, int) or isinstance(raw, bool) or raw < 1:
+            raise CatalogValidationError(
+                f"{path}.parameters.{key} must be a positive integer"
+            )
+        parameters.append((key, raw))
+    nullable = data["nullable"]
+    if not isinstance(nullable, bool):
+        raise CatalogValidationError(f"{path}.nullable must be a boolean")
+    return Binding(
+        profile=profile,
+        table=_physical_component(data["table"], f"{path}.table"),
+        column=_physical_component(data["column"], f"{path}.column"),
+        concept=_identifier(data["concept"], f"{path}.concept"),
+        grain=_controlled_string(
+            data["grain"], f"{path}.grain", BINDING_GRAINS
+        ),
+        role=_controlled_string(data["role"], f"{path}.role", ROLES),
+        physical_type=_nonempty_string(
+            data["physical_type"], f"{path}.physical_type"
+        ),
+        nullable=nullable,
+        parameters=tuple(sorted(parameters)),
+        notes=_string_array(data.get("notes", []), f"{path}.notes"),
+    )
+
+
+def _parse_object_binding(
+    profile: str, value: object, path: str
+) -> ObjectBinding:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _OBJECT_BINDING_KEYS, _OBJECT_BINDING_KEYS, path
+    )
+    return ObjectBinding(
+        profile=profile,
+        object=_identifier(data["object"], f"{path}.object"),
+        table=_physical_component(data["table"], f"{path}.table"),
+        columns=_physical_component_array(
+            data["columns"], f"{path}.columns", minimum=0
+        ),
+        representation=_controlled_string(
+            data["representation"],
+            f"{path}.representation",
+            OBJECT_BINDING_REPRESENTATIONS,
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_table(profile: str, value: object, path: str) -> TableSpec:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _TABLE_KEYS, _TABLE_KEYS, path)
+    keys = tuple(
+        _parse_key(raw, f"{path}.keys[{index}]")
+        for index, raw in enumerate(
+            _expect_list(data["keys"], f"{path}.keys")
+        )
+    )
+    return TableSpec(
+        profile=profile,
+        table=_physical_component(data["table"], f"{path}.table"),
+        grain=_controlled_string(
+            data["grain"], f"{path}.grain", BINDING_GRAINS
+        ),
+        keys=keys,
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_key(value: object, path: str) -> KeyCandidate:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _KEY_KEYS, _KEY_KEYS, path)
+    return KeyCandidate(
+        id=_identifier(data["id"], f"{path}.id"),
+        columns=_physical_component_array(
+            data["columns"], f"{path}.columns", minimum=1
+        ),
+        kind=_controlled_string(
+            data["kind"], f"{path}.kind", KEY_KINDS
+        ),
+        uniqueness=_controlled_string(
+            data["uniqueness"], f"{path}.uniqueness", KEY_UNIQUENESS
+        ),
+        completeness=_controlled_string(
+            data["completeness"],
+            f"{path}.completeness",
+            KEY_COMPLETENESS,
+        ),
+        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_relationship_binding(
+    profile: str, value: object, path: str
+) -> RelationshipBinding:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data,
+        _RELATIONSHIP_BINDING_KEYS,
+        _RELATIONSHIP_BINDING_KEYS,
+        path,
+    )
+    cardinality = _expect_mapping(
+        data["cardinality"], f"{path}.cardinality"
+    )
+    _require_exact_keys(
+        cardinality,
+        _CARDINALITY_KEYS,
+        _CARDINALITY_KEYS,
+        f"{path}.cardinality",
+    )
+    return RelationshipBinding(
+        id=_identifier(data["id"], f"{path}.id"),
+        profile=profile,
+        kind=_controlled_string(
+            data["kind"],
+            f"{path}.kind",
+            RELATIONSHIP_BINDING_KINDS,
+        ),
+        semantic_relationships=_identifier_array(
+            data["semantic_relationships"],
+            f"{path}.semantic_relationships",
+        ),
+        source=_parse_relationship_endpoint(
+            data["source"], f"{path}.source", source=True
+        ),
+        target=_parse_relationship_endpoint(
+            data["target"], f"{path}.target", source=False
+        ),
+        targets_per_source=_controlled_string(
+            cardinality["targets_per_source"],
+            f"{path}.cardinality.targets_per_source",
+            CARDINALITY_VALUES,
+        ),
+        sources_per_target=_controlled_string(
+            cardinality["sources_per_target"],
+            f"{path}.cardinality.sources_per_target",
+            CARDINALITY_VALUES,
+        ),
+        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+        join_hazards=_string_array(
+            data["join_hazards"], f"{path}.join_hazards"
+        ),
+    )
+
+
+def _parse_relationship_endpoint(
+    value: object, path: str, *, source: bool
+) -> RelationshipEndpoint:
+    data = _expect_mapping(value, path)
+    keys = _SOURCE_ENDPOINT_KEYS if source else _TARGET_ENDPOINT_KEYS
+    _require_exact_keys(data, keys, keys, path)
+    completeness = (
+        _controlled_string(
+            data["completeness"],
+            f"{path}.completeness",
+            ENDPOINT_COMPLETENESS,
+        )
+        if source
+        else None
+    )
+    return RelationshipEndpoint(
+        table=_physical_component(data["table"], f"{path}.table"),
+        columns=_physical_component_array(
+            data["columns"], f"{path}.columns", minimum=1
+        ),
+        completeness=completeness,
+    )
+
+
+def _validate_catalog(
+    *,
+    clinical_objects: Mapping[str, ClinicalObject],
+    concepts: Mapping[str, Concept],
+    semantic_relationships: Mapping[str, SemanticRelationship],
+    temporal_semantics: Mapping[str, TemporalSemantic],
+    aggregations: Mapping[str, Aggregation],
+    guardrails: Mapping[str, Guardrail],
+    coverage: Mapping[str, Coverage],
+    vocabularies: Mapping[str, Vocabulary],
+    sources: Mapping[str, ContextSource],
+    contexts: Mapping[str, ClinicalContext],
+    profile_bindings: Mapping[str, ProfileBinding],
+) -> None:
+    profiles = frozenset(profile_bindings)
+    claims = {
+        f"{context.id}#{claim.id}": (context, claim)
+        for context in contexts.values()
+        for claim in context.claims
+    }
+    _validate_contexts(
+        contexts=contexts,
+        sources=sources,
+        concepts=concepts,
+        profile_bindings=profile_bindings,
+    )
+
+    for item in clinical_objects.values():
+        _validate_claim_refs(item.claim_refs, claims, f"clinical object {item.id!r}")
+
+    for concept in concepts.values():
+        missing_objects = sorted(
+            set(concept.objects) - set(clinical_objects)
+        )
+        if missing_objects:
+            raise CatalogValidationError(
+                f"concept {concept.id!r} references unknown clinical objects: "
+                + ", ".join(missing_objects)
+            )
+        if concept.vocabulary and concept.vocabulary not in vocabularies:
+            raise CatalogValidationError(
+                f"concept {concept.id!r} references unknown vocabulary "
+                f"{concept.vocabulary!r}"
+            )
+        missing_temporal = sorted(
+            set(concept.temporal_semantics) - set(temporal_semantics)
+        )
+        if missing_temporal:
+            raise CatalogValidationError(
+                f"concept {concept.id!r} references unknown temporal semantics: "
+                + ", ".join(missing_temporal)
+            )
+        missing_aggregations = sorted(
+            set(concept.aggregations) - set(aggregations)
+        )
+        if missing_aggregations:
+            raise CatalogValidationError(
+                f"concept {concept.id!r} references unknown aggregations: "
+                + ", ".join(missing_aggregations)
+            )
+        _validate_claim_refs(
+            concept.claim_refs, claims, f"concept {concept.id!r}"
+        )
+        for state in concept.missing_states:
+            _validate_claim_refs(
+                state.claim_refs,
+                claims,
+                f"concept {concept.id!r} missing state {state.id!r}",
+            )
+
+    for relationship in semantic_relationships.values():
+        for name, identifier in (
+            ("source_object", relationship.source_object),
+            ("target_object", relationship.target_object),
+        ):
+            if identifier not in clinical_objects:
+                raise CatalogValidationError(
+                    f"semantic relationship {relationship.id!r} {name} "
+                    f"references unknown clinical object {identifier!r}"
+                )
+        _validate_claim_refs(
+            relationship.claim_refs,
+            claims,
+            f"semantic relationship {relationship.id!r}",
+        )
+        missing_temporal = sorted(
+            set(relationship.temporal_semantics) - set(temporal_semantics)
+        )
+        if missing_temporal:
+            raise CatalogValidationError(
+                f"semantic relationship {relationship.id!r} references "
+                "unknown temporal semantics: " + ", ".join(missing_temporal)
+            )
+    _validate_semantic_hierarchy_acyclic(semantic_relationships)
+
+    for temporal in temporal_semantics.values():
+        missing_objects = sorted(
+            set(temporal.objects) - set(clinical_objects)
+        )
+        if missing_objects:
+            raise CatalogValidationError(
+                f"temporal semantic {temporal.id!r} references unknown objects: "
+                + ", ".join(missing_objects)
+            )
+        missing_features = sorted(
+            set(temporal.feature_refs) - set(concepts)
+        )
+        if missing_features:
+            raise CatalogValidationError(
+                f"temporal semantic {temporal.id!r} references unknown features: "
+                + ", ".join(missing_features)
+            )
+        incompatible_features = sorted(
+            feature
+            for feature in temporal.feature_refs
+            if not (
+                set(concepts[feature].objects)
+                & set(temporal.objects)
+            )
+        )
+        if incompatible_features:
+            raise CatalogValidationError(
+                f"temporal semantic {temporal.id!r} feature_refs do not "
+                "belong to any referenced temporal object: "
+                + ", ".join(incompatible_features)
+            )
+        missing_relative = sorted(
+            set(temporal.relative_to) - set(temporal_semantics)
+        )
+        if missing_relative:
+            raise CatalogValidationError(
+                f"temporal semantic {temporal.id!r} has unknown relative_to IDs: "
+                + ", ".join(missing_relative)
+            )
+        _validate_claim_refs(
+            temporal.claim_refs,
+            claims,
+            f"temporal semantic {temporal.id!r}",
+        )
+    _validate_temporal_acyclic(temporal_semantics)
+
+    for aggregation in aggregations.values():
+        for name, identifier in (
+            ("source_object", aggregation.source_object),
+            ("target_object", aggregation.target_object),
+        ):
+            if identifier not in clinical_objects:
+                raise CatalogValidationError(
+                    f"aggregation {aggregation.id!r} {name} references "
+                    f"unknown clinical object {identifier!r}"
+                )
+        if aggregation.source_concept not in concepts:
+            raise CatalogValidationError(
+                f"aggregation {aggregation.id!r} references unknown "
+                f"source_concept {aggregation.source_concept!r}"
+            )
+        if (
+            aggregation.result_concept is not None
+            and aggregation.result_concept not in concepts
+        ):
+            raise CatalogValidationError(
+                f"aggregation {aggregation.id!r} references unknown "
+                f"result_concept {aggregation.result_concept!r}"
+            )
+        if aggregation.status == "provided" and aggregation.result_concept is None:
+            raise CatalogValidationError(
+                f"provided aggregation {aggregation.id!r} requires result_concept"
+            )
+        if (
+            aggregation.status in {"analyst_defined", "unsupported"}
+            and aggregation.result_concept is not None
+        ):
+            raise CatalogValidationError(
+                f"{aggregation.status} aggregation {aggregation.id!r} "
+                "must not select a result_concept"
+            )
+        if (
+            aggregation.result_concept is not None
+            and aggregation.target_object
+            not in concepts[aggregation.result_concept].objects
+        ):
+            raise CatalogValidationError(
+                f"aggregation {aggregation.id!r} result_concept "
+                f"{aggregation.result_concept!r} does not belong to "
+                f"target_object {aggregation.target_object!r}"
+            )
+        missing_relationships = sorted(
+            set(aggregation.semantic_relationships)
+            - set(semantic_relationships)
+        )
+        if missing_relationships:
+            raise CatalogValidationError(
+                f"aggregation {aggregation.id!r} references unknown "
+                "semantic relationships: " + ", ".join(missing_relationships)
+            )
+        _validate_claim_refs(
+            aggregation.claim_refs,
+            claims,
+            f"aggregation {aggregation.id!r}",
+        )
+
+    entity_maps: dict[str, Mapping[str, Any]] = {
+        "clinical_object": clinical_objects,
+        "concept": concepts,
+        "semantic_relationship": semantic_relationships,
+        "temporal_semantic": temporal_semantics,
+        "aggregation": aggregations,
+        "guardrail": guardrails,
+        "topic": contexts,
+    }
+    for record in coverage.values():
+        if record.subject not in entity_maps[record.subject_kind]:
+            raise CatalogValidationError(
+                f"coverage {record.id!r} references unknown "
+                f"{record.subject_kind} subject {record.subject!r}"
+            )
+        _validate_scoped_claim_refs(
+            scope=record.scope,
+            profiles=record.profiles,
+            references=record.claim_refs,
+            claims=claims,
+            label=f"coverage {record.id!r}",
+        )
+
+    for temporal in temporal_semantics.values():
+        if temporal.feature_refs:
+            continue
+        qualifying = [
+            record
+            for record in coverage.values()
+            if record.subject_kind == "temporal_semantic"
+            and record.subject == temporal.id
+            and record.status in {"unsupported", "unresolved"}
+        ]
+        if not qualifying:
+            raise CatalogValidationError(
+                f"temporal semantic {temporal.id!r} has no feature_refs and "
+                "requires unsupported or unresolved coverage"
+            )
+
+    for guardrail in guardrails.values():
+        references = (
+            ("objects", guardrail.objects, clinical_objects),
+            ("concepts", guardrail.concepts, concepts),
+            (
+                "semantic_relationships",
+                guardrail.semantic_relationships,
+                semantic_relationships,
+            ),
+            (
+                "temporal_semantics",
+                guardrail.temporal_semantics,
+                temporal_semantics,
+            ),
+            ("aggregations", guardrail.aggregations, aggregations),
+            ("coverage", guardrail.coverage, coverage),
+        )
+        for name, identifiers, target in references:
+            missing = sorted(set(identifiers) - set(target))
+            if missing:
+                raise CatalogValidationError(
+                    f"guardrail {guardrail.id!r} {name} references unknown IDs: "
+                    + ", ".join(missing)
+                )
+        _validate_scoped_claim_refs(
+            scope=guardrail.scope,
+            profiles=guardrail.profiles,
+            references=guardrail.claim_refs,
+            claims=claims,
+            label=f"guardrail {guardrail.id!r}",
+        )
+
+    _validate_profile_bindings(
+        profile_bindings=profile_bindings,
+        concepts=concepts,
+        clinical_objects=clinical_objects,
+        semantic_relationships=semantic_relationships,
+        claims=claims,
+    )
+
+    concept_profiles: defaultdict[str, set[str]] = defaultdict(set)
+    for profile in profile_bindings.values():
+        for binding in profile.feature_bindings:
+            concept_profiles[binding.concept].add(profile.profile)
+    for record in coverage.values():
+        if record.status != "supported" or record.subject_kind != "concept":
+            continue
+        missing_profiles = sorted(
+            set(record.profiles) - concept_profiles[record.subject]
+        )
+        if missing_profiles:
+            raise CatalogValidationError(
+                f"supported coverage {record.id!r} has no feature binding in "
+                "profiles: " + ", ".join(missing_profiles)
+            )
+
+
+def _validate_contexts(
+    *,
+    contexts: Mapping[str, ClinicalContext],
+    sources: Mapping[str, ContextSource],
+    concepts: Mapping[str, Concept],
+    profile_bindings: Mapping[str, ProfileBinding],
+) -> None:
+    table_ids = {
+        table.identifier
+        for profile in profile_bindings.values()
+        for table in profile.tables
+    }
+    relationship_ids = {
+        relationship.id: relationship
+        for profile in profile_bindings.values()
+        for relationship in profile.relationship_bindings
+    }
+    authoritative = {
+        "maintainer_confirmed",
+        "release_schema",
+        "release_legend",
+    }
+    for context in contexts.values():
+        missing_concepts = sorted(
+            set(context.related_concepts) - set(concepts)
+        )
+        if missing_concepts:
+            raise CatalogValidationError(
+                f"context {context.id!r} references unknown concepts: "
+                + ", ".join(missing_concepts)
+            )
+        for table in context.related_tables:
+            if table.identifier not in table_ids:
+                raise CatalogValidationError(
+                    f"context {context.id!r} references unknown table "
+                    f"{table.identifier!r}"
+                )
+            if table.profile not in context.profiles:
+                raise CatalogValidationError(
+                    f"context {context.id!r} references table outside profiles: "
+                    f"{table.identifier!r}"
+                )
+        for identifier in context.related_relationships:
+            relationship = relationship_ids.get(identifier)
+            if relationship is None:
+                raise CatalogValidationError(
+                    f"context {context.id!r} references unknown physical "
+                    f"relationship {identifier!r}"
+                )
+            if relationship.profile not in context.profiles:
+                raise CatalogValidationError(
+                    f"context {context.id!r} references relationship outside "
+                    f"profiles: {identifier!r}"
+                )
+        for claim in context.claims:
+            missing_sources = sorted(set(claim.sources) - set(sources))
+            if missing_sources:
+                raise CatalogValidationError(
+                    f"context {context.id!r} claim {claim.id!r} references "
+                    "unknown sources: " + ", ".join(missing_sources)
+                )
+            claim_sources = [sources[item] for item in claim.sources]
+            if context.scope != "profile_specific":
+                incompatible = sorted(
+                    item.id
+                    for item in claim_sources
+                    if item.scope != context.scope
+                )
+                if incompatible:
+                    raise CatalogValidationError(
+                        f"context {context.id!r} claim {claim.id!r} has "
+                        "incompatible source scope: " + ", ".join(incompatible)
+                    )
+            else:
+                for source in claim_sources:
+                    if source.scope == "profile_specific" and not set(
+                        context.profiles
+                    ).issubset(source.profiles):
+                        raise CatalogValidationError(
+                            f"context {context.id!r} claim {claim.id!r} "
+                            f"uses source {source.id!r} outside profiles"
+                        )
+                if claim.status == "verified" and not any(
+                    source.scope == "profile_specific"
+                    and source.kind in authoritative
+                    and set(context.profiles).issubset(source.profiles)
+                    for source in claim_sources
+                ):
+                    raise CatalogValidationError(
+                        f"context {context.id!r} claim {claim.id!r} is verified "
+                        "but has no applicable authoritative profile source"
+                    )
+            if claim.status == "contradicted" and len(claim.sources) < 2:
+                raise CatalogValidationError(
+                    f"contradicted claim {context.id}#{claim.id} must cite "
+                    "at least two sources"
+                )
+
+
+def _validate_claim_refs(
+    references: Sequence[str],
+    claims: Mapping[str, tuple[ClinicalContext, ContextClaim]],
+    label: str,
+) -> None:
+    missing = sorted(set(references) - set(claims))
+    if missing:
+        raise CatalogValidationError(
+            f"{label} references unknown claims: " + ", ".join(missing)
+        )
+
+
+def _validate_scoped_claim_refs(
+    *,
+    scope: str,
+    profiles: Sequence[str],
+    references: Sequence[str],
+    claims: Mapping[str, tuple[ClinicalContext, ContextClaim]],
+    label: str,
+) -> None:
+    _validate_claim_refs(references, claims, label)
+    for reference in references:
+        context, _ = claims[reference]
+        if scope == "general_clinical":
+            if context.scope != "general_clinical":
+                raise CatalogValidationError(
+                    f"{label} claim {reference!r} has scope "
+                    f"{context.scope!r}, expected general_clinical"
+                )
+        elif scope == "embed_general":
+            if context.scope not in {"general_clinical", "embed_general"}:
+                raise CatalogValidationError(
+                    f"{label} claim {reference!r} has incompatible scope "
+                    f"{context.scope!r}"
+                )
+        elif (
+            context.scope == "profile_specific"
+            and not set(profiles).issubset(context.profiles)
+        ):
+            raise CatalogValidationError(
+                f"{label} claim {reference!r} is outside selected profiles"
+            )
+
+
+def _validate_profile_bindings(
+    *,
+    profile_bindings: Mapping[str, ProfileBinding],
+    concepts: Mapping[str, Concept],
+    clinical_objects: Mapping[str, ClinicalObject],
+    semantic_relationships: Mapping[str, SemanticRelationship],
+    claims: Mapping[str, tuple[ClinicalContext, ContextClaim]],
+) -> None:
+    empty_profiles = sorted(
+        profile_id
+        for profile_id, profile in profile_bindings.items()
+        if not profile.feature_bindings
+    )
+    if empty_profiles:
+        raise CatalogValidationError(
+            "catalog profiles have no physical bindings: "
+            + ", ".join(empty_profiles)
+        )
+    global_relationship_ids: set[str] = set()
+    qualified_bindings: set[str] = set()
+    for profile_id, profile in profile_bindings.items():
+        columns_by_table: defaultdict[str, dict[str, Binding]] = defaultdict(dict)
+        grains_by_table: defaultdict[str, set[str]] = defaultdict(set)
+        for binding in profile.feature_bindings:
+            if binding.concept not in concepts:
+                raise CatalogValidationError(
+                    f"feature binding {binding.qualified_identifier!r} "
+                    f"references unknown concept {binding.concept!r}"
+                )
+            if binding.qualified_identifier in qualified_bindings:
+                raise CatalogValidationError(
+                    f"duplicate physical binding "
+                    f"{binding.qualified_identifier!r}"
+                )
+            qualified_bindings.add(binding.qualified_identifier)
+            columns_by_table[binding.table][binding.column] = binding
+            grains_by_table[binding.table].add(binding.grain)
+
+        tables_by_name: dict[str, TableSpec] = {}
+        for table in profile.tables:
+            if table.table in tables_by_name:
+                raise CatalogValidationError(
+                    f"duplicate table specification {table.identifier!r}"
+                )
+            tables_by_name[table.table] = table
+            columns = columns_by_table.get(table.table)
+            if not columns:
+                raise CatalogValidationError(
+                    f"table specification {table.identifier!r} has no "
+                    "feature bindings"
+                )
+            if grains_by_table[table.table] != {table.grain}:
+                raise CatalogValidationError(
+                    f"table {table.identifier!r} grain {table.grain!r} "
+                    "does not match feature-binding grains"
+                )
+            seen_key_ids: set[str] = set()
+            key_declarations: dict[
+                tuple[str, ...], tuple[str, str, str]
+            ] = {}
+            for key in table.keys:
+                if key.id in seen_key_ids:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} has duplicate key ID "
+                        f"{key.id!r}"
+                    )
+                seen_key_ids.add(key.id)
+                missing = sorted(set(key.columns) - set(columns))
+                if missing:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} key {key.id!r} "
+                        "references unknown columns: " + ", ".join(missing)
+                    )
+                declaration = (
+                    key.kind,
+                    key.uniqueness,
+                    key.completeness,
+                )
+                previous = key_declarations.setdefault(
+                    key.columns, declaration
+                )
+                if previous != declaration:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} has conflicting key "
+                        f"declarations for columns {list(key.columns)!r}"
+                    )
+        missing_tables = sorted(set(columns_by_table) - set(tables_by_name))
+        if missing_tables:
+            raise CatalogValidationError(
+                f"profile {profile_id!r} feature bindings lack table "
+                "specifications: " + ", ".join(missing_tables)
+            )
+
+        seen_object_bindings: set[tuple[str, str, tuple[str, ...]]] = set()
+        for binding in profile.object_bindings:
+            if binding.object not in clinical_objects:
+                raise CatalogValidationError(
+                    f"object binding references unknown clinical object "
+                    f"{binding.object!r}"
+                )
+            columns = columns_by_table.get(binding.table)
+            if columns is None:
+                raise CatalogValidationError(
+                    f"object binding references unknown profile table "
+                    f"{profile_id}:{binding.table}"
+                )
+            missing = sorted(set(binding.columns) - set(columns))
+            if missing:
+                raise CatalogValidationError(
+                    f"object binding {profile_id}:{binding.table} references "
+                    "unknown columns: " + ", ".join(missing)
+                )
+            identity = (binding.object, binding.table, binding.columns)
+            if identity in seen_object_bindings:
+                raise CatalogValidationError(
+                    f"duplicate object binding for {binding.object!r} in "
+                    f"{profile_id}:{binding.table}"
+                )
+            seen_object_bindings.add(identity)
+            _validate_claim_refs(
+                binding.claim_refs,
+                claims,
+                f"object binding {profile_id}:{binding.table}",
+            )
+
+        for relationship in profile.relationship_bindings:
+            if relationship.id in global_relationship_ids:
+                raise CatalogValidationError(
+                    f"duplicate relationship binding ID {relationship.id!r}"
+                )
+            global_relationship_ids.add(relationship.id)
+            missing_semantic = sorted(
+                set(relationship.semantic_relationships)
+                - set(semantic_relationships)
+            )
+            if missing_semantic:
+                raise CatalogValidationError(
+                    f"relationship binding {relationship.id!r} references "
+                    "unknown semantic relationships: "
+                    + ", ".join(missing_semantic)
+                )
+            _validate_claim_refs(
+                relationship.claim_refs,
+                claims,
+                f"relationship binding {relationship.id!r}",
+            )
+            _validate_physical_relationship(
+                relationship, columns_by_table, tables_by_name
+            )
+        _validate_physical_hierarchy_acyclic(profile.relationship_bindings)
+
+
+def _validate_physical_relationship(
+    relationship: RelationshipBinding,
+    columns_by_table: Mapping[str, Mapping[str, Binding]],
+    tables_by_name: Mapping[str, TableSpec],
+) -> None:
+    source_columns = columns_by_table.get(relationship.source.table)
+    target_columns = columns_by_table.get(relationship.target.table)
+    if source_columns is None:
+        raise CatalogValidationError(
+            f"relationship binding {relationship.id!r} references unknown "
+            f"source table {relationship.profile}:{relationship.source.table}"
+        )
+    if target_columns is None:
+        raise CatalogValidationError(
+            f"relationship binding {relationship.id!r} references unknown "
+            f"target table {relationship.profile}:{relationship.target.table}"
+        )
+    if len(relationship.source.columns) != len(relationship.target.columns):
+        raise CatalogValidationError(
+            f"relationship binding {relationship.id!r} endpoint column "
+            "tuples must have equal length"
+        )
+    for name, endpoint, available in (
+        ("source", relationship.source, source_columns),
+        ("target", relationship.target, target_columns),
+    ):
+        missing = sorted(set(endpoint.columns) - set(available))
+        if missing:
+            raise CatalogValidationError(
+                f"relationship binding {relationship.id!r} {name} "
+                "references unknown columns: " + ", ".join(missing)
+            )
+    for source, target in zip(
+        relationship.source.columns,
+        relationship.target.columns,
+        strict=True,
+    ):
+        if source_columns[source].physical_type != target_columns[target].physical_type:
+            raise CatalogValidationError(
+                f"relationship binding {relationship.id!r} has incompatible "
+                f"physical types for {source!r} and {target!r}"
+            )
+    source_table = tables_by_name[relationship.source.table]
+    target_table = tables_by_name[relationship.target.table]
+    contradictory = {
+        "required": "incomplete",
+        "optional": "complete",
+    }.get(relationship.source.completeness)
+    if contradictory and any(
+        key.columns == relationship.source.columns
+        and key.completeness == contradictory
+        for key in source_table.keys
+    ):
+        raise CatalogValidationError(
+            f"relationship binding {relationship.id!r} source completeness "
+            "contradicts the documented key"
+        )
+    if (
+        relationship.targets_per_source in {"exactly_one", "one_or_more"}
+        and relationship.source.completeness != "required"
+    ):
+        raise CatalogValidationError(
+            f"relationship binding {relationship.id!r} claims at least one "
+            "target, so source completeness must be required"
+        )
+    if relationship.targets_per_source in {"exactly_one", "zero_or_one"}:
+        if not any(
+            key.columns == relationship.target.columns
+            and key.uniqueness == "unique"
+            for key in target_table.keys
+        ):
+            raise CatalogValidationError(
+                f"relationship binding {relationship.id!r} claims at most "
+                "one target but target columns are not a unique key"
+            )
+    if relationship.sources_per_target in {"exactly_one", "zero_or_one"}:
+        if not any(
+            key.columns == relationship.source.columns
+            and key.uniqueness == "unique"
+            for key in source_table.keys
+        ):
+            raise CatalogValidationError(
+                f"relationship binding {relationship.id!r} claims at most "
+                "one source but source columns are not a unique key"
+            )
+
+
+def _validate_semantic_hierarchy_acyclic(
+    relationships: Mapping[str, SemanticRelationship],
+) -> None:
+    graph: defaultdict[str, set[str]] = defaultdict(set)
+    nodes: set[str] = set()
+    for item in relationships.values():
+        if item.kind != "hierarchy":
+            continue
+        graph[item.source_object].add(item.target_object)
+        nodes.update((item.source_object, item.target_object))
+    _validate_acyclic(graph, nodes, "semantic hierarchy")
+
+
+def _validate_temporal_acyclic(
+    temporals: Mapping[str, TemporalSemantic],
+) -> None:
+    graph = {
+        identifier: set(item.relative_to)
+        for identifier, item in temporals.items()
+    }
+    _validate_acyclic(graph, set(temporals), "temporal relative_to")
+
+
+def _validate_physical_hierarchy_acyclic(
+    relationships: Sequence[RelationshipBinding],
+) -> None:
+    graph: defaultdict[str, set[str]] = defaultdict(set)
+    nodes: set[str] = set()
+    for item in relationships:
+        if item.kind != "hierarchy":
+            continue
+        graph[item.source.table].add(item.target.table)
+        nodes.update((item.source.table, item.target.table))
+    _validate_acyclic(graph, nodes, "physical hierarchy")
+
+
+def _validate_acyclic(
+    graph: Mapping[Any, set[Any]], nodes: set[Any], label: str
+) -> None:
+    visiting: set[Any] = set()
+    visited: set[Any] = set()
+
+    def visit(node: Any) -> None:
+        if node in visited:
+            return
+        if node in visiting:
+            raise CatalogValidationError(f"{label} must be acyclic")
+        visiting.add(node)
+        for target in graph.get(node, set()):
+            visit(target)
+        visiting.remove(node)
+        visited.add(node)
+
+    for node in sorted(nodes):
+        visit(node)
 
 
 def default_catalog_path() -> Path:
@@ -2289,7 +4409,12 @@ def default_catalog_path() -> Path:
 
 
 def load_catalog(path: str | Path | None = None) -> Catalog:
-    """Read and validate a catalog, rejecting duplicate JSON object keys."""
+    """Read and validate a schema-v5 catalog.
+
+    JSON duplicate keys and the non-standard ``NaN``/``Infinity`` constants
+    are rejected before semantic validation so the resulting catalog has one
+    deterministic interpretation.
+    """
 
     catalog_path = default_catalog_path() if path is None else Path(path)
     try:
@@ -2327,1149 +4452,9 @@ def _object_without_duplicate_keys(
 
 
 def _reject_json_constant(value: str) -> None:
-    raise CatalogValidationError(f"non-standard JSON number {value!r} is forbidden")
-
-
-def _parse_concept(concept_id: str, value: object) -> Concept:
-    path = f"$.concepts.{concept_id}"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _CONCEPT_REQUIRED_KEYS, _CONCEPT_KEYS, path
+    raise CatalogValidationError(
+        f"non-standard JSON number {value!r} is forbidden"
     )
-    feature_kind = _nonempty_string(data["feature_kind"], f"{path}.feature_kind")
-    if feature_kind not in FEATURE_KINDS:
-        raise CatalogValidationError(
-            f"{path}.feature_kind has unknown value {feature_kind!r}"
-        )
-    domains = _string_array(data["domains"], f"{path}.domains", minimum=1)
-    for domain in domains:
-        if domain not in DOMAINS:
-            raise CatalogValidationError(
-                f"{path}.domains contains unknown value {domain!r}"
-            )
-    vocabulary = data.get("vocabulary")
-    if vocabulary is not None:
-        vocabulary = _nonempty_string(vocabulary, f"{path}.vocabulary")
-        _require_identifier(vocabulary, f"{path}.vocabulary")
-    return Concept(
-        id=concept_id,
-        label=_nonempty_string(data["label"], f"{path}.label"),
-        definition=_nonempty_string(data["definition"], f"{path}.definition"),
-        feature_kind=feature_kind,
-        domains=domains,
-        search_terms=_string_array(
-            data["search_terms"], f"{path}.search_terms", minimum=1
-        ),
-        caveats=_string_array(data["caveats"], f"{path}.caveats"),
-        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
-        vocabulary=vocabulary,
-    )
-
-
-def _parse_binding(
-    value: object, index: int, profiles: frozenset[str]
-) -> Binding:
-    path = f"$.bindings[{index}]"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _BINDING_REQUIRED_KEYS, _BINDING_KEYS, path
-    )
-    profile = _nonempty_string(data["profile"], f"{path}.profile")
-    _require_identifier(profile, f"{path}.profile")
-    if profile not in profiles:
-        raise CatalogValidationError(
-            f"{path}.profile references unknown profile {profile!r}"
-        )
-    concept = _nonempty_string(data["concept"], f"{path}.concept")
-    _require_identifier(concept, f"{path}.concept")
-    grain = _nonempty_string(data["grain"], f"{path}.grain")
-    if grain not in GRAINS:
-        raise CatalogValidationError(
-            f"{path}.grain has unknown value {grain!r}"
-        )
-    role = _nonempty_string(data["role"], f"{path}.role")
-    if role not in ROLES:
-        raise CatalogValidationError(
-            f"{path}.role has unknown value {role!r}"
-        )
-    nullable = data["nullable"]
-    if not isinstance(nullable, bool):
-        raise CatalogValidationError(f"{path}.nullable must be a boolean")
-
-    parameters: tuple[tuple[str, int], ...] = ()
-    if "parameters" in data:
-        raw_parameters = _expect_mapping(
-            data["parameters"], f"{path}.parameters"
-        )
-        if not raw_parameters:
-            raise CatalogValidationError(
-                f"{path}.parameters must not be empty"
-            )
-        unsupported = sorted(set(raw_parameters) - BINDING_PARAMETER_KEYS)
-        if unsupported:
-            raise CatalogValidationError(
-                f"{path}.parameters has unsupported fields: "
-                + ", ".join(unsupported)
-            )
-        slot = raw_parameters["slot"]
-        if (
-            not isinstance(slot, int)
-            or isinstance(slot, bool)
-            or slot < 1
-        ):
-            raise CatalogValidationError(
-                f"{path}.parameters.slot must be a positive integer"
-            )
-        parameters = (("slot", slot),)
-
-    notes: tuple[str, ...] = ()
-    if "notes" in data:
-        notes = _string_array(data["notes"], f"{path}.notes", minimum=1)
-    return Binding(
-        profile=profile,
-        table=_physical_component(data["table"], f"{path}.table"),
-        column=_physical_component(data["column"], f"{path}.column"),
-        concept=concept,
-        grain=grain,
-        role=role,
-        physical_type=_nonempty_string(
-            data["physical_type"], f"{path}.physical_type"
-        ),
-        nullable=nullable,
-        parameters=parameters,
-        notes=notes,
-    )
-
-
-def _parse_vocabulary(vocabulary_id: str, value: object) -> Vocabulary:
-    path = f"$.vocabularies.{vocabulary_id}"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _VOCABULARY_REQUIRED_KEYS, _VOCABULARY_KEYS, path
-    )
-    completeness = _nonempty_string(
-        data["completeness"], f"{path}.completeness"
-    )
-    if completeness not in VOCABULARY_COMPLETENESS:
-        raise CatalogValidationError(
-            f"{path}.completeness has unknown value {completeness!r}"
-        )
-    parsing = _nonempty_string(data["parsing"], f"{path}.parsing")
-    if parsing not in VOCABULARY_PARSING:
-        raise CatalogValidationError(
-            f"{path}.parsing has unknown value {parsing!r}"
-        )
-    raw_codes = _expect_mapping(data["codes"], f"{path}.codes")
-    if not raw_codes:
-        raise CatalogValidationError(f"{path}.codes must not be empty")
-    codes: list[tuple[str, str]] = []
-    for code, meaning in sorted(raw_codes.items()):
-        if not isinstance(code, str) or code == "":
-            raise CatalogValidationError(
-                f"{path}.codes keys must be non-empty strings"
-            )
-        codes.append(
-            (code, _nonempty_string(meaning, f"{path}.codes.{code}"))
-        )
-    caveats = (
-        _string_array(data["caveats"], f"{path}.caveats")
-        if "caveats" in data
-        else ()
-    )
-    return Vocabulary(
-        id=vocabulary_id,
-        label=_nonempty_string(data["label"], f"{path}.label"),
-        completeness=completeness,
-        parsing=parsing,
-        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
-        codes=tuple(codes),
-        caveats=caveats,
-    )
-
-
-def _parse_table(
-    value: object, index: int, profiles: frozenset[str]
-) -> TableSpec:
-    path = f"$.tables[{index}]"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(data, _TABLE_KEYS, _TABLE_KEYS, path)
-    profile = _controlled_identifier(
-        data["profile"], f"{path}.profile", profiles
-    )
-    grain = _controlled_string(data["grain"], f"{path}.grain", GRAINS)
-    raw_keys = _expect_list(data["keys"], f"{path}.keys")
-    keys = tuple(
-        _parse_key(raw_key, f"{path}.keys[{key_index}]")
-        for key_index, raw_key in enumerate(raw_keys)
-    )
-    return TableSpec(
-        profile=profile,
-        table=_physical_component(data["table"], f"{path}.table"),
-        grain=grain,
-        keys=keys,
-        caveats=_string_array(data["caveats"], f"{path}.caveats"),
-    )
-
-
-def _parse_key(value: object, path: str) -> KeyCandidate:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(data, _KEY_KEYS, _KEY_KEYS, path)
-    key_id = _nonempty_string(data["id"], f"{path}.id")
-    _require_identifier(key_id, f"{path}.id")
-    return KeyCandidate(
-        id=key_id,
-        columns=_physical_component_array(
-            data["columns"], f"{path}.columns"
-        ),
-        kind=_controlled_string(
-            data["kind"], f"{path}.kind", KEY_KINDS
-        ),
-        uniqueness=_controlled_string(
-            data["uniqueness"],
-            f"{path}.uniqueness",
-            KEY_UNIQUENESS,
-        ),
-        completeness=_controlled_string(
-            data["completeness"],
-            f"{path}.completeness",
-            KEY_COMPLETENESS,
-        ),
-        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
-        caveats=_string_array(data["caveats"], f"{path}.caveats"),
-    )
-
-
-def _parse_relationship(
-    value: object, index: int, profiles: frozenset[str]
-) -> Relationship:
-    path = f"$.relationships[{index}]"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _RELATIONSHIP_KEYS, _RELATIONSHIP_KEYS, path
-    )
-    relationship_id = _nonempty_string(data["id"], f"{path}.id")
-    _require_identifier(relationship_id, f"{path}.id")
-    profile = _controlled_identifier(
-        data["profile"], f"{path}.profile", profiles
-    )
-    cardinality = _expect_mapping(
-        data["cardinality"], f"{path}.cardinality"
-    )
-    _require_exact_keys(
-        cardinality,
-        _CARDINALITY_KEYS,
-        _CARDINALITY_KEYS,
-        f"{path}.cardinality",
-    )
-    return Relationship(
-        id=relationship_id,
-        profile=profile,
-        kind=_controlled_string(
-            data["kind"], f"{path}.kind", RELATIONSHIP_KINDS
-        ),
-        source=_parse_source_endpoint(
-            data["source"], f"{path}.source"
-        ),
-        target=_parse_target_endpoint(
-            data["target"], f"{path}.target"
-        ),
-        targets_per_source=_controlled_string(
-            cardinality["targets_per_source"],
-            f"{path}.cardinality.targets_per_source",
-            CARDINALITY_VALUES,
-        ),
-        sources_per_target=_controlled_string(
-            cardinality["sources_per_target"],
-            f"{path}.cardinality.sources_per_target",
-            CARDINALITY_VALUES,
-        ),
-        evidence=_evidence_array(data["evidence"], f"{path}.evidence"),
-        caveats=_string_array(data["caveats"], f"{path}.caveats"),
-        join_hazards=_string_array(
-            data["join_hazards"], f"{path}.join_hazards"
-        ),
-    )
-
-
-def _parse_context_source(
-    source_id: str,
-    value: object,
-    profiles: frozenset[str],
-) -> ContextSource:
-    path = f"$.sources.{source_id}"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _CONTEXT_SOURCE_KEYS, _CONTEXT_SOURCE_KEYS, path
-    )
-    kind = _controlled_string(data["kind"], f"{path}.kind", SOURCE_KINDS)
-    scope = _controlled_string(
-        data["scope"], f"{path}.scope", CONTEXT_SCOPES
-    )
-    source_profiles = _string_array(
-        data["profiles"], f"{path}.profiles", identifier=True
-    )
-    unknown_profiles = sorted(set(source_profiles) - profiles)
-    if unknown_profiles:
-        raise CatalogValidationError(
-            f"{path}.profiles references unknown profiles: "
-            + ", ".join(unknown_profiles)
-        )
-    if (scope == "profile_specific") != bool(source_profiles):
-        requirement = (
-            "at least one profile"
-            if scope == "profile_specific"
-            else "an empty profile list"
-        )
-        raise CatalogValidationError(
-            f"{path}.profiles must contain {requirement} for scope {scope!r}"
-        )
-    if kind in {"release_schema", "release_legend"} and not source_profiles:
-        raise CatalogValidationError(
-            f"{path}.profiles must identify the release profile for "
-            f"source kind {kind!r}"
-        )
-    locator_kind = _controlled_string(
-        data["locator_kind"],
-        f"{path}.locator_kind",
-        SOURCE_LOCATOR_KINDS,
-    )
-    locator = _nonempty_string(data["locator"], f"{path}.locator")
-    if locator_kind == "url" and not locator.startswith("https://"):
-        raise CatalogValidationError(
-            f"{path}.locator must be an https URL for locator kind 'url'"
-        )
-    if locator_kind == "repository_path":
-        locator_path = Path(locator)
-        if locator_path.is_absolute() or ".." in locator_path.parts:
-            raise CatalogValidationError(
-                f"{path}.locator must be a repository-relative path "
-                "without parent traversal"
-            )
-    return ContextSource(
-        id=source_id,
-        title=_nonempty_string(data["title"], f"{path}.title"),
-        kind=kind,
-        scope=scope,
-        locator_kind=locator_kind,
-        locator=locator,
-        version_scope=_nonempty_string(
-            data["version_scope"], f"{path}.version_scope"
-        ),
-        profiles=source_profiles,
-        notes=_string_array(data["notes"], f"{path}.notes"),
-    )
-
-
-def _parse_clinical_context(
-    context_id: str,
-    value: object,
-    profiles: frozenset[str],
-) -> ClinicalContext:
-    path = f"$.contexts.{context_id}"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _CLINICAL_CONTEXT_KEYS, _CLINICAL_CONTEXT_KEYS, path
-    )
-    kind = _controlled_string(
-        data["kind"], f"{path}.kind", CONTEXT_KINDS
-    )
-    scope = _controlled_string(
-        data["scope"], f"{path}.scope", CONTEXT_SCOPES
-    )
-    context_profiles = _string_array(
-        data["profiles"], f"{path}.profiles", identifier=True
-    )
-    unknown_profiles = sorted(set(context_profiles) - profiles)
-    if unknown_profiles:
-        raise CatalogValidationError(
-            f"{path}.profiles references unknown profiles: "
-            + ", ".join(unknown_profiles)
-        )
-    if (scope == "profile_specific") != bool(context_profiles):
-        requirement = (
-            "at least one profile"
-            if scope == "profile_specific"
-            else "an empty profile list"
-        )
-        raise CatalogValidationError(
-            f"{path}.profiles must contain {requirement} for scope {scope!r}"
-        )
-
-    domains = _string_array(
-        data["domains"], f"{path}.domains", minimum=1
-    )
-    unknown_domains = sorted(set(domains) - set(DOMAINS))
-    if unknown_domains:
-        raise CatalogValidationError(
-            f"{path}.domains contains unknown values: "
-            + ", ".join(unknown_domains)
-        )
-    related_concepts = _string_array(
-        data["related_concepts"],
-        f"{path}.related_concepts",
-        identifier=True,
-    )
-    related_relationships = _string_array(
-        data["related_relationships"],
-        f"{path}.related_relationships",
-        identifier=True,
-    )
-    raw_related_tables = _expect_list(
-        data["related_tables"], f"{path}.related_tables"
-    )
-    related_tables: list[ContextTableReference] = []
-    seen_tables: set[str] = set()
-    for index, raw_table in enumerate(raw_related_tables):
-        table_path = f"{path}.related_tables[{index}]"
-        table_data = _expect_mapping(raw_table, table_path)
-        _require_exact_keys(
-            table_data,
-            _CONTEXT_TABLE_REFERENCE_KEYS,
-            _CONTEXT_TABLE_REFERENCE_KEYS,
-            table_path,
-        )
-        reference = ContextTableReference(
-            profile=_controlled_identifier(
-                table_data["profile"], f"{table_path}.profile", profiles
-            ),
-            table=_physical_component(
-                table_data["table"], f"{table_path}.table"
-            ),
-        )
-        if reference.identifier in seen_tables:
-            raise CatalogValidationError(
-                f"{path}.related_tables contains duplicate "
-                f"{reference.identifier!r}"
-            )
-        seen_tables.add(reference.identifier)
-        related_tables.append(reference)
-    if scope != "profile_specific" and (
-        related_tables or related_relationships
-    ):
-        raise CatalogValidationError(
-            f"{path} may reference physical tables and relationships only "
-            "when scope is 'profile_specific'"
-        )
-
-    raw_claims = _expect_list(data["claims"], f"{path}.claims")
-    if not raw_claims:
-        raise CatalogValidationError(f"{path}.claims must not be empty")
-    claims = tuple(
-        _parse_context_claim(raw_claim, f"{path}.claims[{index}]")
-        for index, raw_claim in enumerate(raw_claims)
-    )
-    claim_ids = [claim.id for claim in claims]
-    if len(claim_ids) != len(set(claim_ids)):
-        raise CatalogValidationError(
-            f"{path}.claims contains duplicate claim IDs"
-        )
-    statements = [claim.statement for claim in claims]
-    if len(statements) != len(set(statements)):
-        raise CatalogValidationError(
-            f"{path}.claims contains duplicate statements"
-        )
-
-    raw_steps = _expect_list(
-        data["workflow_steps"], f"{path}.workflow_steps"
-    )
-    workflow_steps = tuple(
-        _parse_workflow_step(raw_step, f"{path}.workflow_steps[{index}]")
-        for index, raw_step in enumerate(raw_steps)
-    )
-    if kind == "clinical_workflow" and len(workflow_steps) < 2:
-        raise CatalogValidationError(
-            f"{path}.workflow_steps must contain at least two ordered "
-            "stages for a clinical workflow"
-        )
-    if kind != "clinical_workflow" and workflow_steps:
-        raise CatalogValidationError(
-            f"{path}.workflow_steps must be empty unless kind is "
-            "'clinical_workflow'"
-        )
-    step_ids = [step.id for step in workflow_steps]
-    if len(step_ids) != len(set(step_ids)):
-        raise CatalogValidationError(
-            f"{path}.workflow_steps contains duplicate step IDs"
-        )
-    unknown_step_claims = sorted(
-        {
-            claim_id
-            for step in workflow_steps
-            for claim_id in step.claims
-            if claim_id not in set(claim_ids)
-        }
-    )
-    if unknown_step_claims:
-        raise CatalogValidationError(
-            f"{path}.workflow_steps references unknown claims: "
-            + ", ".join(unknown_step_claims)
-        )
-
-    return ClinicalContext(
-        id=context_id,
-        title=_nonempty_string(data["title"], f"{path}.title"),
-        kind=kind,
-        scope=scope,
-        profiles=context_profiles,
-        summary=_nonempty_string(data["summary"], f"{path}.summary"),
-        domains=domains,
-        search_terms=_string_array(
-            data["search_terms"], f"{path}.search_terms", minimum=1
-        ),
-        related_concepts=related_concepts,
-        related_tables=tuple(related_tables),
-        related_relationships=related_relationships,
-        claims=claims,
-        workflow_steps=workflow_steps,
-        caveats=_string_array(data["caveats"], f"{path}.caveats"),
-    )
-
-
-def _parse_context_claim(value: object, path: str) -> ContextClaim:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _CONTEXT_CLAIM_KEYS, _CONTEXT_CLAIM_KEYS, path
-    )
-    claim_id = _nonempty_string(data["id"], f"{path}.id")
-    _require_identifier(claim_id, f"{path}.id")
-    return ContextClaim(
-        id=claim_id,
-        statement=_nonempty_string(data["statement"], f"{path}.statement"),
-        status=_controlled_string(
-            data["status"], f"{path}.status", CLAIM_STATUSES
-        ),
-        sources=_string_array(
-            data["sources"],
-            f"{path}.sources",
-            minimum=1,
-            identifier=True,
-        ),
-        caveats=_string_array(data["caveats"], f"{path}.caveats"),
-    )
-
-
-def _parse_workflow_step(value: object, path: str) -> WorkflowStep:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _WORKFLOW_STEP_KEYS, _WORKFLOW_STEP_KEYS, path
-    )
-    step_id = _nonempty_string(data["id"], f"{path}.id")
-    _require_identifier(step_id, f"{path}.id")
-    return WorkflowStep(
-        id=step_id,
-        label=_nonempty_string(data["label"], f"{path}.label"),
-        claims=_string_array(
-            data["claims"],
-            f"{path}.claims",
-            minimum=1,
-            identifier=True,
-        ),
-    )
-
-
-def _parse_analysis_pattern(
-    pattern_id: str,
-    value: object,
-    profiles: frozenset[str],
-) -> AnalysisPattern:
-    path = f"$.analysis_patterns.{pattern_id}"
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _ANALYSIS_PATTERN_KEYS, _ANALYSIS_PATTERN_KEYS, path
-    )
-    scope = _controlled_string(
-        data["scope"], f"{path}.scope", CONTEXT_SCOPES
-    )
-    pattern_profiles = _string_array(
-        data["profiles"], f"{path}.profiles", identifier=True
-    )
-    unknown_profiles = sorted(set(pattern_profiles) - profiles)
-    if unknown_profiles:
-        raise CatalogValidationError(
-            f"{path}.profiles references unknown profiles: "
-            + ", ".join(unknown_profiles)
-        )
-    if (scope == "profile_specific") != bool(pattern_profiles):
-        requirement = (
-            "at least one profile"
-            if scope == "profile_specific"
-            else "an empty profile list"
-        )
-        raise CatalogValidationError(
-            f"{path}.profiles must contain {requirement} for scope {scope!r}"
-        )
-    domains = _string_array(
-        data["domains"], f"{path}.domains", minimum=1
-    )
-    unknown_domains = sorted(set(domains) - set(DOMAINS))
-    if unknown_domains:
-        raise CatalogValidationError(
-            f"{path}.domains contains unknown values: "
-            + ", ".join(unknown_domains)
-        )
-    grains = _string_array(
-        data["applicable_grains"], f"{path}.applicable_grains", minimum=1
-    )
-    unknown_grains = sorted(set(grains) - set(GRAINS))
-    if unknown_grains:
-        raise CatalogValidationError(
-            f"{path}.applicable_grains contains unknown values: "
-            + ", ".join(unknown_grains)
-        )
-
-    related_tables = _parse_context_table_references(
-        data["related_tables"], f"{path}.related_tables", profiles
-    )
-    if scope != "profile_specific" and (
-        related_tables or data["related_relationships"]
-    ):
-        raise CatalogValidationError(
-            f"{path} may reference physical tables and relationships only "
-            "when scope is 'profile_specific'"
-        )
-
-    alternatives = tuple(
-        _parse_analysis_alternative(item, f"{path}.alternatives[{index}]")
-        for index, item in enumerate(
-            _expect_list(data["alternatives"], f"{path}.alternatives")
-        )
-    )
-    decisions = tuple(
-        _parse_analysis_decision(
-            item, f"{path}.required_decisions[{index}]"
-        )
-        for index, item in enumerate(
-            _expect_list(
-                data["required_decisions"], f"{path}.required_decisions"
-            )
-        )
-    )
-    shortcuts = tuple(
-        _parse_prohibited_shortcut(
-            item, f"{path}.prohibited_shortcuts[{index}]"
-        )
-        for index, item in enumerate(
-            _expect_list(
-                data["prohibited_shortcuts"],
-                f"{path}.prohibited_shortcuts",
-            )
-        )
-    )
-    for field, items in (
-        ("alternatives", alternatives),
-        ("required_decisions", decisions),
-        ("prohibited_shortcuts", shortcuts),
-    ):
-        if not items:
-            raise CatalogValidationError(f"{path}.{field} must not be empty")
-        ids = [item.id for item in items]
-        if len(ids) != len(set(ids)):
-            raise CatalogValidationError(
-                f"{path}.{field} contains duplicate IDs"
-            )
-
-    return AnalysisPattern(
-        id=pattern_id,
-        title=_nonempty_string(data["title"], f"{path}.title"),
-        status=_controlled_string(
-            data["status"], f"{path}.status", ANALYSIS_PATTERN_STATUSES
-        ),
-        scope=scope,
-        profiles=pattern_profiles,
-        summary=_nonempty_string(data["summary"], f"{path}.summary"),
-        domains=domains,
-        search_terms=_string_array(
-            data["search_terms"], f"{path}.search_terms", minimum=1
-        ),
-        applicable_grains=grains,
-        related_concepts=_string_array(
-            data["related_concepts"],
-            f"{path}.related_concepts",
-            minimum=1,
-            identifier=True,
-        ),
-        related_tables=related_tables,
-        related_relationships=_string_array(
-            data["related_relationships"],
-            f"{path}.related_relationships",
-            identifier=True,
-        ),
-        related_contexts=_string_array(
-            data["related_contexts"],
-            f"{path}.related_contexts",
-            minimum=1,
-            identifier=True,
-        ),
-        alternatives=alternatives,
-        required_decisions=decisions,
-        prohibited_shortcuts=shortcuts,
-        caveats=_string_array(data["caveats"], f"{path}.caveats"),
-    )
-
-
-def _parse_context_table_references(
-    value: object,
-    path: str,
-    profiles: frozenset[str],
-) -> tuple[ContextTableReference, ...]:
-    references: list[ContextTableReference] = []
-    seen: set[str] = set()
-    for index, raw_table in enumerate(_expect_list(value, path)):
-        table_path = f"{path}[{index}]"
-        table_data = _expect_mapping(raw_table, table_path)
-        _require_exact_keys(
-            table_data,
-            _CONTEXT_TABLE_REFERENCE_KEYS,
-            _CONTEXT_TABLE_REFERENCE_KEYS,
-            table_path,
-        )
-        reference = ContextTableReference(
-            profile=_controlled_identifier(
-                table_data["profile"], f"{table_path}.profile", profiles
-            ),
-            table=_physical_component(
-                table_data["table"], f"{table_path}.table"
-            ),
-        )
-        if reference.identifier in seen:
-            raise CatalogValidationError(
-                f"{path} contains duplicate {reference.identifier!r}"
-            )
-        seen.add(reference.identifier)
-        references.append(reference)
-    return tuple(references)
-
-
-def _parse_analysis_alternative(
-    value: object, path: str
-) -> AnalysisAlternative:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data,
-        _ANALYSIS_ALTERNATIVE_KEYS,
-        _ANALYSIS_ALTERNATIVE_KEYS,
-        path,
-    )
-    return AnalysisAlternative(
-        id=_analysis_item_id(data["id"], f"{path}.id"),
-        label=_nonempty_string(data["label"], f"{path}.label"),
-        description=_nonempty_string(
-            data["description"], f"{path}.description"
-        ),
-        appropriate_when=_nonempty_string(
-            data["appropriate_when"], f"{path}.appropriate_when"
-        ),
-        limitations=_string_array(
-            data["limitations"], f"{path}.limitations", minimum=1
-        ),
-    )
-
-
-def _parse_analysis_decision(
-    value: object, path: str
-) -> AnalysisDecision:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _ANALYSIS_DECISION_KEYS, _ANALYSIS_DECISION_KEYS, path
-    )
-    return AnalysisDecision(
-        id=_analysis_item_id(data["id"], f"{path}.id"),
-        question=_nonempty_string(data["question"], f"{path}.question"),
-        rationale=_nonempty_string(data["rationale"], f"{path}.rationale"),
-    )
-
-
-def _parse_prohibited_shortcut(
-    value: object, path: str
-) -> ProhibitedShortcut:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data,
-        _PROHIBITED_SHORTCUT_KEYS,
-        _PROHIBITED_SHORTCUT_KEYS,
-        path,
-    )
-    return ProhibitedShortcut(
-        id=_analysis_item_id(data["id"], f"{path}.id"),
-        statement=_nonempty_string(data["statement"], f"{path}.statement"),
-        reason=_nonempty_string(data["reason"], f"{path}.reason"),
-    )
-
-
-def _analysis_item_id(value: object, path: str) -> str:
-    identifier = _nonempty_string(value, path)
-    _require_identifier(identifier, path)
-    return identifier
-
-
-def _parse_source_endpoint(
-    value: object, path: str
-) -> RelationshipEndpoint:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _SOURCE_ENDPOINT_KEYS, _SOURCE_ENDPOINT_KEYS, path
-    )
-    return RelationshipEndpoint(
-        table=_physical_component(data["table"], f"{path}.table"),
-        columns=_physical_component_array(
-            data["columns"], f"{path}.columns"
-        ),
-        completeness=_controlled_string(
-            data["completeness"],
-            f"{path}.completeness",
-            ENDPOINT_COMPLETENESS,
-        ),
-    )
-
-
-def _parse_target_endpoint(
-    value: object, path: str
-) -> RelationshipEndpoint:
-    data = _expect_mapping(value, path)
-    _require_exact_keys(
-        data, _TARGET_ENDPOINT_KEYS, _TARGET_ENDPOINT_KEYS, path
-    )
-    return RelationshipEndpoint(
-        table=_physical_component(data["table"], f"{path}.table"),
-        columns=_physical_component_array(
-            data["columns"], f"{path}.columns"
-        ),
-    )
-
-
-def _validate_relationship(
-    relationship: Relationship,
-    bindings_by_table: Mapping[tuple[str, str], Mapping[str, Binding]],
-    table_specs: Mapping[tuple[str, str], TableSpec],
-) -> None:
-    source_key = (relationship.profile, relationship.source.table)
-    target_key = (relationship.profile, relationship.target.table)
-    source_columns = bindings_by_table.get(source_key)
-    target_columns = bindings_by_table.get(target_key)
-    if source_columns is None:
-        raise CatalogValidationError(
-            f"relationship {relationship.id!r} references unknown source "
-            f"table {relationship.profile}:{relationship.source.table}"
-        )
-    if target_columns is None:
-        raise CatalogValidationError(
-            f"relationship {relationship.id!r} references unknown target "
-            f"table {relationship.profile}:{relationship.target.table}"
-        )
-    if len(relationship.source.columns) != len(relationship.target.columns):
-        raise CatalogValidationError(
-            f"relationship {relationship.id!r} endpoint column tuples must "
-            "have equal length"
-        )
-    for endpoint_name, columns, available in (
-        ("source", relationship.source.columns, source_columns),
-        ("target", relationship.target.columns, target_columns),
-    ):
-        missing = sorted(set(columns) - set(available))
-        if missing:
-            raise CatalogValidationError(
-                f"relationship {relationship.id!r} {endpoint_name} references "
-                "unknown columns: " + ", ".join(missing)
-            )
-    for source_column, target_column in zip(
-        relationship.source.columns, relationship.target.columns, strict=True
-    ):
-        source_type = source_columns[source_column].physical_type
-        target_type = target_columns[target_column].physical_type
-        if source_type != target_type:
-            raise CatalogValidationError(
-                f"relationship {relationship.id!r} has incompatible physical "
-                f"types for {source_column!r} and {target_column!r}: "
-                f"{source_type!r} != {target_type!r}"
-            )
-    source = table_specs[source_key]
-    contradictory_key_completeness = {
-        "required": "incomplete",
-        "optional": "complete",
-    }.get(relationship.source.completeness)
-    if contradictory_key_completeness is not None and any(
-        key.columns == relationship.source.columns
-        and key.completeness == contradictory_key_completeness
-        for key in source.keys
-    ):
-        raise CatalogValidationError(
-            f"relationship {relationship.id!r} source completeness "
-            f"{relationship.source.completeness!r} contradicts the documented "
-            f"{contradictory_key_completeness!r} key completeness"
-        )
-    if (
-        relationship.targets_per_source in {"exactly_one", "one_or_more"}
-        and relationship.source.completeness != "required"
-    ):
-        raise CatalogValidationError(
-            f"relationship {relationship.id!r} claims at least one target per "
-            "source, so source completeness must be 'required'"
-        )
-    if relationship.targets_per_source in {"exactly_one", "zero_or_one"}:
-        target = table_specs[target_key]
-        if not any(
-            key.columns == relationship.target.columns
-            and key.uniqueness == "unique"
-            for key in target.keys
-        ):
-            raise CatalogValidationError(
-                f"relationship {relationship.id!r} claims at most one target "
-                "but its target columns are not a documented unique key"
-            )
-    if relationship.sources_per_target in {"exactly_one", "zero_or_one"}:
-        if not any(
-            key.columns == relationship.source.columns
-            and key.uniqueness == "unique"
-            for key in source.keys
-        ):
-            raise CatalogValidationError(
-                f"relationship {relationship.id!r} claims at most one source "
-                "but its source columns are not a documented unique key"
-            )
-
-
-def _validate_context_references(
-    *,
-    contexts: Mapping[str, ClinicalContext],
-    sources: Mapping[str, ContextSource],
-    concepts: Mapping[str, Concept],
-    bindings: Sequence[Binding],
-    table_specs: Mapping[tuple[str, str], TableSpec],
-    relationships: Mapping[str, Relationship],
-) -> None:
-    concept_profiles: defaultdict[str, set[str]] = defaultdict(set)
-    for binding in bindings:
-        concept_profiles[binding.concept].add(binding.profile)
-
-    authoritative_profile_source_kinds = {
-        "maintainer_confirmed",
-        "release_schema",
-        "release_legend",
-    }
-    for context in contexts.values():
-        path = f"$.contexts.{context.id}"
-        if not (
-            context.related_concepts
-            or context.related_tables
-            or context.related_relationships
-        ):
-            raise CatalogValidationError(
-                f"{path} must reference at least one concept, table, or "
-                "relationship"
-            )
-        missing_concepts = sorted(
-            set(context.related_concepts) - set(concepts)
-        )
-        if missing_concepts:
-            raise CatalogValidationError(
-                f"{path}.related_concepts references unknown concepts: "
-                + ", ".join(missing_concepts)
-            )
-        if context.scope == "profile_specific":
-            for concept_id in context.related_concepts:
-                if not (
-                    concept_profiles[concept_id] & set(context.profiles)
-                ):
-                    raise CatalogValidationError(
-                        f"{path}.related_concepts references concept "
-                        f"{concept_id!r} with no binding in context profiles"
-                    )
-
-        for table in context.related_tables:
-            table_key = (table.profile, table.table)
-            if table_key not in table_specs:
-                raise CatalogValidationError(
-                    f"{path}.related_tables references unknown table "
-                    f"{table.identifier!r}"
-                )
-            if table.profile not in context.profiles:
-                raise CatalogValidationError(
-                    f"{path}.related_tables references table "
-                    f"{table.identifier!r} outside context profiles"
-                )
-
-        for relationship_id in context.related_relationships:
-            relationship = relationships.get(relationship_id)
-            if relationship is None:
-                raise CatalogValidationError(
-                    f"{path}.related_relationships references unknown "
-                    f"relationship {relationship_id!r}"
-                )
-            if relationship.profile not in context.profiles:
-                raise CatalogValidationError(
-                    f"{path}.related_relationships references relationship "
-                    f"{relationship_id!r} outside context profiles"
-                )
-
-        for claim in context.claims:
-            claim_path = f"{path}.claims.{claim.id}"
-            missing_sources = sorted(set(claim.sources) - set(sources))
-            if missing_sources:
-                raise CatalogValidationError(
-                    f"{claim_path}.sources references unknown sources: "
-                    + ", ".join(missing_sources)
-                )
-            claim_sources = [sources[source_id] for source_id in claim.sources]
-            if context.scope != "profile_specific":
-                incompatible = sorted(
-                    source.id
-                    for source in claim_sources
-                    if source.scope != context.scope
-                )
-                if incompatible:
-                    raise CatalogValidationError(
-                        f"{claim_path}.sources has scope incompatible with "
-                        f"context scope {context.scope!r}: "
-                        + ", ".join(incompatible)
-                    )
-            else:
-                for source in claim_sources:
-                    if source.scope != "profile_specific":
-                        continue
-                    if not set(context.profiles).issubset(source.profiles):
-                        raise CatalogValidationError(
-                            f"{claim_path}.sources references profile source "
-                            f"{source.id!r} outside context profiles"
-                        )
-                if claim.status == "verified" and not any(
-                    source.scope == "profile_specific"
-                    and source.kind in authoritative_profile_source_kinds
-                    and set(context.profiles).issubset(source.profiles)
-                    for source in claim_sources
-                ):
-                    raise CatalogValidationError(
-                        f"{claim_path} is verified but has no applicable "
-                        "maintainer, release-schema, or release-legend source"
-                    )
-            if claim.status == "contradicted" and len(claim.sources) < 2:
-                raise CatalogValidationError(
-                    f"{claim_path} is contradicted and must cite at least "
-                    "two sources"
-                )
-
-        if context.kind == "clinical_workflow":
-            referenced_claims = {
-                claim_id
-                for step in context.workflow_steps
-                for claim_id in step.claims
-            }
-            unplaced_claims = sorted(
-                {claim.id for claim in context.claims} - referenced_claims
-            )
-            if unplaced_claims:
-                raise CatalogValidationError(
-                    f"{path}.workflow_steps does not place claims: "
-                    + ", ".join(unplaced_claims)
-                )
-
-
-def _validate_hierarchy_acyclic(
-    relationships: Sequence[Relationship],
-) -> None:
-    graph: defaultdict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
-    nodes: set[tuple[str, str]] = set()
-    for relationship in relationships:
-        if relationship.kind != "hierarchy":
-            continue
-        source = (relationship.profile, relationship.source.table)
-        target = (relationship.profile, relationship.target.table)
-        graph[source].add(target)
-        nodes.update((source, target))
-
-    visiting: set[tuple[str, str]] = set()
-    visited: set[tuple[str, str]] = set()
-
-    def visit(node: tuple[str, str]) -> None:
-        if node in visited:
-            return
-        if node in visiting:
-            raise CatalogValidationError(
-                "hierarchy relationships must be acyclic"
-            )
-        visiting.add(node)
-        for target in graph.get(node, ()):
-            visit(target)
-        visiting.remove(node)
-        visited.add(node)
-
-    for node in sorted(nodes):
-        visit(node)
-
-
-def _validate_analysis_pattern_references(
-    *,
-    patterns: Mapping[str, AnalysisPattern],
-    concepts: Mapping[str, Concept],
-    bindings: Sequence[Binding],
-    table_specs: Mapping[tuple[str, str], TableSpec],
-    relationships: Mapping[str, Relationship],
-    contexts: Mapping[str, ClinicalContext],
-) -> None:
-    concept_profiles: defaultdict[str, set[str]] = defaultdict(set)
-    for binding in bindings:
-        concept_profiles[binding.concept].add(binding.profile)
-
-    for pattern in patterns.values():
-        path = f"$.analysis_patterns.{pattern.id}"
-        missing_concepts = sorted(
-            set(pattern.related_concepts) - set(concepts)
-        )
-        if missing_concepts:
-            raise CatalogValidationError(
-                f"{path}.related_concepts references unknown concepts: "
-                + ", ".join(missing_concepts)
-            )
-        missing_contexts = sorted(
-            set(pattern.related_contexts) - set(contexts)
-        )
-        if missing_contexts:
-            raise CatalogValidationError(
-                f"{path}.related_contexts references unknown contexts: "
-                + ", ".join(missing_contexts)
-            )
-        if pattern.scope == "profile_specific":
-            for concept_id in pattern.related_concepts:
-                if not (
-                    concept_profiles[concept_id] & set(pattern.profiles)
-                ):
-                    raise CatalogValidationError(
-                        f"{path}.related_concepts references concept "
-                        f"{concept_id!r} with no binding in pattern profiles"
-                    )
-        for table in pattern.related_tables:
-            if (table.profile, table.table) not in table_specs:
-                raise CatalogValidationError(
-                    f"{path}.related_tables references unknown table "
-                    f"{table.identifier!r}"
-                )
-            if table.profile not in pattern.profiles:
-                raise CatalogValidationError(
-                    f"{path}.related_tables references table "
-                    f"{table.identifier!r} outside pattern profiles"
-                )
-        for relationship_id in pattern.related_relationships:
-            relationship = relationships.get(relationship_id)
-            if relationship is None:
-                raise CatalogValidationError(
-                    f"{path}.related_relationships references unknown "
-                    f"relationship {relationship_id!r}"
-                )
-            if relationship.profile not in pattern.profiles:
-                raise CatalogValidationError(
-                    f"{path}.related_relationships references relationship "
-                    f"{relationship_id!r} outside pattern profiles"
-                )
-        for context_id in pattern.related_contexts:
-            context = contexts[context_id]
-            if (
-                pattern.scope == "profile_specific"
-                and context.scope == "profile_specific"
-                and not set(pattern.profiles).issubset(context.profiles)
-            ):
-                raise CatalogValidationError(
-                    f"{path}.related_contexts references context "
-                    f"{context_id!r} outside pattern profiles"
-                )
 
 
 def _expect_mapping(value: object, path: str) -> Mapping[str, Any]:
@@ -3492,9 +4477,8 @@ def _require_exact_keys(
     allowed: frozenset[str],
     path: str,
 ) -> None:
-    actual = frozenset(data)
     _require_keys(data, required, path)
-    unexpected = sorted(actual - allowed)
+    unexpected = sorted(frozenset(data) - allowed)
     if unexpected:
         raise CatalogValidationError(
             f"{path} has unexpected fields: {', '.join(unexpected)}"
@@ -3516,15 +4500,15 @@ def _require_keys(
 def _nonempty_string(value: object, path: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise CatalogValidationError(f"{path} must be a non-empty string")
+    if value != value.strip():
+        raise CatalogValidationError(
+            f"{path} must not have surrounding whitespace"
+        )
     return value
 
 
 def _physical_component(value: object, path: str) -> str:
     component = _nonempty_string(value, path)
-    if component != component.strip():
-        raise CatalogValidationError(
-            f"{path} must not have surrounding whitespace"
-        )
     if ":" in component:
         raise CatalogValidationError(
             f"{path} must not contain ':' because it separates profiles"
@@ -3533,12 +4517,15 @@ def _physical_component(value: object, path: str) -> str:
 
 
 def _physical_component_array(
-    value: object, path: str
+    value: object,
+    path: str,
+    *,
+    minimum: int = 1,
 ) -> tuple[str, ...]:
     items = _expect_list(value, path)
-    if not items:
+    if len(items) < minimum:
         raise CatalogValidationError(
-            f"{path} must contain at least 1 item(s)"
+            f"{path} must contain at least {minimum} item(s)"
         )
     parsed = tuple(
         _physical_component(item, f"{path}[{index}]")
@@ -3550,7 +4537,9 @@ def _physical_component_array(
 
 
 def _controlled_string(
-    value: object, path: str, allowed: Sequence[str] | frozenset[str]
+    value: object,
+    path: str,
+    allowed: Sequence[str] | frozenset[str],
 ) -> str:
     parsed = _nonempty_string(value, path)
     if parsed not in allowed:
@@ -3561,15 +4550,33 @@ def _controlled_string(
 
 
 def _controlled_identifier(
-    value: object, path: str, allowed: Sequence[str] | frozenset[str]
+    value: object,
+    path: str,
+    allowed: Sequence[str] | frozenset[str],
 ) -> str:
-    parsed = _nonempty_string(value, path)
-    _require_identifier(parsed, path)
+    parsed = _identifier(value, path)
     if parsed not in allowed:
         raise CatalogValidationError(
             f"{path} references unknown value {parsed!r}"
         )
     return parsed
+
+
+def _identifier(value: object, path: str) -> str:
+    parsed = _nonempty_string(value, path)
+    _require_identifier(parsed, path)
+    return parsed
+
+
+def _identifier_array(
+    value: object,
+    path: str,
+    *,
+    minimum: int = 0,
+) -> tuple[str, ...]:
+    return _string_array(
+        value, path, minimum=minimum, identifier=True
+    )
 
 
 def _string_array(
@@ -3586,23 +4593,77 @@ def _string_array(
         )
     parsed: list[str] = []
     for index, item in enumerate(items):
-        string = _nonempty_string(item, f"{path}[{index}]")
+        item_path = f"{path}[{index}]"
+        string = _nonempty_string(item, item_path)
         if identifier:
-            _require_identifier(string, f"{path}[{index}]")
+            _require_identifier(string, item_path)
         parsed.append(string)
     if len(set(parsed)) != len(parsed):
         raise CatalogValidationError(f"{path} must contain unique values")
     return tuple(parsed)
 
 
-def _evidence_array(value: object, path: str) -> tuple[str, ...]:
-    evidence = _string_array(value, path, minimum=1)
-    for item in evidence:
-        if item not in EVIDENCE_VALUES:
+def _domain_array(value: object, path: str) -> tuple[str, ...]:
+    domains = _string_array(value, path, minimum=1, identifier=True)
+    unknown = sorted(set(domains) - set(DOMAINS))
+    if unknown:
+        raise CatalogValidationError(
+            f"{path} contains unknown domain values: {', '.join(unknown)}"
+        )
+    return domains
+
+
+def _claim_ref_array(
+    value: object,
+    path: str,
+    *,
+    minimum: int = 0,
+) -> tuple[str, ...]:
+    references = _string_array(value, path, minimum=minimum)
+    for index, reference in enumerate(references):
+        if _CLAIM_REF_PATTERN.fullmatch(reference) is None:
             raise CatalogValidationError(
-                f"{path} contains unknown evidence value {item!r}"
+                f"{path}[{index}] must use 'context-id#claim-id' syntax"
             )
+    return references
+
+
+def _evidence_array(value: object, path: str) -> tuple[str, ...]:
+    evidence = _string_array(value, path, minimum=1, identifier=True)
+    unknown = sorted(set(evidence) - EVIDENCE_VALUES)
+    if unknown:
+        raise CatalogValidationError(
+            f"{path} contains unknown evidence values: {', '.join(unknown)}"
+        )
     return evidence
+
+
+def _scope_and_profiles(
+    data: Mapping[str, Any],
+    path: str,
+    available_profiles: frozenset[str],
+) -> tuple[str, tuple[str, ...]]:
+    scope = _controlled_string(
+        data["scope"], f"{path}.scope", CONTEXT_SCOPES
+    )
+    profiles = _identifier_array(data["profiles"], f"{path}.profiles")
+    unknown = sorted(set(profiles) - available_profiles)
+    if unknown:
+        raise CatalogValidationError(
+            f"{path}.profiles references unknown profiles: "
+            + ", ".join(unknown)
+        )
+    if scope == "profile_specific" and not profiles:
+        raise CatalogValidationError(
+            f"{path}.profiles must not be empty when scope is "
+            "'profile_specific'"
+        )
+    if scope != "profile_specific" and profiles:
+        raise CatalogValidationError(
+            f"{path}.profiles must be empty unless scope is "
+            "'profile_specific'"
+        )
+    return scope, profiles
 
 
 def _require_constant_array(
@@ -3637,24 +4698,16 @@ def _optional_filter(value: object, name: str) -> str | None:
     return value.strip()
 
 
-def _matches_search_filters(
-    binding: Binding,
-    concept: Concept,
-    filters: Mapping[str, str | None],
-) -> bool:
-    return (
-        (filters["profile"] is None or binding.profile == filters["profile"])
-        and (filters["table"] is None or binding.table == filters["table"])
-        and (filters["grain"] is None or binding.grain == filters["grain"])
-        and (
-            filters["domain"] is None
-            or filters["domain"] in concept.domains
+def _validate_limit(limit: object) -> None:
+    if (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or limit < 1
+        or limit > 500
+    ):
+        raise CatalogValidationError(
+            "limit must be an integer between 1 and 500"
         )
-        and (
-            filters["feature_kind"] is None
-            or concept.feature_kind == filters["feature_kind"]
-        )
-    )
 
 
 def _tokens(value: str) -> tuple[str, ...]:
@@ -3665,7 +4718,7 @@ def _tokens(value: str) -> tuple[str, ...]:
 
 
 def _normalize_token(token: str) -> str:
-    """Apply a deliberately small plural normalization for search."""
+    """Apply a deliberately small plural normalization for discovery."""
 
     if len(token) > 4 and token.endswith("ies"):
         return f"{token[:-3]}y"
@@ -3680,167 +4733,89 @@ def _normalize_token(token: str) -> str:
     return token
 
 
-def _compact_identifier(value: str) -> str:
-    """Collapse identifier punctuation for aliases such as ACCAnon/acc_anon."""
-
-    return re.sub(r"[\W_]+", "", value.casefold())
-
-
-def _score_document(
-    document: _ConceptSearchDocument,
-    binding_document: _BindingSearchDocument,
+def _discovery_reasons(
+    document: _DiscoveryDocument,
     query_text: str,
     query_tokens: frozenset[str],
-) -> int:
-    if not query_text:
-        return 0
-    score = 0
-    if query_text == binding_document.identifier_text:
-        score += 1000
-    if query_text == document.concept_id_text:
-        score += 800
-    fields = (
-        (binding_document.identifier_text, 120),
-        (document.concept_id_text, 100),
-        (document.label_text, 80),
-        (document.search_terms_text, 60),
-        (document.definition_text, 30),
-        (binding_document.auxiliary_text, 10),
-    )
-    for text, phrase_weight in fields:
-        if query_text in text:
-            score += phrase_weight
-    token_fields = (
-        (frozenset(_tokens(binding_document.identifier_text)), 24),
-        (frozenset(_tokens(document.concept_id_text)), 20),
-        (frozenset(_tokens(document.label_text)), 16),
-        (frozenset(_tokens(document.search_terms_text)), 12),
-        (frozenset(_tokens(document.definition_text)), 6),
-        (frozenset(_tokens(binding_document.auxiliary_text)), 2),
-    )
-    for token in query_tokens:
-        for field_tokens, token_weight in token_fields:
-            if token in field_tokens:
-                score += token_weight
-    return score
+    *,
+    profile: str | None,
+) -> list[dict[str, Any]]:
+    """Explain which indexed semantic fields caused a discovery match."""
+
+    reasons: list[dict[str, Any]] = []
+    active_fields = list(document.fields)
+    if profile is not None:
+        active_fields.extend(
+            (field, text)
+            for field_profile, field, text in document.profile_fields
+            if field_profile == profile
+        )
+    for field, text in active_fields:
+        field_tokens = frozenset(_tokens(text))
+        matched = sorted(query_tokens & field_tokens)
+        phrase_match = bool(query_text and query_text in text)
+        if not matched and not phrase_match:
+            continue
+        reason: dict[str, Any] = {
+            "field": field,
+            "terms": matched,
+            "matched_terms": matched,
+        }
+        if phrase_match:
+            reason["phrase_match"] = True
+        reasons.append(reason)
+    return reasons
 
 
-def _score_context_document(
-    document: _ContextSearchDocument,
-    claims: tuple[_ContextClaimSearchDocument, ...],
+def _discovery_score(
+    document: _DiscoveryDocument,
     query_text: str,
-    query_tokens: frozenset[str],
     matched_tokens: frozenset[str],
+    reasons: Sequence[Mapping[str, Any]],
 ) -> int:
+    """Produce a deterministic relevance score without hiding its causes."""
+
     if not query_text:
         return 0
     score = 0
-    if query_text == document.identifier_text:
+    identifier_text = document.identifier.casefold()
+    label_text = document.label.casefold()
+    if query_text == identifier_text:
         score += 1000
-    if _compact_identifier(query_text) == _compact_identifier(
-        document.identifier_text
-    ):
-        score += 500
-    fields = (
-        (document.identifier_text, 120),
-        (document.title_text, 100),
-        (document.search_terms_text, 70),
-        (document.summary_text, 40),
-    )
-    for text, phrase_weight in fields:
-        if query_text in text:
-            score += phrase_weight
-    if any(query_text in claim.claim.statement.casefold() for claim in claims):
-        score += 60
-    token_fields = (
-        (frozenset(_tokens(document.identifier_text)), 24),
-        (frozenset(_tokens(document.title_text)), 20),
-        (frozenset(_tokens(document.search_terms_text)), 14),
-        (frozenset(_tokens(document.summary_text)), 8),
-        (document.all_tokens, 3),
-    )
-    claim_tokens = frozenset().union(
-        *(claim.all_tokens for claim in claims)
-    )
-    for token in query_tokens:
-        for field_tokens, token_weight in token_fields:
-            if token in field_tokens:
-                score += token_weight
-        if token in claim_tokens:
-            score += 10
+    if query_text == label_text:
+        score += 800
+    if query_text in identifier_text:
+        score += 180
+    if query_text in label_text:
+        score += 140
+    field_weights = {
+        "identifier": 50,
+        "label": 45,
+        "title": 45,
+        "search_terms": 35,
+        "subject": 30,
+        "meaning": 25,
+        "statement": 25,
+        "definition": 20,
+        "summary": 20,
+        "objects": 18,
+        "features": 18,
+        "attribution": 15,
+        "temporal_qualification": 15,
+        "method": 15,
+        "claims": 12,
+        "missing_states": 12,
+        "vocabulary": 12,
+        "binding.table": 15,
+        "binding.column": 80,
+        "caveats": 5,
+    }
+    for reason in reasons:
+        weight = field_weights.get(str(reason["field"]), 8)
+        score += weight * len(reason.get("matched_terms", ()))
+        if reason.get("phrase_match"):
+            score += weight * 2
+    query_tokens = frozenset(_tokens(query_text)) - _SEARCH_STOPWORDS
     if query_tokens:
-        score += round(40 * len(matched_tokens) / len(query_tokens))
+        score += round(100 * len(matched_tokens) / len(query_tokens))
     return score
-
-
-def _context_search_match(
-    context: ClinicalContext,
-    claim_documents: tuple[_ContextClaimSearchDocument, ...],
-    score: int,
-) -> dict[str, Any]:
-    matching_claims = tuple(
-        claim_document.claim for claim_document in claim_documents
-    )
-    matching_claim_ids = {claim.id for claim in matching_claims}
-    workflow_steps = []
-    for step in context.workflow_steps:
-        claims = [
-            claim_id
-            for claim_id in step.claims
-            if claim_id in matching_claim_ids
-        ]
-        if claims:
-            workflow_steps.append(
-                {
-                    "id": step.id,
-                    "label": step.label,
-                    "claims": claims,
-                }
-            )
-    return {
-        "score": score,
-        "identifier": context.id,
-        "title": context.title,
-        "kind": context.kind,
-        "scope": context.scope,
-        "profiles": list(context.profiles),
-        "summary": context.summary,
-        "domains": list(context.domains),
-        "related_concepts": list(context.related_concepts),
-        "related_tables": [
-            table.to_dict() for table in context.related_tables
-        ],
-        "related_relationships": list(context.related_relationships),
-        "matching_claims": [
-            claim.to_dict() for claim in matching_claims
-        ],
-        "workflow_steps": workflow_steps,
-        "caveats": list(context.caveats),
-    }
-
-
-def _search_match(
-    document: _ConceptSearchDocument,
-    binding_documents: tuple[_BindingSearchDocument, ...],
-    score: int,
-) -> dict[str, Any]:
-    concept = document.concept
-    vocabulary = document.vocabulary
-    return {
-        "score": score,
-        "identifier": concept.id,
-        "concept": concept.id,
-        "label": concept.label,
-        "definition": concept.definition,
-        "feature_kind": concept.feature_kind,
-        "domains": list(concept.domains),
-        "evidence": list(concept.evidence),
-        "caveats": list(concept.caveats),
-        "bindings": [
-            binding_document.binding.to_dict()
-            for binding_document in binding_documents
-        ],
-        "vocabulary": (
-            vocabulary.id if vocabulary is not None else None
-        ),
-    }

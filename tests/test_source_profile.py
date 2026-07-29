@@ -15,15 +15,18 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from embed_context.catalog import (
-    ANALYSIS_PATTERN_STATUSES,
+    AGGREGATION_STATUSES,
+    BINDING_GRAINS,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
+    COVERAGE_STATUSES,
     DOMAINS,
     FEATURE_KINDS,
-    GRAINS,
+    SEMANTIC_RELATIONSHIP_KINDS,
     SOURCE_KINDS,
     SOURCE_LOCATOR_KINDS,
+    TEMPORAL_KINDS,
 )
 from scripts.validate_source_profile import (
     ProfileValidationError,
@@ -69,13 +72,41 @@ class SourceProfileVerifierTests(unittest.TestCase):
         *,
         profiles: list[str] | None = None,
     ) -> None:
+        selected_profiles = profiles or ["sample"]
+        profile_bindings = {}
+        for profile in selected_profiles:
+            profile_features = [
+                {
+                    key: value
+                    for key, value in binding.items()
+                    if key != "profile"
+                }
+                for binding in bindings
+                if binding["profile"] == profile
+            ]
+            profile_bindings[profile] = {
+                "feature_bindings": profile_features,
+                "object_bindings": [],
+                "tables": [
+                    {
+                        "table": table,
+                        "grain": "exam",
+                        "keys": [],
+                        "caveats": [],
+                    }
+                    for table in sorted(
+                        {binding["table"] for binding in profile_features}
+                    )
+                ],
+                "relationship_bindings": [],
+            }
         self.catalog_path.write_text(
             json.dumps(
                 {
                     "$schema": "./catalog.schema.json",
-                    "schema_version": 4,
-                    "profiles": profiles or ["sample"],
-                    "grains": list(GRAINS),
+                    "schema_version": 5,
+                    "profiles": selected_profiles,
+                    "binding_grains": list(BINDING_GRAINS),
                     "feature_kinds": list(FEATURE_KINDS),
                     "domains": list(DOMAINS),
                     "context_kinds": list(CONTEXT_KINDS),
@@ -83,43 +114,44 @@ class SourceProfileVerifierTests(unittest.TestCase):
                     "source_kinds": list(SOURCE_KINDS),
                     "source_locator_kinds": list(SOURCE_LOCATOR_KINDS),
                     "claim_statuses": list(CLAIM_STATUSES),
-                    "analysis_pattern_statuses": list(
-                        ANALYSIS_PATTERN_STATUSES
+                    "semantic_relationship_kinds": list(
+                        SEMANTIC_RELATIONSHIP_KINDS
                     ),
+                    "temporal_kinds": list(TEMPORAL_KINDS),
+                    "aggregation_statuses": list(AGGREGATION_STATUSES),
+                    "coverage_statuses": list(COVERAGE_STATUSES),
+                    "clinical_objects": {
+                        "exam": {
+                            "label": "Exam",
+                            "definition": "One represented examination.",
+                            "grain": "One exam.",
+                            "domains": ["exam"],
+                            "search_terms": ["exam"],
+                            "claim_refs": [],
+                            "caveats": [],
+                        }
+                    },
                     "concepts": {
                         "synthetic.feature": {
                             "label": "Synthetic feature",
                             "definition": "Feature used only for verifier tests.",
                             "feature_kind": "numeric",
                             "domains": ["technical"],
+                            "objects": ["exam"],
                             "search_terms": ["synthetic"],
                             "caveats": [],
                             "evidence": ["release_schema"],
                         }
                     },
-                    "bindings": bindings,
+                    "semantic_relationships": {},
+                    "temporal_semantics": {},
+                    "aggregations": {},
+                    "guardrails": {},
+                    "coverage": {},
                     "vocabularies": {},
-                    "tables": [
-                        {
-                            "profile": profile,
-                            "table": table,
-                            "grain": "exam",
-                            "keys": [],
-                            "caveats": [],
-                        }
-                        for profile in (profiles or ["sample"])
-                        for table in sorted(
-                            {
-                                binding["table"]
-                                for binding in bindings
-                                if binding["profile"] == profile
-                            }
-                        )
-                    ],
-                    "relationships": [],
                     "sources": {},
                     "contexts": {},
-                    "analysis_patterns": {},
+                    "profile_bindings": profile_bindings,
                 }
             ),
             encoding="utf-8",

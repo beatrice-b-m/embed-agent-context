@@ -1,30 +1,36 @@
-"""Synthetic catalog fixtures shared by core and CLI tests."""
+"""Synthetic schema-v5 catalog fixtures shared by core tests."""
 
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from embed_context.catalog import (
-    ANALYSIS_PATTERN_STATUSES,
+    AGGREGATION_STATUSES,
+    BINDING_GRAINS,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
+    COVERAGE_STATUSES,
     DOMAINS,
     FEATURE_KINDS,
-    GRAINS,
+    SEMANTIC_RELATIONSHIP_KINDS,
     SOURCE_KINDS,
     SOURCE_LOCATOR_KINDS,
+    TEMPORAL_KINDS,
 )
 
 
 def synthetic_catalog() -> dict[str, Any]:
+    """Return a small two-profile clinical-semantic catalog."""
+
     return {
         "$schema": "./catalog.schema.json",
-        "schema_version": 4,
-        "profiles": ["open-v2"],
-        "grains": list(GRAINS),
+        "schema_version": 5,
+        "profiles": ["profile-a", "profile-b"],
+        "binding_grains": list(BINDING_GRAINS),
         "feature_kinds": list(FEATURE_KINDS),
         "domains": list(DOMAINS),
         "context_kinds": list(CONTEXT_KINDS),
@@ -32,192 +38,648 @@ def synthetic_catalog() -> dict[str, Any]:
         "source_kinds": list(SOURCE_KINDS),
         "source_locator_kinds": list(SOURCE_LOCATOR_KINDS),
         "claim_statuses": list(CLAIM_STATUSES),
-        "analysis_pattern_statuses": list(ANALYSIS_PATTERN_STATUSES),
-        "concepts": {
-            "exam.tissue_density": {
-                "label": "Breast tissue density",
-                "definition": "Breast tissue density code.",
-                "feature_kind": "coded",
-                "domains": ["exam", "mammography"],
-                "search_terms": ["tissueden", "breast composition"],
-                "caveats": ["Null has no documented code meaning."],
-                "evidence": ["release_schema", "release_legend"],
-                "vocabulary": "exam.tissue_density",
+        "semantic_relationship_kinds": list(SEMANTIC_RELATIONSHIP_KINDS),
+        "temporal_kinds": list(TEMPORAL_KINDS),
+        "aggregation_statuses": list(AGGREGATION_STATUSES),
+        "coverage_statuses": list(COVERAGE_STATUSES),
+        "clinical_objects": {
+            "patient": {
+                "label": "Patient",
+                "definition": "A person represented in EMBED clinical data.",
+                "grain": "One represented person.",
+                "domains": ["identity"],
+                "search_terms": ["person", "patient"],
+                "claim_refs": ["embed.semantic#patient-meaning"],
+                "caveats": ["Representation does not establish complete care."],
             },
-            "identity.accession": {
-                "label": "Exam accession identifier",
-                "definition": "Opaque exam record identifier.",
-                "feature_kind": "identifier",
-                "domains": ["identity", "exam"],
-                "search_terms": ["acc_anon", "accession"],
-                "caveats": ["Do not expose identifier values."],
-                "evidence": ["release_schema", "inference"],
+            "imaging_exam": {
+                "label": "Breast-imaging exam",
+                "definition": "A represented breast-imaging examination.",
+                "grain": "One represented imaging examination.",
+                "domains": ["exam", "imaging"],
+                "search_terms": ["exam", "study"],
+                "claim_refs": ["embed.semantic#exam-meaning"],
+                "caveats": [],
+            },
+            "pathology_diagnosis": {
+                "label": "Pathology diagnosis",
+                "definition": "A diagnosis represented by pathology metadata.",
+                "grain": "One represented pathology diagnosis group.",
+                "domains": ["pathology"],
+                "search_terms": ["pathology result", "cancer diagnosis"],
+                "claim_refs": ["embed.semantic#diagnosis-meaning"],
+                "caveats": ["An unattached state is not a diagnosis."],
             },
         },
-        "bindings": [
-            {
-                "profile": "open-v2",
-                "table": "exam_level_anon",
-                "column": "tissueden",
-                "concept": "exam.tissue_density",
-                "grain": "exam",
-                "role": "canonical",
-                "physical_type": "int8",
-                "nullable": True,
+        "concepts": {
+            "identity.patient_identifier": {
+                "label": "Patient identifier",
+                "definition": "Opaque patient identifier.",
+                "feature_kind": "identifier",
+                "domains": ["identity"],
+                "objects": ["patient"],
+                "search_terms": ["patient id"],
+                "caveats": ["Do not interpret the identifier clinically."],
+                "evidence": ["release_schema"],
+                "claim_refs": ["embed.semantic#patient-meaning"],
+                "missing_states": [],
+                "temporal_semantics": [],
+                "aggregations": [],
             },
-            {
-                "profile": "open-v2",
-                "table": "combined_anon",
-                "column": "tissueden",
-                "concept": "exam.tissue_density",
-                "grain": "wide_row",
-                "role": "wide_projection",
-                "physical_type": "int8",
-                "nullable": True,
-                "notes": ["Wide-value equality is not established."],
+            "exam.study_date": {
+                "label": "Exam study date",
+                "definition": "Date of the represented imaging exam.",
+                "feature_kind": "date",
+                "domains": ["exam", "temporal"],
+                "objects": ["imaging_exam"],
+                "search_terms": ["exam date", "study date"],
+                "caveats": ["It is not a universal diagnosis date."],
+                "evidence": ["release_schema", "maintainer_confirmed"],
+                "claim_refs": ["embed.semantic#exam-time"],
+                "missing_states": [],
+                "temporal_semantics": ["exam.event_time"],
+                "aggregations": [],
             },
-            {
-                "profile": "open-v2",
-                "table": "exam_level_anon",
-                "column": "acc_anon",
-                "concept": "identity.accession",
-                "grain": "exam",
-                "role": "canonical",
-                "physical_type": "int64",
-                "nullable": True,
+            "pathology.severity": {
+                "label": "Pathology severity",
+                "definition": "Inverse-coded represented pathology diagnosis group.",
+                "feature_kind": "coded",
+                "domains": ["pathology"],
+                "objects": ["pathology_diagnosis", "imaging_exam"],
+                "search_terms": ["cancer outcome", "pathology result"],
+                "caveats": ["Lower represented values are more severe."],
+                "evidence": ["maintainer_confirmed"],
+                "claim_refs": ["embed.semantic#severity-meaning"],
+                "missing_states": [
+                    {
+                        "id": "unattached_pathology",
+                        "representation": "null",
+                        "meaning": "No pathology is attached through this field.",
+                        "claim_refs": ["embed.semantic#unattached-pathology"],
+                        "caveats": [
+                            "This does not establish a negative diagnosis or complete follow-up."
+                        ],
+                    }
+                ],
+                "temporal_semantics": [],
+                "aggregations": [
+                    "pathology.severity-to-exam",
+                    "pathology.severity-to-patient",
+                ],
+                "vocabulary": "pathology.severity",
             },
-        ],
+            "technical.row_index": {
+                "label": "Technical row index",
+                "definition": "Release-local serialized row index.",
+                "feature_kind": "technical",
+                "domains": ["technical"],
+                "objects": [],
+                "search_terms": ["row index"],
+                "caveats": ["Not a clinical identifier."],
+                "evidence": ["release_schema"],
+                "claim_refs": [],
+                "missing_states": [],
+                "temporal_semantics": [],
+                "aggregations": [],
+            },
+        },
+        "semantic_relationships": {
+            "patient.has_exam": {
+                "label": "Patient has imaging exam",
+                "kind": "hierarchy",
+                "source_object": "patient",
+                "target_object": "imaging_exam",
+                "cardinality": {
+                    "targets_per_source": "zero_or_more",
+                    "sources_per_target": "zero_or_one",
+                },
+                "optionality": {
+                    "source": "optional",
+                    "target": "required",
+                },
+                "attribution": "An exam is attributed to a represented patient.",
+                "attribution_limitations": [
+                    "Catalog metadata does not establish complete patient coverage."
+                ],
+                "temporal_qualification": "Exams may occur repeatedly over time.",
+                "temporal_semantics": ["exam.event_time"],
+                "domains": ["identity", "exam"],
+                "search_terms": ["patient exam relationship"],
+                "claim_refs": ["embed.semantic#patient-exam"],
+                "caveats": [],
+            }
+        },
+        "temporal_semantics": {
+            "exam.event_time": {
+                "label": "Imaging-exam event time",
+                "kind": "event_time",
+                "meaning": "When the represented imaging examination occurred.",
+                "objects": ["imaging_exam"],
+                "feature_refs": ["exam.study_date"],
+                "relative_to": [],
+                "domains": ["exam", "temporal"],
+                "search_terms": ["exam time", "study date"],
+                "claim_refs": ["embed.semantic#exam-time"],
+                "caveats": ["No universal diagnosis anchor is selected."],
+            },
+            "specimen.collection_time": {
+                "label": "Specimen collection time",
+                "kind": "event_time",
+                "meaning": "When a pathology specimen was collected.",
+                "objects": ["pathology_diagnosis"],
+                "feature_refs": [],
+                "relative_to": ["exam.event_time"],
+                "domains": ["pathology", "procedure", "temporal"],
+                "search_terms": ["specimen date", "collection time"],
+                "claim_refs": ["embed.semantic#specimen-time-gap"],
+                "caveats": [
+                    "The synthetic profiles do not bind a supported specimen-time feature."
+                ],
+            },
+        },
+        "aggregations": {
+            "pathology.severity-to-exam": {
+                "label": "Provided exam severity rollup",
+                "status": "provided",
+                "source_object": "pathology_diagnosis",
+                "target_object": "imaging_exam",
+                "source_concept": "pathology.severity",
+                "result_concept": "pathology.severity",
+                "semantic_relationships": [],
+                "method": "Select the minimum represented severity value.",
+                "ordering": "Inverse: lower values represent greater severity.",
+                "domains": ["exam", "pathology"],
+                "search_terms": ["exam pathology severity aggregate"],
+                "claim_refs": ["embed.semantic#severity-aggregation"],
+                "caveats": ["The fixture reuses one concept only for brevity."],
+            },
+            "pathology.severity-to-patient": {
+                "label": "Patient severity policy",
+                "status": "analyst_defined",
+                "source_object": "pathology_diagnosis",
+                "target_object": "patient",
+                "source_concept": "pathology.severity",
+                "result_concept": None,
+                "semantic_relationships": [],
+                "method": "The analyst must choose a task-specific policy.",
+                "ordering": "No patient-level ordering policy is supplied.",
+                "domains": ["identity", "pathology"],
+                "search_terms": ["patient outcome aggregation"],
+                "claim_refs": ["embed.semantic#aggregation-boundary"],
+                "caveats": ["The catalog selects no patient-level outcome."],
+            },
+        },
+        "guardrails": {
+            "pathology.null-is-not-negative": {
+                "title": "Unattached pathology is not negative pathology",
+                "statement": "Do not classify unattached pathology as benign or no cancer.",
+                "rationale": "Attachment and diagnosis are different states.",
+                "scope": "embed_general",
+                "profiles": [],
+                "objects": ["pathology_diagnosis"],
+                "concepts": ["pathology.severity"],
+                "semantic_relationships": [],
+                "temporal_semantics": [],
+                "aggregations": [],
+                "coverage": [],
+                "domains": ["pathology"],
+                "search_terms": ["null pathology", "negative outcome"],
+                "claim_refs": ["embed.semantic#unattached-pathology"],
+                "caveats": [],
+            },
+            "temporal.no-universal-diagnosis-date": {
+                "title": "No universal diagnosis date",
+                "statement": "Choose task-specific anchors from dates with different meanings.",
+                "rationale": "Event and documentation times answer different questions.",
+                "scope": "embed_general",
+                "profiles": [],
+                "objects": ["imaging_exam", "pathology_diagnosis"],
+                "concepts": ["exam.study_date"],
+                "semantic_relationships": [],
+                "temporal_semantics": [
+                    "exam.event_time",
+                    "specimen.collection_time",
+                ],
+                "aggregations": [],
+                "coverage": ["specimen-time.profile-support"],
+                "domains": ["temporal", "pathology"],
+                "search_terms": ["diagnosis date", "temporal anchor"],
+                "claim_refs": ["embed.semantic#specimen-time-gap"],
+                "caveats": [],
+            },
+        },
+        "coverage": {
+            "specimen-time.profile-support": {
+                "subject_kind": "temporal_semantic",
+                "subject": "specimen.collection_time",
+                "status": "unsupported",
+                "scope": "profile_specific",
+                "profiles": ["profile-a", "profile-b"],
+                "summary": "No supported specimen collection time feature is bound.",
+                "domains": ["pathology", "temporal"],
+                "search_terms": ["specimen date missing"],
+                "claim_refs": ["embed.semantic#specimen-time-gap"],
+                "caveats": ["Do not substitute procedure or report time."],
+            },
+            "pathology-severity.profile-support": {
+                "subject_kind": "concept",
+                "subject": "pathology.severity",
+                "status": "supported",
+                "scope": "profile_specific",
+                "profiles": ["profile-a", "profile-b"],
+                "summary": "Both synthetic profiles bind pathology severity.",
+                "domains": ["pathology"],
+                "search_terms": ["pathology severity coverage"],
+                "claim_refs": ["profiles.synthetic#severity-binding"],
+                "caveats": [],
+            },
+        },
         "vocabularies": {
-            "exam.tissue_density": {
-                "label": "Tissue-density codes",
-                "completeness": "unknown",
+            "pathology.severity": {
+                "label": "Pathology severity groups",
+                "completeness": "closed",
                 "parsing": "atomic",
-                "evidence": ["release_legend"],
-                "caveats": ["The list is not guaranteed to be exhaustive."],
+                "evidence": ["maintainer_confirmed"],
+                "caveats": [
+                    "Null is an attachment state, not a seventh diagnosis code."
+                ],
                 "codes": {
-                    "1": "Almost entirely fat",
-                    "2": "Scattered fibroglandular densities",
+                    "0": "Invasive breast cancer",
+                    "1": "In-situ breast cancer",
+                    "2": "High-risk lesion",
+                    "3": "Borderline lesion",
+                    "4": "Benign finding",
+                    "5": "Non-breast cancer",
                 },
             }
         },
-        "tables": [
-            {
-                "profile": "open-v2",
-                "table": "combined_anon",
-                "grain": "wide_row",
-                "keys": [],
-                "caveats": ["Synthetic wide table has no declared key."],
-            },
-            {
-                "profile": "open-v2",
-                "table": "exam_level_anon",
-                "grain": "exam",
-                "keys": [
-                    {
-                        "id": "exam.accession",
-                        "columns": ["acc_anon"],
-                        "kind": "natural",
-                        "uniqueness": "unique",
-                        "completeness": "complete",
-                        "evidence": ["cross_table_check"],
-                        "caveats": [],
-                    }
-                ],
-                "caveats": [],
-            },
-        ],
-        "relationships": [],
         "sources": {
-            "open-v2.release-schema": {
-                "title": "Synthetic open-v2 release schema",
+            "embed.semantic-source": {
+                "title": "Synthetic EMBED semantic review",
+                "kind": "maintainer_confirmed",
+                "scope": "embed_general",
+                "locator_kind": "logical_artifact",
+                "locator": "synthetic semantic review",
+                "version_scope": "Synthetic portable semantics.",
+                "profiles": [],
+                "notes": [],
+            },
+            "profiles.synthetic-schema": {
+                "title": "Synthetic profile schemas",
                 "kind": "release_schema",
                 "scope": "profile_specific",
                 "locator_kind": "logical_artifact",
-                "locator": "synthetic open-v2 footer schema",
-                "version_scope": "Synthetic open-v2 contract fixture.",
-                "profiles": ["open-v2"],
+                "locator": "synthetic profile footer schemas",
+                "version_scope": "Synthetic profiles A and B.",
+                "profiles": ["profile-a", "profile-b"],
                 "notes": [],
-            }
+            },
         },
         "contexts": {
-            "open-v2.density-interpretation": {
-                "title": "Density interpretation boundary",
-                "kind": "interpretation_guardrail",
-                "scope": "profile_specific",
-                "profiles": ["open-v2"],
-                "summary": "Density is a coded exam feature.",
-                "domains": ["exam", "mammography"],
-                "search_terms": ["density interpretation"],
-                "related_concepts": ["exam.tissue_density"],
-                "related_tables": [
-                    {
-                        "profile": "open-v2",
-                        "table": "exam_level_anon",
-                    }
+            "embed.semantic": {
+                "title": "Synthetic portable clinical semantics",
+                "kind": "data_representation",
+                "scope": "embed_general",
+                "profiles": [],
+                "summary": "Portable object, outcome, aggregation, and time meanings.",
+                "domains": ["identity", "exam", "pathology", "temporal"],
+                "search_terms": ["clinical semantics", "pathology timeline"],
+                "related_concepts": [
+                    "identity.patient_identifier",
+                    "exam.study_date",
+                    "pathology.severity",
                 ],
+                "related_tables": [],
                 "related_relationships": [],
                 "claims": [
                     {
-                        "id": "coded-feature",
-                        "statement": (
-                            "The synthetic density field is represented as a "
-                            "coded exam feature."
-                        ),
+                        "id": "patient-meaning",
+                        "statement": "A patient object represents one person.",
                         "status": "verified",
-                        "sources": ["open-v2.release-schema"],
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "exam-meaning",
+                        "statement": "An imaging exam is distinct from a pathology diagnosis.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "diagnosis-meaning",
+                        "statement": "Pathology diagnosis groups represent tissue interpretations.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "patient-exam",
+                        "statement": "A represented patient may have multiple imaging exams.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "exam-time",
+                        "statement": "Study date represents imaging-exam event time.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "severity-meaning",
+                        "statement": "Pathology severity uses inverse ordering.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "unattached-pathology",
+                        "statement": "Null severity means no attached pathology, not a negative diagnosis.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "severity-aggregation",
+                        "statement": "A provided exam rollup selects the inverse-scale minimum.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "aggregation-boundary",
+                        "statement": "No patient-level pathology aggregation is supplied.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                    {
+                        "id": "specimen-time-gap",
+                        "statement": "Specimen collection time is meaningful but unsupported in the profiles.",
+                        "status": "verified",
+                        "sources": ["embed.semantic-source"],
+                        "caveats": [],
+                    },
+                ],
+                "workflow_steps": [],
+                "caveats": [],
+            },
+            "profiles.synthetic": {
+                "title": "Synthetic physical representations",
+                "kind": "data_representation",
+                "scope": "profile_specific",
+                "profiles": ["profile-a", "profile-b"],
+                "summary": "Two physical layouts bind the same portable semantics.",
+                "domains": ["identity", "exam", "pathology"],
+                "search_terms": ["profile bindings"],
+                "related_concepts": [
+                    "identity.patient_identifier",
+                    "exam.study_date",
+                    "pathology.severity",
+                ],
+                "related_tables": [
+                    {"profile": "profile-a", "table": "clinical_a"},
+                    {"profile": "profile-b", "table": "patients_b"},
+                    {"profile": "profile-b", "table": "exams_b"},
+                ],
+                "related_relationships": ["profile-b.exams.patient"],
+                "claims": [
+                    {
+                        "id": "severity-binding",
+                        "statement": "Both profiles expose a pathology severity binding.",
+                        "status": "verified",
+                        "sources": ["profiles.synthetic-schema"],
                         "caveats": [],
                     }
                 ],
                 "workflow_steps": [],
-                "caveats": ["Synthetic context for contract tests."],
-            }
+                "caveats": [],
+            },
         },
-        "analysis_patterns": {
-            "open-v2.density-analysis": {
-                "title": "Synthetic density analysis guidance",
-                "status": "draft",
-                "scope": "profile_specific",
-                "profiles": ["open-v2"],
-                "summary": "Choose a density analysis policy explicitly.",
-                "domains": ["exam", "mammography"],
-                "search_terms": ["density analysis"],
-                "applicable_grains": ["exam"],
-                "related_concepts": ["exam.tissue_density"],
-                "related_tables": [
+        "profile_bindings": {
+            "profile-a": {
+                "feature_bindings": [
                     {
-                        "profile": "open-v2",
-                        "table": "exam_level_anon",
+                        "table": "clinical_a",
+                        "column": "person_id",
+                        "concept": "identity.patient_identifier",
+                        "grain": "wide_row",
+                        "role": "wide_projection",
+                        "physical_type": "int64",
+                        "nullable": False,
+                    },
+                    {
+                        "table": "clinical_a",
+                        "column": "study_when",
+                        "concept": "exam.study_date",
+                        "grain": "wide_row",
+                        "role": "wide_projection",
+                        "physical_type": "timestamp[ns]",
+                        "nullable": True,
+                    },
+                    {
+                        "table": "clinical_a",
+                        "column": "severity_code",
+                        "concept": "pathology.severity",
+                        "grain": "wide_row",
+                        "role": "wide_projection",
+                        "physical_type": "int8",
+                        "nullable": True,
+                    },
+                ],
+                "object_bindings": [
+                    {
+                        "object": "patient",
+                        "table": "clinical_a",
+                        "columns": ["person_id"],
+                        "representation": "co_located",
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": [],
+                    },
+                    {
+                        "object": "imaging_exam",
+                        "table": "clinical_a",
+                        "columns": ["study_when"],
+                        "representation": "co_located",
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": [],
+                    },
+                    {
+                        "object": "pathology_diagnosis",
+                        "table": "clinical_a",
+                        "columns": ["severity_code"],
+                        "representation": "co_located",
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": [],
+                    },
+                ],
+                "tables": [
+                    {
+                        "table": "clinical_a",
+                        "grain": "wide_row",
+                        "keys": [
+                            {
+                                "id": "profile-a.clinical.row",
+                                "columns": ["person_id", "study_when"],
+                                "kind": "natural",
+                                "uniqueness": "unknown",
+                                "completeness": "incomplete",
+                                "evidence": ["release_schema"],
+                                "caveats": ["The wide-row tuple is not a clinical-object key."],
+                            }
+                        ],
+                        "caveats": ["One row co-locates several clinical objects."],
                     }
                 ],
-                "related_relationships": [],
-                "related_contexts": ["open-v2.density-interpretation"],
-                "alternatives": [
+                "relationship_bindings": [],
+            },
+            "profile-b": {
+                "feature_bindings": [
                     {
-                        "id": "coded-groups",
-                        "label": "Coded density groups",
-                        "description": "Retain the released categories.",
-                        "appropriate_when": "Category-specific effects matter.",
-                        "limitations": ["Sparse groups may require review."],
+                        "table": "patients_b",
+                        "column": "pid",
+                        "concept": "identity.patient_identifier",
+                        "grain": "patient",
+                        "role": "canonical",
+                        "physical_type": "int64",
+                        "nullable": False,
+                    },
+                    {
+                        "table": "exams_b",
+                        "column": "pid",
+                        "concept": "identity.patient_identifier",
+                        "grain": "exam",
+                        "role": "reference",
+                        "physical_type": "int64",
+                        "nullable": False,
+                    },
+                    {
+                        "table": "exams_b",
+                        "column": "exam_id",
+                        "concept": "technical.row_index",
+                        "grain": "exam",
+                        "role": "technical",
+                        "physical_type": "int64",
+                        "nullable": False,
+                    },
+                    {
+                        "table": "exams_b",
+                        "column": "exam_date",
+                        "concept": "exam.study_date",
+                        "grain": "exam",
+                        "role": "canonical",
+                        "physical_type": "timestamp[ns]",
+                        "nullable": True,
+                    },
+                    {
+                        "table": "exams_b",
+                        "column": "path_group",
+                        "concept": "pathology.severity",
+                        "grain": "exam",
+                        "role": "reference",
+                        "physical_type": "int8",
+                        "nullable": True,
+                    },
+                ],
+                "object_bindings": [
+                    {
+                        "object": "patient",
+                        "table": "patients_b",
+                        "columns": ["pid"],
+                        "representation": "canonical",
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": [],
+                    },
+                    {
+                        "object": "imaging_exam",
+                        "table": "exams_b",
+                        "columns": ["exam_id"],
+                        "representation": "canonical",
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": [],
+                    },
+                    {
+                        "object": "pathology_diagnosis",
+                        "table": "exams_b",
+                        "columns": ["path_group"],
+                        "representation": "partial",
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": ["Diagnosis detail is projected at exam grain."],
+                    },
+                ],
+                "tables": [
+                    {
+                        "table": "patients_b",
+                        "grain": "patient",
+                        "keys": [
+                            {
+                                "id": "profile-b.patient.id",
+                                "columns": ["pid"],
+                                "kind": "natural",
+                                "uniqueness": "unique",
+                                "completeness": "complete",
+                                "evidence": ["release_schema"],
+                                "caveats": [],
+                            }
+                        ],
+                        "caveats": [],
+                    },
+                    {
+                        "table": "exams_b",
+                        "grain": "exam",
+                        "keys": [
+                            {
+                                "id": "profile-b.exam.id",
+                                "columns": ["exam_id"],
+                                "kind": "technical",
+                                "uniqueness": "unique",
+                                "completeness": "complete",
+                                "evidence": ["release_schema"],
+                                "caveats": [],
+                            },
+                            {
+                                "id": "profile-b.exam.patient",
+                                "columns": ["pid"],
+                                "kind": "natural",
+                                "uniqueness": "not_unique",
+                                "completeness": "complete",
+                                "evidence": ["release_schema"],
+                                "caveats": ["A patient may have multiple exams."],
+                            },
+                        ],
+                        "caveats": [],
+                    },
+                ],
+                "relationship_bindings": [
+                    {
+                        "id": "profile-b.exams.patient",
+                        "kind": "hierarchy",
+                        "semantic_relationships": ["patient.has_exam"],
+                        "source": {
+                            "table": "exams_b",
+                            "columns": ["pid"],
+                            "completeness": "required",
+                        },
+                        "target": {"table": "patients_b", "columns": ["pid"]},
+                        "cardinality": {
+                            "targets_per_source": "exactly_one",
+                            "sources_per_target": "zero_or_more",
+                        },
+                        "evidence": ["release_schema"],
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": [],
+                        "join_hazards": ["Joining patient values repeats them at exam grain."],
                     }
                 ],
-                "required_decisions": [
-                    {
-                        "id": "grouping",
-                        "question": "How are density groups represented?",
-                        "rationale": "The analysis determines grouping.",
-                    }
-                ],
-                "prohibited_shortcuts": [
-                    {
-                        "id": "null-as-category",
-                        "statement": "Do not assign null to a density category.",
-                        "reason": "Null has no documented code meaning.",
-                    }
-                ],
-                "caveats": ["Synthetic pattern for contract tests."],
-            }
+            },
         },
     }
+
+
+def cloned_catalog() -> dict[str, Any]:
+    return deepcopy(synthetic_catalog())
 
 
 def write_catalog(path: Path, data: dict[str, Any] | None = None) -> Path:
