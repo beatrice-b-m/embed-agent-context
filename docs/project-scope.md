@@ -120,9 +120,12 @@ report, risk, and temporal-availability interpretation.
 General clinical background, non-profile-specific EMBED documentation, and
 open-v2 representation are separate scopes. Workflow stages are ordered and
 backed by stable claim IDs. Each claim retains its review status and sources;
-unresolved follow-up, interval-cancer, screening-matching, modality-inclusion,
-temporal-availability, and pathology-interpretation policies remain unresolved
-rather than becoming defaults.
+maintainer-confirmed representation semantics are distinguished from remaining
+unknown MagView code mappings, unverified report-addendum linkage, and
+unvalidated risk-field variants, percentage formatting, sentinel meanings, and
+model versions. Task-specific follow-up, cohort, label, and modality-inclusion
+choices are analysis policy and are not tracked as dataset claims awaiting
+verification.
 
 This layer is descriptive and read-only. It does not perform joins, define
 cohorts, derive labels, exclude records, prescribe care, or replace a versioned

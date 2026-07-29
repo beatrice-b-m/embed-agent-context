@@ -47,8 +47,14 @@ hazards.
 Phase 3 adds a sourced clinical and procedural context layer. It distinguishes
 general clinical background, public EMBED behavior, and open-v2 representation;
 keeps review status and provenance on individual claims; orders clinical
-workflow stages; and preserves open temporal, matching, and outcome-policy
-questions as unresolved. The canonical catalog is now schema version 3.
+workflow stages; and preserves only genuine source-mapping and representation
+questions as unresolved. Maintainer-confirmed open-v2 context now establishes
+same-episode linked accessions, descriptor-versus-modality boundaries,
+procedure-associated pathology-code ordering, report-version chronology,
+clinical-time risk calculation, and consistent within-patient date shifts.
+Unknown recommendation and pathology code mappings, report-addendum linkage,
+and risk-field definitions and sentinel meanings remain explicit. The canonical
+catalog is schema version 3.
 
 ## Command-line queries
 

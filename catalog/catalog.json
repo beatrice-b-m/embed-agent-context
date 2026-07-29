@@ -172,14 +172,15 @@
         "path_severity_side_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level coded severity field; its derivation is unresolved.",
-        "Code meanings and temporal availability are unresolved."
+        "This level-specific field uses the inverse pathology-severity groups, but its exact aggregation across procedure-associated pathology records is unresolved."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
-      ]
+      ],
+      "vocabulary": "pathology.severity"
     },
     "breast.side": {
       "label": "Breast side",
@@ -325,12 +326,11 @@
         "dob"
       ],
       "caveats": [
-        "Anonymization may alter calendar values; preserved ordering and interval properties are unresolved."
+        "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved."
       ],
       "evidence": [
         "release_schema",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "demographics.cohort": {
@@ -687,14 +687,15 @@
         "path_severity_exam_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level coded severity field; its derivation is unresolved.",
-        "Code meanings and temporal availability are unresolved."
+        "This level-specific field uses the inverse pathology-severity groups, but its exact aggregation across procedure-associated pathology records is unresolved."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
-      ]
+      ],
+      "vocabulary": "pathology.severity"
     },
     "exam.procedure_description": {
       "label": "Procedure description",
@@ -795,11 +796,12 @@
         "study date"
       ],
       "caveats": [
-        "Anonymization may alter calendar values; preserved ordering and interval properties are unresolved."
+        "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved."
       ],
       "evidence": [
         "release_schema",
-        "release_legend"
+        "release_legend",
+        "maintainer_confirmed"
       ]
     },
     "exam.tissue_density": {
@@ -1021,7 +1023,7 @@
     },
     "imaging.linked_accession_identifier": {
       "label": "Linked exam accession identifier",
-      "definition": "Anonymized accession reference for a linked study.",
+      "definition": "Anonymized accession reference for a same-episode exam linked at study time.",
       "feature_kind": "identifier",
       "domains": [
         "identity",
@@ -1035,13 +1037,13 @@
       ],
       "caveats": [
         "Treat identifiers as opaque; do not expose values or assume stability beyond the documented release.",
-        "A non-null reference is not guaranteed to resolve to the exam table."
+        "A non-null reference is expected to identify a same-episode exam, but release and data-quality edge cases may not resolve to the exported exam table.",
+        "The reference does not identify a prior or follow-up exam; compare study dates when temporal context is needed."
       ],
       "evidence": [
         "release_schema",
         "cross_table_check",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "imaging.linked_study_flag": {
@@ -1057,12 +1059,13 @@
         "linked_study_flag"
       ],
       "caveats": [
-        "The legend supplies no code meanings, and row-wise equivalence with linked-accession presence is not established."
+        "The flag is expected to identify a linked same-episode exam, but data-quality edge cases mean it must not be used to repair a missing linked-accession value."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
-        "unresolved"
+        "observed_v2_values",
+        "maintainer_confirmed"
       ]
     },
     "imaging.location": {
@@ -1120,7 +1123,8 @@
         "recc"
       ],
       "caveats": [
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "The loose MagView reporting schema permits site- and time-dependent formatting heterogeneity; preserve the source string rather than imposing a canonical ordering or grammar.",
+        "Codes absent from the released legend are valid source-system values with unknown mappings pending investigation with the MagView reporting teams.",
         "Recommendations may encode post-assessment information and require a task-specific temporal anchor.",
         "The legend list is not guaranteed exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings."
@@ -1129,6 +1133,7 @@
         "release_schema",
         "release_legend",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ],
       "vocabulary": "imaging.recommendation"
@@ -1935,7 +1940,7 @@
     },
     "pathology.diagnosis_code_slot": {
       "label": "Pathology diagnosis code slot",
-      "definition": "Physical slot containing a pathology finding code.",
+      "definition": "Procedure-associated slot containing one of up to ten pathology descriptor codes.",
       "feature_kind": "coded",
       "domains": [
         "pathology"
@@ -1955,16 +1960,17 @@
         "pathology finding"
       ],
       "caveats": [
-        "The shared vocabulary mapping is derived; slot ordering, repetition, and secondary-finding semantics are unresolved.",
-        "The legend list is not guaranteed exhaustive.",
+        "Codes are generally ordered from more severe to less severe by pathology-severity group, but within-group order, slot position, and the number of populated slots are not informative for decision-making.",
+        "Duplicate codes are not intended but may occur and must be treated as equivalent to one occurrence of that code.",
+        "In the classic MagView representation, each distinct procedure produces its own procedure/pathology values even when the associated finding is otherwise duplicated.",
+        "All observed codes are valid source-system values; codes absent from the released legend have unknown mappings pending internal investigation.",
         "Null semantics are not documented and must not be inferred from the code meanings."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
         "observed_v2_values",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ],
       "vocabulary": "pathology.finding_codes"
     },
@@ -2004,14 +2010,13 @@
         "procdate_anon"
       ],
       "caveats": [
-        "Anonymization may alter calendar values; preserved ordering and interval properties are unresolved.",
+        "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved.",
         "Procedure information may be post-exam and requires a task-specific temporal anchor."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "pathology.report_date": {
@@ -2028,19 +2033,18 @@
         "pdate_anon"
       ],
       "caveats": [
-        "Anonymization may alter calendar values; preserved ordering and interval properties are unresolved.",
+        "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved.",
         "Pathology-report information may be post-exam and requires a task-specific temporal anchor."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "pathology.severity": {
       "label": "Pathology severity",
-      "definition": "Finding-level coded pathology-severity field.",
+      "definition": "Inverse coded group for the most severe procedure-associated pathology descriptor.",
       "feature_kind": "coded",
       "domains": [
         "pathology"
@@ -2050,13 +2054,15 @@
         "path_severity"
       ],
       "caveats": [
-        "Code meanings, ordinality, derivation, and temporal availability are unresolved."
+        "Lower values are more severe; do not use an increasing numeric threshold to select cancer-positive pathology.",
+        "Null means that no pathology is attached and must not be interpreted as benign or negative."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
-      ]
+        "maintainer_confirmed"
+      ],
+      "vocabulary": "pathology.severity"
     },
     "pathology.surgery_type": {
       "label": "Breast surgery type",
@@ -2082,7 +2088,7 @@
     },
     "report.sequence": {
       "label": "Report sequence",
-      "definition": "Released report-sequence-like field.",
+      "definition": "MagView report-version sequence number incremented when a new report version is created.",
       "feature_kind": "identifier",
       "domains": [
         "report"
@@ -2092,12 +2098,14 @@
         "rseq"
       ],
       "caveats": [
-        "Sequence chronology, zero semantics, and uniqueness are unresolved."
+        "Within an accession, the minimum sequence identifies the earliest represented report and the maximum identifies the latest represented report.",
+        "The specific origin of sequence value zero is unknown, but it participates in the same minimum-to-maximum ordering.",
+        "Source-system and site heterogeneity can produce duplicate natural tuples; sequence is not a globally unique report identifier."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "report.text": {
@@ -2121,7 +2129,7 @@
     },
     "risk.ibis_brca1": {
       "label": "IBIS BRCA1 output",
-      "definition": "Released numeric risk output named IBISBRCA1.",
+      "definition": "IBIS BRCA1 risk output calculated during clinical care and extracted from MagView.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2132,17 +2140,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact model version, percentage-point formatting, and meanings of exceptional values such as 100 are not validated."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_brca2": {
       "label": "IBIS BRCA2 output",
-      "definition": "Released numeric risk output named IBISBRCA2.",
+      "definition": "IBIS BRCA2 risk output calculated during clinical care and extracted from MagView.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2153,17 +2162,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact model version, percentage-point formatting, and meanings of exceptional values such as 100 are not validated."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_lifetime": {
       "label": "IBIS lifetime output",
-      "definition": "Released numeric risk output named IBISLIFE.",
+      "definition": "IBIS lifetime risk output calculated during clinical care and extracted from MagView.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2174,17 +2184,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact model version, percentage-point formatting, and meanings of exceptional values such as 100 are not validated."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_population_lifetime": {
       "label": "IBIS population lifetime-like output",
-      "definition": "Released numeric risk output named IBISPOPL.",
+      "definition": "Clinical-time MagView risk output named IBISPOPL.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2195,17 +2206,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact population-relative meaning, model version, percentage-point formatting, and exceptional-value semantics require internal investigation."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_population_ten_year": {
       "label": "IBIS population ten-year-like output",
-      "definition": "Released numeric risk output named IBISPOP10.",
+      "definition": "Clinical-time MagView risk output named IBISPOP10.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2216,17 +2228,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact population-relative meaning, model version, percentage-point formatting, and exceptional-value semantics require internal investigation."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_td1": {
       "label": "IBIS TD1 output",
-      "definition": "Released numeric risk output named IBIS_TD1.",
+      "definition": "Clinical-time MagView risk output named IBIS_TD1.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2237,17 +2250,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The TD1 variant meaning, model version, percentage-point formatting, and exceptional-value semantics require internal investigation."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_td2": {
       "label": "IBIS TD2 output",
-      "definition": "Released numeric risk output named IBIS_TD2.",
+      "definition": "Clinical-time MagView risk output named IBIS_TD2.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2258,17 +2272,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The TD2 variant meaning, model version, percentage-point formatting, and exceptional-value semantics require internal investigation."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_td3": {
       "label": "IBIS TD3 output",
-      "definition": "Released numeric risk output named IBIS_TD3.",
+      "definition": "Clinical-time MagView risk output named IBIS_TD3.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2279,17 +2294,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The TD3 variant meaning, model version, percentage-point formatting, and exceptional-value semantics require internal investigation."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_td4": {
       "label": "IBIS TD4 output",
-      "definition": "Released numeric risk output named IBIS_TD4.",
+      "definition": "Clinical-time MagView risk output named IBIS_TD4.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2300,17 +2316,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The TD4 variant meaning, model version, percentage-point formatting, and exceptional-value semantics require internal investigation."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.ibis_ten_year": {
-      "label": "IBIS ten-year-like output",
-      "definition": "Released numeric risk output named IBIS10.",
+      "label": "IBIS ten-year output",
+      "definition": "IBIS ten-year risk output calculated during clinical care and extracted from MagView.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2321,17 +2338,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact model version, percentage-point formatting, and meanings of exceptional values such as 100 are not validated."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.nci_five_year": {
-      "label": "NCI five-year-like output",
-      "definition": "Released numeric risk output named NCI5.",
+      "label": "NCI five-year output",
+      "definition": "NCI five-year risk output calculated during clinical care and extracted from MagView.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2342,17 +2360,18 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact model version, percentage-point formatting, and meanings of -35, -2, and 100 are not validated."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "risk.nci_lifetime": {
       "label": "NCI lifetime output",
-      "definition": "Released numeric risk output named NCILIFE.",
+      "definition": "NCI lifetime risk output calculated during clinical care and extracted from MagView.",
       "feature_kind": "model_output",
       "domains": [
         "risk"
@@ -2363,11 +2382,12 @@
         "risk model"
       ],
       "caveats": [
-        "Definition, outcome, horizon, unit, negative-value semantics, and upper-bound semantics require maintainer confirmation."
+        "The exact model version, percentage-point formatting, and meanings of -35, -2, and 100 are not validated."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
@@ -6352,12 +6372,13 @@
       "completeness": "unknown",
       "parsing": "shared_slot_dictionary",
       "evidence": [
-        "release_legend"
+        "release_legend",
+        "maintainer_confirmed"
       ],
       "caveats": [
-        "The release legend does not state that this code list is exhaustive.",
+        "All observed source-system codes are valid, but codes absent from the release legend retain unknown mappings pending internal investigation.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "The mapping from the shared legend header to individual physical slots is derived, and slot semantics are unresolved."
+        "The shared dictionary applies to procedure-associated path1 through path10 slots; slot position and duplicate occurrences are not decision-making signals."
       ],
       "codes": {
         "AB": "Abscess",
@@ -6542,6 +6563,27 @@
         "TC": "Tubular carcinoma",
         "TR": "Treatment effect",
         "VGH": "Virginal hyperplasia"
+      }
+    },
+    "pathology.severity": {
+      "label": "Pathology severity groups",
+      "completeness": "closed",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "The scale is inverse: lower values represent more severe pathology.",
+        "Null means no pathology is attached and is not a benign or negative category.",
+        "Internal raw value 6 is not retained in the canonical exported context."
+      ],
+      "codes": {
+        "0": "Invasive breast cancer",
+        "1": "In-situ breast cancer",
+        "2": "High-risk lesion",
+        "3": "Borderline lesion",
+        "4": "Benign finding",
+        "5": "Non-breast cancer"
       }
     },
     "pathology.lymph_node_surgery_type": {
@@ -6996,7 +7038,7 @@
           "evidence": ["release_schema", "observed_v2_values"],
           "caveats": [
             "Accession plus report sequence does not uniquely identify every report row.",
-            "Sequence chronology and zero semantics are unresolved."
+            "Minimum rseq is the earliest represented report version and maximum rseq is the latest; the specific origin of zero is unknown."
           ]
         },
         {
@@ -7065,7 +7107,7 @@
         }
       ],
       "caveats": [
-        "Risk-to-exam referential coverage and computation timing require maintainer confirmation."
+        "Risk-to-exam referential coverage remains unresolved; risk scores were calculated during clinical care and extracted from MagView."
       ]
     },
     {
@@ -7505,7 +7547,7 @@
       ],
       "join_hazards": [
         "Do not assume every exam has a risk row.",
-        "Do not infer that risk outputs were available at imaging time."
+        "Clinical-time calculation does not establish the exact calculation timestamp within the study episode."
       ]
     },
     {
@@ -7625,6 +7667,21 @@
       "notes": [
         "This source records reviewed catalog conclusions, including unresolved relationship behavior.",
         "It is not a substitute for maintainer confirmation of clinical workflow semantics."
+      ]
+    },
+    "open-v2.maintainer-clarification-2026-07-29": {
+      "title": "Open-v2 maintainer clarification on representation and provenance",
+      "kind": "maintainer_confirmed",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "EMBED maintainer clarification recorded 2026-07-29",
+      "version_scope": "Open-v2 linked-exam, multimodal descriptor, pathology, report, risk, and date semantics reviewed on 2026-07-29.",
+      "profiles": [
+        "open-v2"
+      ],
+      "notes": [
+        "Confirms same-episode linked accessions, descriptor-versus-modality boundaries, procedure-associated pathology-code behavior, report-version sequencing, clinical-time risk calculation, and consistent within-patient date shifts.",
+        "Retains unknown MagView code mappings, report addendum linkage, risk-field variants, percentage formatting, sentinel meanings, and model versions for later internal investigation."
       ]
     },
     "open-v2.release-legend": {
@@ -7919,14 +7976,27 @@
         },
         {
           "id": "recommendation-composition",
-          "statement": "Recommendation strings may be composed, but delimiter, ordering, repetition, and exhaustiveness are unresolved.",
+          "statement": "Recommendation strings come from a loose multi-site MagView reporting schema with expected formatting heterogeneity.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.release-legend",
+            "open-v2.catalog-linkage-review",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "Preserve the source string rather than imposing a canonical grammar."
+          ]
+        },
+        {
+          "id": "recommendation-code-mappings",
+          "statement": "Mappings for valid recommendation codes absent from the released legend are currently unknown and require investigation with the MagView reporting teams.",
           "status": "unresolved",
           "sources": [
             "open-v2.release-legend",
-            "open-v2.catalog-linkage-review"
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Preserve the source string rather than splitting it with an assumed grammar."
+            "Do not guess or silently normalize undocumented recommendation codes."
           ]
         },
         {
@@ -7955,7 +8025,7 @@
       "profiles": [
         "open-v2"
       ],
-      "summary": "Linked accession fields describe optional references whose clinical meaning and referential coverage remain limited.",
+      "summary": "Linked accession fields identify same-episode exams linked at study time, with expected data-quality and release-coverage edge cases.",
       "domains": [
         "exam",
         "identity",
@@ -8019,12 +8089,13 @@
         },
         {
           "id": "flag-equivalence",
-          "statement": "Row-wise equivalence between linked-study flag state and linked-accession presence is unresolved.",
-          "status": "unresolved",
+          "statement": "The linked-study flag and linked-accession presence are expected to describe the same same-episode linkage, but data-quality edge cases can violate row-wise equivalence.",
+          "status": "reconciled",
           "sources": [
             "open-v2.release-schema",
             "open-v2.release-legend",
-            "open-v2.catalog-linkage-review"
+            "open-v2.catalog-linkage-review",
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
             "Do not use one field as a missing-value repair for the other."
@@ -8032,20 +8103,20 @@
         },
         {
           "id": "link-meaning",
-          "statement": "The clinical and temporal meaning of a linked accession is not established by the reference alone.",
-          "status": "unresolved",
+          "statement": "A linked accession identifies a same-episode exam linked at study time; it does not designate a prior or follow-up exam.",
+          "status": "verified",
           "sources": [
-            "open-v2.catalog-linkage-review"
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Do not assume that the reference identifies a prior, follow-up, or same-episode exam."
+            "Use the linked exams' study dates for their temporal context."
           ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
         "Linked references describe relationship metadata and are not executable joins.",
-        "No screening-matching or follow-up-window policy is supplied."
+        "Release filtering and ordinary data-quality artifacts can leave expected link or flag invariants unsatisfied in edge cases."
       ]
     },
     "open-v2.multimodal-finding-context": {
@@ -8115,33 +8186,20 @@
         },
         {
           "id": "descriptor-null-semantics",
-          "statement": "A null modality-specific descriptor does not establish that the modality was absent or that the finding was negative.",
-          "status": "unresolved",
+          "statement": "Modality-specific descriptor fields indicate presence or absence of particular finding descriptors and do not establish whether that modality was performed or available.",
+          "status": "verified",
           "sources": [
             "open-v2.release-schema",
-            "open-v2.catalog-linkage-review"
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Not-applicable, undocumented, and missing observations are not distinguished by the schema alone."
-          ]
-        },
-        {
-          "id": "modality-followup-policy",
-          "statement": "Whether ultrasound or MRI contributes to a task-specific follow-up outcome is unresolved and must not be inferred from column availability.",
-          "status": "unresolved",
-          "sources": [
-            "open-v2.release-schema",
-            "open-v2.catalog-linkage-review"
-          ],
-          "caveats": [
-            "Executable modality-inclusion policy belongs outside the context catalog."
+            "Use the separate exam/modality features for modality availability."
           ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
-        "Do not collapse modality-specific observations into one finding truth without a reviewed task policy.",
-        "The catalog describes representation and interpretation hazards, not imaging acquisition completeness."
+        "Descriptor presence and modality availability are separate questions represented by different features."
       ]
     },
     "open-v2.pathology-procedure-context": {
@@ -8233,34 +8291,47 @@
         },
         {
           "id": "diagnosis-slot-order",
-          "statement": "Pathology diagnosis slots share a released code dictionary, but slot ordering, repetition, and secondary-finding semantics are unresolved.",
-          "status": "unresolved",
+          "statement": "Path1 through path10 are procedure-associated pathology descriptor codes, generally ordered by severity group; slot position, within-group order, and duplicate occurrences are not informative for decision-making.",
+          "status": "reconciled",
           "sources": [
             "open-v2.release-schema",
             "open-v2.release-legend",
-            "open-v2.catalog-linkage-review"
+            "open-v2.catalog-linkage-review",
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "A slot number records physical position only."
+            "Duplicate codes are not intended but may occur and are equivalent to one occurrence."
+          ]
+        },
+        {
+          "id": "pathology-code-mappings",
+          "statement": "Pathology descriptor codes observed in open-v2 but absent from the released legend are valid source-system codes with mappings that are currently unknown.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-legend",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "Retain unknown codes as observed and defer their interpretation to internal MagView mapping investigation."
           ]
         },
         {
           "id": "severity-meaning",
-          "statement": "Open-v2 pathology-severity code meanings, ordinality, derivation, and temporal availability remain unresolved.",
-          "status": "unresolved",
+          "statement": "Pathology severity is the inverse coded group of the most severe attached pathology descriptor: 0 invasive cancer, 1 in-situ cancer, 2 high-risk lesion, 3 borderline lesion, 4 benign finding, and 5 non-breast cancer.",
+          "status": "verified",
           "sources": [
             "open-v2.release-schema",
-            "open-v2.catalog-linkage-review"
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Do not apply public or alpha severity thresholds as an open-v2 contract."
+            "Lower values are more severe; null means no attached pathology and is not benign or negative."
           ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
         "Procedure and pathology information may postdate imaging and must not be treated as contemporaneous by default.",
-        "This context supplies no pathology aggregation, tie-breaking, or back-attribution algorithm."
+        "In the classic MagView representation, distinct procedures carry distinct procedure/pathology values even when the associated finding content is otherwise duplicated."
       ]
     },
     "open-v2.report-context": {
@@ -8270,7 +8341,7 @@
       "profiles": [
         "open-v2"
       ],
-      "summary": "Reports are separate records whose sequence, multiplicity, addendum relationship, and temporal interpretation remain only partly documented.",
+      "summary": "Reports are accession-linked records whose sequence orders successive MagView report versions; source heterogeneity can produce duplicate natural tuples and the addendum-flag relationship remains unverified.",
       "domains": [
         "imaging",
         "report",
@@ -8310,10 +8381,11 @@
       "claims": [
         {
           "id": "separate-report-surface",
-          "statement": "Open-v2 stores anonymized report text and a report-sequence-like field at report grain.",
+          "statement": "Open-v2 stores anonymized accession-linked radiology report text with the associated report-creation date and MagView report-version sequence.",
           "status": "verified",
           "sources": [
-            "open-v2.release-schema"
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
             "Report content was not read while authoring the catalog."
@@ -8332,24 +8404,27 @@
         },
         {
           "id": "sequence-meaning",
-          "statement": "Report-sequence chronology, zero semantics, and uniqueness within an accession are unresolved.",
-          "status": "unresolved",
+          "statement": "MagView increments rseq when a new report version is created; within an accession the minimum represented sequence is earliest and the maximum is latest.",
+          "status": "reconciled",
           "sources": [
             "open-v2.release-schema",
-            "open-v2.catalog-linkage-review"
+            "open-v2.catalog-linkage-review",
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Do not select a final report by numeric sequence without a reviewed rule."
+            "The specific origin of rseq zero is unknown, but zero participates in the same minimum-to-maximum chronology.",
+            "Ordinary source-system and site heterogeneity can produce duplicate natural tuples."
           ]
         },
         {
           "id": "addendum-link",
-          "statement": "The relationship between imaging addendum flags and individual report records is unresolved.",
+          "statement": "Reports with rseq greater than the accession minimum are expected to be addended versions, but the relationship to imaging addendum_flag has not been manually verified.",
           "status": "unresolved",
           "sources": [
             "open-v2.release-schema",
             "open-v2.release-legend",
-            "open-v2.catalog-linkage-review"
+            "open-v2.catalog-linkage-review",
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
             "Do not infer that one flag identifies a particular report revision."
@@ -8369,7 +8444,7 @@
       ],
       "workflow_steps": [],
       "caveats": [
-        "Original observations, revisions, addenda, and a final reported state must not be collapsed without evidence.",
+        "Use minimum and maximum rseq for earliest and latest represented report versions; do not rely on tuple uniqueness.",
         "Treat report text as potentially sensitive and do not expose raw values through this context service."
       ]
     },
@@ -8380,7 +8455,7 @@
       "profiles": [
         "open-v2"
       ],
-      "summary": "Risk outputs occupy a separate assessment grain, but their units, horizons, derivations, coverage, and timing require confirmation.",
+      "summary": "Risk outputs were calculated during clinical care in MagView, but several field variants, percentage formatting, exceptional values, and model versions require internal investigation.",
       "domains": [
         "risk",
         "temporal",
@@ -8431,11 +8506,12 @@
         },
         {
           "id": "risk-semantics",
-          "statement": "The outcome, horizon, unit, derivation, and sentinel behavior of the registered risk outputs are unresolved unless explicitly stated in an individual concept caveat.",
+          "statement": "IBISPOP10, IBISPOPL, and IBIS_TD1 through IBIS_TD4 lack confirmed definitions; percentage-point formatting, meanings of -35, -2, and 100, and the generating NCI and IBIS model versions are also unvalidated.",
           "status": "unresolved",
           "sources": [
             "open-v2.release-schema",
-            "open-v2.catalog-linkage-review"
+            "open-v2.catalog-linkage-review",
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
             "Do not infer a probability scale or comparable range from numeric physical type."
@@ -8454,14 +8530,13 @@
         },
         {
           "id": "risk-availability",
-          "statement": "A risk row linked to an accession does not establish that the risk output was available when imaging was acquired or interpreted.",
-          "status": "unresolved",
+          "statement": "The released risk scores were calculated during clinical care and extracted from the breast-imaging MagView EHR system.",
+          "status": "verified",
           "sources": [
-            "open-v2.release-schema",
-            "open-v2.catalog-linkage-review"
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "A task-specific temporal anchor and maintainer confirmation are required."
+            "Clinical-time calculation does not by itself establish the exact calculation timestamp within the study episode."
           ]
         }
       ],
@@ -8478,7 +8553,7 @@
       "profiles": [
         "open-v2"
       ],
-      "summary": "Dates and linked downstream records describe when events were recorded, but do not by themselves prove when information was available for a task.",
+      "summary": "Open-v2 dates use a consistent per-patient random shift, preserving within-patient ordering and date differences while obscuring absolute calendar dates.",
       "domains": [
         "imaging",
         "pathology",
@@ -8540,33 +8615,20 @@
             "open-v2.release-legend"
           ],
           "caveats": [
-            "Physical date representation does not prove preserved calendar or interval properties."
+            "Absolute calendar values are anonymized and must not be interpreted literally."
           ]
         },
         {
           "id": "anonymization-properties",
-          "statement": "Preserved ordering and interval properties for open-v2 anonymized dates are unresolved in the applicable release evidence.",
-          "status": "unresolved",
+          "statement": "EMBED applies one consistent random date shift per patient across that patient's dates, so within-patient ordering and date differences are reliable while absolute day, month, and year are not.",
+          "status": "verified",
           "sources": [
             "open-v2.release-schema",
             "open-v2.release-legend",
-            "open-v2.catalog-linkage-review"
+            "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Do not transfer date-shift guarantees from a different EMBED representation without verification."
-          ]
-        },
-        {
-          "id": "downstream-availability",
-          "statement": "Pathology, surgery, report revision, recommendation, and risk fields can encode information unavailable at an earlier imaging-time anchor.",
-          "status": "unresolved",
-          "sources": [
-            "open-v2.release-schema",
-            "open-v2.release-legend",
-            "open-v2.catalog-linkage-review"
-          ],
-          "caveats": [
-            "Each task must define and validate its own availability boundary."
+            "Do not compare absolute calendar dates across patients."
           ]
         },
         {
@@ -8580,23 +8642,11 @@
           "caveats": [
             "The wide table's construction remains unresolved."
           ]
-        },
-        {
-          "id": "policy-boundaries",
-          "statement": "Canonical follow-up windows, negative confirmation, interval-cancer handling, screening matching, and ultrasound inclusion remain unresolved policies.",
-          "status": "unresolved",
-          "sources": [
-            "open-v2.catalog-linkage-review"
-          ],
-          "caveats": [
-            "The context catalog intentionally supplies no default values for these policies."
-          ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
-        "This context identifies leakage and interpretation hazards; it does not implement temporal validation.",
-        "Executable cohort and label policies belong in versioned toolkit configuration after review."
+        "Task-specific cohort, follow-up, label, and modality-inclusion choices are analysis policies rather than dataset claims and belong outside this context catalog."
       ]
     }
   }

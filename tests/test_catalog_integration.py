@@ -101,7 +101,7 @@ class CheckedInCatalogTests(unittest.TestCase):
 
         self.assertEqual(cited_sources, set(self.catalog.sources))
 
-    def test_phase_three_context_keeps_scope_and_policy_boundaries(self) -> None:
+    def test_phase_three_context_keeps_scope_and_maintainer_boundaries(self) -> None:
         self.assertEqual(
             {context.scope for context in self.catalog.contexts.values()},
             {"general_clinical", "embed_general", "profile_specific"},
@@ -124,16 +124,67 @@ class CheckedInCatalogTests(unittest.TestCase):
             "open-v2.temporal-availability-context"
         )["context"]
         claims = {claim["id"]: claim for claim in temporal["claims"]}
-        policy = claims["policy-boundaries"]
-        self.assertEqual(policy["status"], "unresolved")
-        for term in (
-            "follow-up windows",
-            "interval-cancer",
-            "screening matching",
-            "ultrasound inclusion",
-        ):
-            with self.subTest(term=term):
-                self.assertIn(term, policy["statement"])
+        anonymization = claims["anonymization-properties"]
+        self.assertEqual(anonymization["status"], "verified")
+        self.assertIn("consistent random date shift", anonymization["statement"])
+        self.assertNotIn("policy-boundaries", claims)
+        self.assertNotIn("downstream-availability", claims)
+
+        linked = self.catalog.get_context(
+            "open-v2.linked-exam-context"
+        )["context"]
+        linked_claims = {
+            claim["id"]: claim for claim in linked["claims"]
+        }
+        self.assertEqual(linked_claims["link-meaning"]["status"], "verified")
+        self.assertIn(
+            "same-episode exam",
+            linked_claims["link-meaning"]["statement"],
+        )
+
+        multimodal = self.catalog.get_context(
+            "open-v2.multimodal-finding-context"
+        )["context"]
+        multimodal_claims = {
+            claim["id"]: claim for claim in multimodal["claims"]
+        }
+        self.assertEqual(
+            multimodal_claims["descriptor-null-semantics"]["status"],
+            "verified",
+        )
+        self.assertNotIn("modality-followup-policy", multimodal_claims)
+
+        pathology = self.catalog.get_context(
+            "open-v2.pathology-procedure-context"
+        )["context"]
+        pathology_claims = {
+            claim["id"]: claim for claim in pathology["claims"]
+        }
+        self.assertEqual(
+            pathology_claims["severity-meaning"]["status"],
+            "verified",
+        )
+        self.assertEqual(
+            pathology_claims["pathology-code-mappings"]["status"],
+            "unresolved",
+        )
+
+        report = self.catalog.get_context("open-v2.report-context")["context"]
+        report_claims = {claim["id"]: claim for claim in report["claims"]}
+        self.assertEqual(
+            report_claims["sequence-meaning"]["status"],
+            "reconciled",
+        )
+        self.assertIn(
+            "minimum represented sequence",
+            report_claims["sequence-meaning"]["statement"],
+        )
+        self.assertEqual(report_claims["addendum-link"]["status"], "unresolved")
+
+        risk = self.catalog.get_context("open-v2.risk-context")["context"]
+        risk_claims = {claim["id"]: claim for claim in risk["claims"]}
+        self.assertEqual(risk_claims["risk-availability"]["status"], "verified")
+        self.assertEqual(risk_claims["risk-semantics"]["status"], "unresolved")
 
     def test_phase_three_requirement_level_context_queries(self) -> None:
         temporal = self.catalog.search_contexts("temporal leakage")
@@ -303,6 +354,10 @@ class CheckedInCatalogTests(unittest.TestCase):
         self.assertEqual(result["meaning"], "Negative")
         self.assertEqual(result["concept"], "imaging.assessment")
 
+        severity = self.catalog.lookup_code("pathology.severity", "0")
+        self.assertEqual(severity["meaning"], "Invasive breast cancer")
+        self.assertEqual(severity["concept"], "pathology.severity")
+
         for vocabulary in self.catalog.vocabularies.values():
             for _, meaning in vocabulary.codes:
                 self.assertNotIn("**", meaning)
@@ -335,15 +390,21 @@ class CheckedInCatalogTests(unittest.TestCase):
             any("mass" in identifier for identifier in mass_identifiers)
         )
 
-    def test_pathology_severity_aggregate_caveats_distinguish_coded_field(self) -> None:
+    def test_pathology_severity_aggregates_share_codes_but_not_derivation(self) -> None:
         for concept_id in (
             "breast_side.pathology_severity_aggregate",
             "exam.pathology_severity_aggregate",
         ):
             with self.subTest(concept=concept_id):
-                caveats = self.catalog.concepts[concept_id].caveats
+                concept = self.catalog.concepts[concept_id]
+                caveats = concept.caveats
+                self.assertEqual(concept.vocabulary, "pathology.severity")
                 self.assertTrue(
-                    any("finding-level coded severity field" in item for item in caveats)
+                    any(
+                        "exact aggregation across procedure-associated"
+                        in item
+                        for item in caveats
+                    )
                 )
                 self.assertTrue(
                     all("finding-level presence flag" not in item for item in caveats)
