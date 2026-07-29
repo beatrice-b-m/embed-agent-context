@@ -123,7 +123,10 @@ locators. A profile filter matches only contexts that explicitly declare that
 profile; profile-independent context is not silently treated as universal.
 Search results contain only the claims that matched claim-level filters or
 text, along with their source details. Workflow stages are trimmed to those
-matching claims so returned references remain internally resolvable.
+matching claims so returned references remain internally resolvable. A context
+matched only through navigation fields such as its title, domain, or search
+terms can therefore have an empty `matching_claims` array and no returned
+sources.
 
 Search scans the in-memory catalog linearly. It considers concept IDs, physical
 names, labels, definitions, search terms, facets, caveats, and vocabulary

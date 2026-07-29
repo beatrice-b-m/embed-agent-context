@@ -1438,7 +1438,7 @@ class Catalog:
                 continue
             matching_claims = (
                 eligible_claims
-                if not query_tokens or context_overlap
+                if not query_tokens
                 else tuple(
                     claim_document
                     for claim_document, overlap in claim_overlaps
@@ -1865,7 +1865,6 @@ class Catalog:
                 claim_text = " ".join(
                     (
                         claim.id,
-                        f"{context.id}.{claim.id}",
                         claim.statement,
                         claim.status,
                         *claim.caveats,

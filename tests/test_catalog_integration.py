@@ -145,6 +145,20 @@ class CheckedInCatalogTests(unittest.TestCase):
             },
         )
 
+        pathology_text = self.catalog.search_contexts("pathology")
+        pathology_context = next(
+            match
+            for match in pathology_text["matches"]
+            if match["identifier"] == "open-v2.pathology-procedure-context"
+        )
+        self.assertNotIn(
+            "finding-versus-biopsy-side",
+            {
+                claim["id"]
+                for claim in pathology_context["matching_claims"]
+            },
+        )
+
         pathology = self.catalog.search_contexts(
             "",
             profile="open-v2",

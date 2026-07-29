@@ -811,6 +811,24 @@ class CatalogQueryTests(unittest.TestCase):
             ["unresolved-units"],
         )
 
+        context_and_claim_text = catalog.search_contexts("density")
+        self.assertEqual(
+            [
+                claim["id"]
+                for claim in context_and_claim_text["matches"][0][
+                    "matching_claims"
+                ]
+            ],
+            ["coded-feature"],
+        )
+
+        context_only_text = catalog.search_contexts("mammography")
+        self.assertEqual(
+            context_only_text["matches"][0]["matching_claims"],
+            [],
+        )
+        self.assertEqual(context_only_text["sources"], {})
+
         by_status = catalog.search_contexts("", status="verified")
         self.assertEqual(
             [
