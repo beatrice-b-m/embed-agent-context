@@ -114,12 +114,14 @@ An MCP client configuration can invoke it from any working directory:
 }
 ```
 
-The server exposes three read-only structured-output tools:
-`get_feature`, `search_features`, and `lookup_code`. It writes MCP protocol
-messages only to stdout; startup errors and diagnostics go to stderr. The
-search tool's input schema enumerates the controlled grain, domain, and feature
-kind filters, while its description lists the profiles and tables present in
-the loaded catalog.
+The server exposes six read-only structured-output tools: `get_feature`,
+`search_features`, `lookup_code`, `get_table`, `get_relationship`, and
+`search_relationships`. It writes MCP protocol messages only to stdout;
+startup errors and diagnostics go to stderr. Search schemas enumerate their
+controlled feature or relationship filters, while descriptions list the
+profiles and tables present in the loaded catalog. Relationship results are
+descriptive metadata; clients must honor their optionality, cardinality,
+caveats, and join hazards rather than treating them as executable joins.
 
 ## Maintainer verification
 

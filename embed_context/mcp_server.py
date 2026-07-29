@@ -12,12 +12,13 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from .catalog import DOMAINS, FEATURE_KINDS, GRAINS
+from .catalog import DOMAINS, FEATURE_KINDS, GRAINS, RELATIONSHIP_KINDS
 
 
 GrainFilter = Literal[*GRAINS]
 DomainFilter = Literal[*DOMAINS]
 FeatureKindFilter = Literal[*FEATURE_KINDS]
+RelationshipKindFilter = Literal[*RELATIONSHIP_KINDS]
 
 
 MCP_INSTALL_HINT = (
@@ -28,6 +29,21 @@ MCP_INSTALL_HINT = (
 
 class CatalogProtocol(Protocol):
     """Catalog operations exposed through the protocol adapter."""
+
+    def get_table(self, profile: str, table: str) -> dict[str, Any]: ...
+
+    def get_relationship(self, identifier: str) -> dict[str, Any]: ...
+
+    def search_relationships(
+        self,
+        *,
+        profile: str | None = None,
+        table: str | None = None,
+        source_table: str | None = None,
+        target_table: str | None = None,
+        kind: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]: ...
 
     def get_feature(
         self, identifier: str, *, include_codes: bool = False
@@ -102,12 +118,14 @@ def build_server(catalog: CatalogProtocol) -> Any:
     filter_description = _catalog_filter_description(catalog)
     server = MCPServer(
         "embed-v2-feature-context",
-        description="Read-only EMBED V2 feature metadata lookup",
-        version="0.1.0",
+        description="Read-only EMBED V2 feature and table-linkage metadata lookup",
+        version="0.2.0",
         instructions=(
-            "Use these read-only tools for EMBED V2 feature meanings, evidence, "
-            "caveats, and coded values. The catalog does not provide clinical "
-            "rows, report text, a complete join specification, or clinical advice. "
+            "Use these read-only tools for EMBED V2 feature meanings, table "
+            "linkages, evidence, caveats, join hazards, and coded values. "
+            "Relationships are descriptive metadata, not executable joins; honor "
+            "their documented optionality, cardinality, and hazards. The catalog "
+            "does not provide clinical rows, report text, or clinical advice. "
             f"Search filters — {filter_description}."
         ),
     )
@@ -158,6 +176,47 @@ def build_server(catalog: CatalogProtocol) -> Any:
         """Look up a code using a vocabulary ID, concept ID, or physical feature."""
 
         return catalog.lookup_code(feature_or_vocabulary, code)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_table(profile: str, table: str) -> dict[str, Any]:
+        """Get one profile-specific table, its keys, and incident relationships."""
+
+        return catalog.get_table(profile, table)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_relationship(identifier: str) -> dict[str, Any]:
+        """Get one table relationship by its stable identifier."""
+
+        return catalog.get_relationship(identifier)
+
+    @server.tool(
+        annotations=read_only,
+        structured_output=True,
+        description=(
+            "Filter table relationships by profile, either endpoint table, "
+            "directional endpoint table, and/or relationship kind. Valid "
+            f"relationship kinds: {', '.join(sorted(RELATIONSHIP_KINDS))}; "
+            f"catalog filters — {filter_description}."
+        ),
+    )
+    def search_relationships(
+        profile: str | None = None,
+        table: str | None = None,
+        source_table: str | None = None,
+        target_table: str | None = None,
+        kind: RelationshipKindFilter | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Filter structured table relationships without executing joins."""
+
+        return catalog.search_relationships(
+            profile=profile,
+            table=table,
+            source_table=source_table,
+            target_table=target_table,
+            kind=kind,
+            limit=limit,
+        )
 
     return server
 

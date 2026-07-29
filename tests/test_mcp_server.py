@@ -102,6 +102,63 @@ class FakeCatalog:
             "meaning": "Synthetic code",
         }
 
+    def get_table(self, profile: str, table: str) -> dict[str, Any]:
+        self.calls.append(
+            (
+                "get_table",
+                {
+                    "profile": profile,
+                    "table": table,
+                },
+            )
+        )
+        return {
+            "kind": "table",
+            "identifier": f"{profile}:{table}",
+        }
+
+    def get_relationship(self, identifier: str) -> dict[str, Any]:
+        self.calls.append(
+            (
+                "get_relationship",
+                {"identifier": identifier},
+            )
+        )
+        return {
+            "kind": "relationship",
+            "identifier": identifier,
+        }
+
+    def search_relationships(
+        self,
+        *,
+        profile: str | None = None,
+        table: str | None = None,
+        source_table: str | None = None,
+        target_table: str | None = None,
+        kind: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        arguments = {
+            "profile": profile,
+            "table": table,
+            "source_table": source_table,
+            "target_table": target_table,
+            "kind": kind,
+            "limit": limit,
+        }
+        self.calls.append(("search_relationships", arguments))
+        return {
+            "filters": {
+                name: value
+                for name, value in arguments.items()
+                if name != "limit"
+            },
+            "count": 1,
+            "total": 1,
+            "matches": [{"id": "synthetic.relationship"}],
+        }
+
 
 class MissingMCPDependencyTests(unittest.TestCase):
     def test_module_entry_point_reports_missing_extra_on_stderr(self) -> None:
@@ -166,7 +223,14 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             {tool.name for tool in result.tools},
-            {"get_feature", "search_features", "lookup_code"},
+            {
+                "get_feature",
+                "search_features",
+                "lookup_code",
+                "get_table",
+                "get_relationship",
+                "search_relationships",
+            },
         )
         for tool in result.tools:
             self.assertTrue(tool.annotations.read_only_hint)
@@ -195,6 +259,25 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             set(schemas["lookup_code"]["properties"]),
             {"feature_or_vocabulary", "code"},
         )
+        self.assertEqual(
+            set(schemas["get_table"]["properties"]),
+            {"profile", "table"},
+        )
+        self.assertEqual(
+            set(schemas["get_relationship"]["properties"]),
+            {"identifier"},
+        )
+        self.assertEqual(
+            set(schemas["search_relationships"]["properties"]),
+            {
+                "profile",
+                "table",
+                "source_table",
+                "target_table",
+                "kind",
+                "limit",
+            },
+        )
         search_properties = schemas["search_features"]["properties"]
         self.assertIn("pathology_finding", schema_enums(search_properties["grain"]))
         self.assertIn(
@@ -204,6 +287,11 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(
             "model_output",
             schema_enums(search_properties["feature_kind"]),
+        )
+        relationship_properties = schemas["search_relationships"]["properties"]
+        self.assertEqual(
+            schema_enums(relationship_properties["kind"]),
+            {"hierarchy", "reference", "projection"},
         )
 
     async def test_get_feature_returns_structured_content(self) -> None:
@@ -302,6 +390,92 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
+    async def test_get_table_returns_core_result_unchanged(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "get_table",
+                {
+                    "profile": "open-v2",
+                    "table": "synthetic_table",
+                },
+            )
+
+        self.assertFalse(result.is_error)
+        self.assertEqual(
+            result.structured_content,
+            {
+                "kind": "table",
+                "identifier": "open-v2:synthetic_table",
+            },
+        )
+        self.assertEqual(
+            self.catalog.calls[-1],
+            (
+                "get_table",
+                {
+                    "profile": "open-v2",
+                    "table": "synthetic_table",
+                },
+            ),
+        )
+
+    async def test_get_relationship_returns_core_result_unchanged(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "get_relationship",
+                {"identifier": "synthetic.relationship"},
+            )
+
+        self.assertFalse(result.is_error)
+        self.assertEqual(
+            result.structured_content,
+            {
+                "kind": "relationship",
+                "identifier": "synthetic.relationship",
+            },
+        )
+        self.assertEqual(
+            self.catalog.calls[-1],
+            (
+                "get_relationship",
+                {"identifier": "synthetic.relationship"},
+            ),
+        )
+
+    async def test_search_relationships_returns_core_result_unchanged(self) -> None:
+        arguments = {
+            "profile": "open-v2",
+            "table": "exam_level_anon",
+            "source_table": "combined_anon",
+            "target_table": "exam_level_anon",
+            "kind": "projection",
+            "limit": 3,
+        }
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "search_relationships",
+                arguments,
+            )
+
+        self.assertFalse(result.is_error)
+        self.assertEqual(
+            result.structured_content,
+            {
+                "filters": {
+                    name: value
+                    for name, value in arguments.items()
+                    if name != "limit"
+                },
+                "count": 1,
+                "total": 1,
+                "matches": [{"id": "synthetic.relationship"}],
+            },
+        )
+        self.assertEqual(
+            self.catalog.calls[-1],
+            ("search_relationships", arguments),
+        )
+
     async def test_invalid_limit_from_core_is_a_tool_error(self) -> None:
         server = build_server(load_catalog())
         async with Client(server) as client:
@@ -317,6 +491,16 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             result = await client.call_tool(
                 "search_features",
                 {"query": "density", "grain": "not-a-grain"},
+            )
+
+        self.assertTrue(result.is_error)
+        self.assertEqual(self.catalog.calls, [])
+
+    async def test_invalid_relationship_kind_is_a_schema_error(self) -> None:
+        async with Client(self.server) as client:
+            result = await client.call_tool(
+                "search_relationships",
+                {"kind": "foreign_key"},
             )
 
         self.assertTrue(result.is_error)
@@ -343,6 +527,19 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("profiles in this catalog: open-v2", search.description)
         self.assertIn("tables in this catalog:", search.description)
         self.assertIn("pathology_findings_anon", search.description)
+        relationship_search = next(
+            tool
+            for tool in result.tools
+            if tool.name == "search_relationships"
+        )
+        self.assertIn(
+            "hierarchy, projection, reference",
+            relationship_search.description,
+        )
+        self.assertIn(
+            "profiles in this catalog: open-v2",
+            relationship_search.description,
+        )
 
     async def test_all_tools_query_the_checked_in_catalog(self) -> None:
         server = build_server(load_catalog())
@@ -362,6 +559,24 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     "code": "N",
                 },
             )
+            table = await client.call_tool(
+                "get_table",
+                {
+                    "profile": "open-v2",
+                    "table": "exam_level_anon",
+                },
+            )
+            relationship = await client.call_tool(
+                "get_relationship",
+                {"identifier": "open-v2.exam_level_anon.patient"},
+            )
+            relationships = await client.call_tool(
+                "search_relationships",
+                {
+                    "table": "exam_level_anon",
+                    "kind": "hierarchy",
+                },
+            )
 
         self.assertFalse(feature.is_error)
         self.assertEqual(
@@ -377,6 +592,25 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("demographics.race", identifiers)
         self.assertFalse(code.is_error)
         self.assertEqual(code.structured_content["meaning"], "Negative")
+        self.assertFalse(table.is_error)
+        self.assertEqual(
+            table.structured_content["identifier"],
+            "open-v2:exam_level_anon",
+        )
+        self.assertTrue(
+            table.structured_content["relationships"]["outgoing"]
+        )
+        self.assertFalse(relationship.is_error)
+        self.assertEqual(
+            relationship.structured_content["relationship"]["kind"],
+            "hierarchy",
+        )
+        self.assertFalse(relationships.is_error)
+        relationship_ids = {
+            match["id"]
+            for match in relationships.structured_content["matches"]
+        }
+        self.assertIn("open-v2.exam_level_anon.patient", relationship_ids)
 
 
 if __name__ == "__main__":
