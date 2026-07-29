@@ -132,6 +132,11 @@ source matches a documented key, `required` source completeness cannot
 contradict an incomplete key and `optional` source completeness cannot
 contradict a complete key.
 
+Key and relationship IDs and profile references use the stable lowercase
+identifier grammar and cannot contain trailing line terminators. Phase 2
+caveat and join-hazard entries must contain at least one non-whitespace
+character.
+
 A relationship claiming at least one target per source must declare the source
 endpoint `required`. A relationship claiming at most one target must point to a
 candidate key documented as unique; the reciprocal at-most-one-source claim

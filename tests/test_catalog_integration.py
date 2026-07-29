@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -316,6 +317,38 @@ class CheckedInCatalogTests(unittest.TestCase):
                 self.assertEqual(
                     set(definitions[definition]["required"]), required
                 )
+
+    def test_phase_two_schema_strings_match_core_validation(self) -> None:
+        schema = json.loads(
+            (REPO_ROOT / "catalog/catalog.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        definitions = schema["$defs"]
+        identifier_schemas = (
+            definitions["key"]["properties"]["id"],
+            definitions["table"]["properties"]["profile"],
+            definitions["relationship"]["properties"]["id"],
+            definitions["relationship"]["properties"]["profile"],
+        )
+        for identifier_schema in identifier_schemas:
+            pattern = identifier_schema["pattern"]
+            with self.subTest(pattern=pattern):
+                self.assertIsNotNone(re.search(pattern, "open-v2.valid_id"))
+                for invalid in ("open-v2.valid_id\n", "Open-v2", " "):
+                    self.assertIsNone(re.search(pattern, invalid))
+
+        nonblank_schemas = (
+            definitions["key"]["properties"]["caveats"]["items"],
+            definitions["table"]["properties"]["caveats"]["items"],
+            definitions["relationship"]["properties"]["caveats"]["items"],
+            definitions["relationship"]["properties"]["join_hazards"]["items"],
+        )
+        for string_schema in nonblank_schemas:
+            pattern = string_schema["pattern"]
+            with self.subTest(pattern=pattern):
+                self.assertIsNotNone(re.search(pattern, "Documented caveat."))
+                self.assertIsNone(re.search(pattern, " \t\n"))
 
 
 if __name__ == "__main__":

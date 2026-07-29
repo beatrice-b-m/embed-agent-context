@@ -377,7 +377,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_.-]*$"
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
         },
         "columns": {
           "type": "array",
@@ -422,7 +422,8 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         }
       }
@@ -440,7 +441,7 @@
       "properties": {
         "profile": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_.-]*$"
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
         },
         "table": {
           "type": "string",
@@ -470,7 +471,8 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         }
       }
@@ -575,11 +577,11 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_.-]*$"
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
         },
         "profile": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_.-]*$"
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
         },
         "kind": {
           "enum": [
@@ -610,7 +612,8 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
         "join_hazards": {
@@ -618,7 +621,8 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         }
       }
