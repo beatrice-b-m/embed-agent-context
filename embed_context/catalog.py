@@ -3776,6 +3776,15 @@ def _validate_catalog(
                 f"source_concept {aggregation.source_concept!r}"
             )
         if (
+            aggregation.source_object
+            not in concepts[aggregation.source_concept].objects
+        ):
+            raise CatalogValidationError(
+                f"aggregation {aggregation.id!r} source_concept "
+                f"{aggregation.source_concept!r} does not belong to "
+                f"source_object {aggregation.source_object!r}"
+            )
+        if (
             aggregation.result_concept is not None
             and aggregation.result_concept not in concepts
         ):
@@ -3857,6 +3866,25 @@ def _validate_catalog(
             raise CatalogValidationError(
                 f"temporal semantic {temporal.id!r} has no feature_refs and "
                 "requires unsupported or unresolved coverage"
+            )
+        generally_covered = any(
+            record.scope in {"general_clinical", "embed_general"}
+            for record in qualifying
+        )
+        covered_profiles = {
+            profile
+            for record in qualifying
+            if record.scope == "profile_specific"
+            for profile in record.profiles
+        }
+        missing_profiles = (
+            [] if generally_covered else sorted(profiles - covered_profiles)
+        )
+        if missing_profiles:
+            raise CatalogValidationError(
+                f"temporal semantic {temporal.id!r} has no feature_refs and "
+                "lacks unsupported or unresolved coverage for profiles: "
+                + ", ".join(missing_profiles)
             )
 
     for guardrail in guardrails.values():
@@ -4178,10 +4206,12 @@ def _validate_profile_bindings(
                     f"{profile_id}:{binding.table}"
                 )
             seen_object_bindings.add(identity)
-            _validate_claim_refs(
-                binding.claim_refs,
-                claims,
-                f"object binding {profile_id}:{binding.table}",
+            _validate_scoped_claim_refs(
+                scope="profile_specific",
+                profiles=(profile_id,),
+                references=binding.claim_refs,
+                claims=claims,
+                label=f"object binding {profile_id}:{binding.table}",
             )
 
         for relationship in profile.relationship_bindings:
@@ -4200,10 +4230,12 @@ def _validate_profile_bindings(
                     "unknown semantic relationships: "
                     + ", ".join(missing_semantic)
                 )
-            _validate_claim_refs(
-                relationship.claim_refs,
-                claims,
-                f"relationship binding {relationship.id!r}",
+            _validate_scoped_claim_refs(
+                scope="profile_specific",
+                profiles=(profile_id,),
+                references=relationship.claim_refs,
+                claims=claims,
+                label=f"relationship binding {relationship.id!r}",
             )
             _validate_physical_relationship(
                 relationship, columns_by_table, tables_by_name

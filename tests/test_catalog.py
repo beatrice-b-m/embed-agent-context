@@ -248,6 +248,15 @@ class CatalogLoaderTests(unittest.TestCase):
             data, "has no feature_refs.*unsupported or unresolved coverage"
         )
 
+        data = cloned_catalog()
+        data["coverage"]["specimen-time.profile-support"]["profiles"] = [
+            "profile-a"
+        ]
+        self.assert_invalid(
+            data,
+            "lacks unsupported or unresolved coverage for profiles: profile-b",
+        )
+
     def test_aggregation_status_controls_result_feature(self) -> None:
         data = cloned_catalog()
         data["aggregations"]["pathology.severity-to-exam"][
@@ -268,6 +277,12 @@ class CatalogLoaderTests(unittest.TestCase):
             "result_concept"
         ] = "identity.patient_identifier"
         self.assert_invalid(data, "does not belong to target_object")
+
+        data = cloned_catalog()
+        data["aggregations"]["pathology.severity-to-exam"][
+            "source_concept"
+        ] = "identity.patient_identifier"
+        self.assert_invalid(data, "does not belong to source_object")
 
         data = cloned_catalog()
         data["aggregations"]["pathology.severity-to-exam"][
@@ -359,6 +374,38 @@ class CatalogLoaderTests(unittest.TestCase):
             "object"
         ] = "unknown.object"
         self.assert_invalid(data, "unknown clinical object")
+
+    def test_binding_claims_must_apply_to_the_containing_profile(self) -> None:
+        data = cloned_catalog()
+        context = data["contexts"]["profiles.profile-b-only"] = dict(
+            data["contexts"]["profiles.synthetic"]
+        )
+        context["profiles"] = ["profile-b"]
+        context["related_tables"] = [
+            table
+            for table in context["related_tables"]
+            if table["profile"] == "profile-b"
+        ]
+        data["profile_bindings"]["profile-a"]["object_bindings"][0][
+            "claim_refs"
+        ] = ["profiles.profile-b-only#severity-binding"]
+        self.assert_invalid(data, "claim.*outside selected profiles")
+
+        data = cloned_catalog()
+        context = data["contexts"]["profiles.profile-a-only"] = dict(
+            data["contexts"]["profiles.synthetic"]
+        )
+        context["profiles"] = ["profile-a"]
+        context["related_tables"] = [
+            table
+            for table in context["related_tables"]
+            if table["profile"] == "profile-a"
+        ]
+        context["related_relationships"] = []
+        data["profile_bindings"]["profile-b"]["relationship_bindings"][0][
+            "claim_refs"
+        ] = ["profiles.profile-a-only#severity-binding"]
+        self.assert_invalid(data, "claim.*outside selected profiles")
 
     def test_relationship_binding_semantics_columns_types_and_keys_are_validated(
         self,

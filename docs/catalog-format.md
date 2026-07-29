@@ -172,7 +172,10 @@ Exam study time, procedure time, specimen collection time, pathology report
 time, and data availability answer different questions. A profile can mark a
 clinically meaningful time as unsupported through `coverage`; absence of a
 binding must not cause the catalog to invent a date. The catalog does not
-designate any candidate as a universal diagnosis date.
+designate any candidate as a universal diagnosis date. A temporal semantic
+without `feature_refs` must have `unsupported` or `unresolved` coverage for
+every declared profile, either through profile-specific records or one
+applicable general record.
 
 ### Aggregations
 
@@ -191,7 +194,9 @@ requires an analysis-specific policy. `unsupported` records that the catalog or
 selected representation does not supply the transition. `unresolved` preserves
 insufficient evidence. A null `result_concept` is explicit: it means there is
 no registered result feature for that transition, not that a default should be
-calculated.
+calculated. The source concept must belong to the source object, and any result
+concept must belong to the target object; validation rejects cross-grain
+transitions whose feature ownership contradicts their declared endpoints.
 
 Aggregation status describes the registered semantic transition, not support
 in every profile. A selected profile supports a supplied transition only when
@@ -302,7 +307,9 @@ claim references, and caveats. The controlled representations are:
 
 `columns` may be empty when the table-level row representation is the relevant
 claim. An object binding does not imply that the object has a unique row or
-that every object instance is captured.
+that every object instance is captured. Its claim references must apply to the
+containing profile; evidence scoped only to another release or layout cannot
+substantiate the binding.
 
 ### Tables and physical relationship bindings
 
@@ -330,6 +337,8 @@ equal arity and compatible physical types, and respect documented key
 uniqueness and completeness. Hierarchy cycles are invalid; reference and
 projection cycles can be legitimate. These checks do not prove clinical
 capture, attribution completeness, or temporal co-availability.
+Relationship-binding claim references are also constrained to evidence
+applicable to the containing profile.
 
 The footer-only source-profile verifier checks the table, column, type, and
 schema-nullability surface derived from feature bindings. It does not scan
