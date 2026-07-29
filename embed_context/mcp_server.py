@@ -91,6 +91,7 @@ class CatalogProtocol(Protocol):
         source_table: str | None = None,
         target_table: str | None = None,
         kind: str | None = None,
+        semantic_relationship: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]: ...
 
@@ -170,6 +171,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
                 "physical relationship kinds: "
                 f"{', '.join(_RELATIONSHIP_BINDING_KIND_VALUES)}"
             ),
+            "semantic_relationship: stable portable relationship ID",
             catalog_scope,
         )
         if part
@@ -321,6 +323,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
         source_table: str | None = None,
         target_table: str | None = None,
         kind: RelationshipBindingKindFilter | None = None,
+        semantic_relationship: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
         """Filter physical relationship bindings without executing joins."""
@@ -331,6 +334,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
             source_table=source_table,
             target_table=target_table,
             kind=kind,
+            semantic_relationship=semantic_relationship,
             limit=limit,
         )
 

@@ -134,6 +134,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--kind",
         choices=sorted(RELATIONSHIP_BINDING_KINDS),
     )
+    relationships_parser.add_argument(
+        "--semantic-relationship",
+        help="match bindings linked to this portable semantic relationship ID",
+    )
     relationships_parser.add_argument("--limit", type=int, default=50)
     return parser
 
@@ -212,6 +216,7 @@ def _run_command(catalog: Any, args: argparse.Namespace) -> dict[str, Any]:
             source_table=args.source_table,
             target_table=args.target_table,
             kind=args.kind,
+            semantic_relationship=args.semantic_relationship,
             limit=args.limit,
         )
     raise AssertionError(f"unsupported command {args.command!r}")

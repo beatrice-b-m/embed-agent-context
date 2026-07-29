@@ -174,6 +174,7 @@ class FakeCatalog:
         source_table: str | None = None,
         target_table: str | None = None,
         kind: str | None = None,
+        semantic_relationship: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
         arguments = {
@@ -182,6 +183,7 @@ class FakeCatalog:
             "source_table": source_table,
             "target_table": target_table,
             "kind": kind,
+            "semantic_relationship": semantic_relationship,
             "limit": limit,
         }
         self.calls.append(("search_relationship_bindings", arguments))
@@ -318,6 +320,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 "source_table",
                 "target_table",
                 "kind",
+                "semantic_relationship",
                 "limit",
             },
         }
@@ -463,6 +466,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             "source_table": "exam_level_anon",
             "target_table": "clinical_data_anon",
             "kind": "hierarchy",
+            "semantic_relationship": "clinical.exam-patient",
             "limit": 3,
         }
         async with Client(self.server) as client:

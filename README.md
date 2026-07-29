@@ -139,12 +139,14 @@ uv run --locked --no-dev python -m embed_context profile-table \
 uv run --locked --no-dev python -m embed_context relationship-binding \
   open-v2.pathology_findings_anon.imaging_finding
 uv run --locked --no-dev python -m embed_context relationship-bindings \
-  --profile open-v2 --table pathology_findings_anon
+  --profile open-v2 \
+  --semantic-relationship clinical.finding-pathology-observation
 ```
 
 Physical relationship bindings are descriptive metadata, not executable joins.
 Callers must honor their optionality, cardinality, evidence, caveats, and join
-hazards.
+hazards. They can be filtered by profile, endpoint table, physical relationship
+kind, or linked portable semantic relationship ID.
 
 Place `--format json` before the subcommand for a stable machine-readable
 envelope:
