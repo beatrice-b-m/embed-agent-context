@@ -1221,10 +1221,6 @@ class Catalog:
         return BINDING_GRAINS
 
     @property
-    def grains(self) -> tuple[str, ...]:
-        return BINDING_GRAINS
-
-    @property
     def feature_kinds(self) -> tuple[str, ...]:
         return FEATURE_KINDS
 

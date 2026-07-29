@@ -125,8 +125,9 @@ Object-to-table representation is new at
 `profile` field; the reader adds profile identity to query results.
 
 The Python core removes the ambiguous v4 compatibility properties and methods
-`catalog.bindings`, `catalog.tables`, `catalog.relationships`, `get_table`,
-`get_relationship`, `search_relationships`, and `get_context`. Use
+`catalog.bindings`, `catalog.tables`, `catalog.relationships`,
+`catalog.grains`, `get_table`, `get_relationship`, `search_relationships`, and
+`get_context`. Use `binding_grains` for the physical grain vocabulary and
 `profile_bindings` for the authoritative nested layer. Explicit flattened
 secondary views are available as `feature_bindings`, `object_bindings`,
 `profile_tables`, and `relationship_bindings`; exact queries use the v5 method

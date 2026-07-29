@@ -52,6 +52,7 @@ class CatalogLoaderTests(unittest.TestCase):
         self.assertEqual(len(catalog.object_bindings), 6)
         self.assertEqual(len(catalog.relationship_bindings), 1)
         self.assertNotIn("analysis_patterns", catalog.summary())
+        self.assertFalse(hasattr(catalog, "grains"))
         with self.assertRaises(TypeError):
             catalog.concepts["new"] = catalog.concepts["exam.study_date"]
         with self.assertRaises(FrozenInstanceError):
