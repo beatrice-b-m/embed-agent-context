@@ -3,6 +3,7 @@
 Schema version 5 is intentionally breaking. Version 4 readers must reject a
 version 5 catalog, and the version 5 reader reports an explicit migration
 error for version 4 input rather than silently reinterpreting it.
+The project package version advances from `0.1.0` to `0.2.0` at this boundary.
 
 ## Collection changes
 

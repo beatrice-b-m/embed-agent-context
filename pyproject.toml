@@ -1,6 +1,6 @@
 [project]
 name = "embedv2-agent-context"
-version = "0.1.0"
+version = "0.2.0"
 description = "Count-free clinical-semantic context for EMBED data"
 requires-python = ">=3.12,<3.14"
 dependencies = []
