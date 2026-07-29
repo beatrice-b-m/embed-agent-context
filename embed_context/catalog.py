@@ -1704,7 +1704,7 @@ class Catalog:
                     and item.subject == identifier
                 ),
                 "object_bindings": [
-                    item.to_dict()
+                    self._object_binding_result(item)
                     for item in self.object_bindings
                     if item.object == identifier
                 ],
@@ -1962,7 +1962,7 @@ class Catalog:
                 and item.table == normalized_table
             ],
             "object_bindings": [
-                item.to_dict()
+                self._object_binding_result(item)
                 for item in self.object_bindings
                 if item.profile == normalized_profile
                 and item.table == normalized_table
@@ -1989,6 +1989,16 @@ class Catalog:
                 for item in entity.semantic_relationships
             ],
             "provenance": self._provenance(entity.claim_refs),
+        }
+
+    def _object_binding_result(
+        self, binding: ObjectBinding
+    ) -> dict[str, Any]:
+        """Resolve evidence where a binding has no standalone exact getter."""
+
+        return {
+            **binding.to_dict(),
+            "provenance": self._provenance(binding.claim_refs),
         }
 
     def search_relationship_bindings(
@@ -2733,7 +2743,7 @@ class Catalog:
                 if item.profile == profile and item.concept in feature_ids
             ],
             "object_bindings": [
-                item.to_dict()
+                self._object_binding_result(item)
                 for item in self.object_bindings
                 if item.profile == profile and item.object in object_ids
             ],

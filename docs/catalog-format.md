@@ -309,7 +309,9 @@ claim references, and caveats. The controlled representations are:
 claim. An object binding does not imply that the object has a unique row or
 that every object instance is captured. Its claim references must apply to the
 containing profile; evidence scoped only to another release or layout cannot
-substantiate the binding.
+substantiate the binding. Because object bindings have no standalone stable ID
+or exact getter, object, discovery, and profile-table responses resolve each
+binding's claims, contexts, and sources in an embedded `provenance` section.
 
 ### Tables and physical relationship bindings
 

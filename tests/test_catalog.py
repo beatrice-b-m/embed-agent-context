@@ -479,6 +479,15 @@ class CatalogQueryTests(unittest.TestCase):
         self.assertIn(
             "embed.semantic-source", result["provenance"]["sources"]
         )
+        for binding in result["related"]["object_bindings"]:
+            self.assertEqual(
+                binding["provenance"]["claims"][0]["id"],
+                "profiles.synthetic#severity-binding",
+            )
+            self.assertIn(
+                "profiles.synthetic-schema",
+                binding["provenance"]["sources"],
+            )
 
     def test_feature_getter_resolves_concept_and_profile_physical_names(
         self,
@@ -608,6 +617,11 @@ class CatalogQueryTests(unittest.TestCase):
         self.assertEqual(result["kind"], "profile_table")
         self.assertEqual(len(result["feature_bindings"]), 4)
         self.assertEqual(len(result["object_bindings"]), 2)
+        for binding in result["object_bindings"]:
+            self.assertEqual(
+                binding["provenance"]["contexts"][0]["profiles"],
+                ["profile-a", "profile-b"],
+            )
         self.assertEqual(
             len(result["relationship_bindings"]["outgoing"]), 1
         )

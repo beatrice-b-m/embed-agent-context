@@ -483,6 +483,18 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             bound["matches"][0]["implementation_bindings"]["profile"],
             "open-v2",
         )
+        object_match = self.catalog.discover(
+            "imaging finding",
+            profile="open-v2",
+            kinds=["clinical_object"],
+        )["matches"][0]
+        object_bindings = object_match["implementation_bindings"][
+            "object_bindings"
+        ]
+        self.assertTrue(object_bindings)
+        self.assertTrue(
+            all(binding["provenance"]["claims"] for binding in object_bindings)
+        )
 
     def test_repository_source_locators_exist_and_are_not_self_citing(
         self,

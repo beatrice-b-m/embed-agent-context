@@ -146,7 +146,10 @@ uv run --locked --no-dev python -m embed_context relationship-bindings \
 Physical relationship bindings are descriptive metadata, not executable joins.
 Callers must honor their optionality, cardinality, evidence, caveats, and join
 hazards. They can be filtered by profile, endpoint table, physical relationship
-kind, or linked portable semantic relationship ID.
+kind, or linked portable semantic relationship ID. Object bindings returned by
+object discovery, exact object lookup, or `profile-table` include resolved
+claim, context, and source provenance; exact relationship-binding lookup
+resolves the same evidence layers.
 
 Place `--format json` before the subcommand for a stable machine-readable
 envelope:
