@@ -77,7 +77,7 @@
   "concepts": {
     "breast_side.architectural_distortion_aggregate": {
       "label": "Side-level architectural distortion aggregate",
-      "definition": "Breast-side-level count-like architectural-distortion aggregate.",
+      "definition": "Breast-side-level Boolean summary of mammography finding-level architectural-distortion presence.",
       "feature_kind": "aggregate",
       "domains": [
         "breast_side",
@@ -88,17 +88,17 @@
         "arch_distortion_side_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "breast_side.asymmetry_aggregate": {
       "label": "Side-level asymmetry aggregate",
-      "definition": "Breast-side-level count-like asymmetry aggregate.",
+      "definition": "Breast-side-level Boolean summary of mammography finding-level asymmetry presence.",
       "feature_kind": "aggregate",
       "domains": [
         "breast_side",
@@ -109,17 +109,17 @@
         "asymmetry_side_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "breast_side.calcification_aggregate": {
       "label": "Side-level calcification aggregate",
-      "definition": "Breast-side-level count-like calcification aggregate.",
+      "definition": "Breast-side-level Boolean summary of mammography finding-level calcification presence.",
       "feature_kind": "aggregate",
       "domains": [
         "breast_side",
@@ -130,17 +130,17 @@
         "calc_side_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "breast_side.mass_aggregate": {
       "label": "Side-level mass aggregate",
-      "definition": "Breast-side-level count-like mass aggregate.",
+      "definition": "Breast-side-level Boolean summary of mammography finding-level mass presence.",
       "feature_kind": "aggregate",
       "domains": [
         "breast_side",
@@ -151,17 +151,17 @@
         "mass_side_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "breast_side.pathology_severity_aggregate": {
       "label": "Side-level pathology severity aggregate",
-      "definition": "Breast-side-level coded pathology-severity aggregate.",
+      "definition": "Minimum, and therefore most severe, pathology-severity value among procedure-associated pathology records in the breast-side aggregate group.",
       "feature_kind": "aggregate",
       "domains": [
         "breast_side",
@@ -172,13 +172,12 @@
         "path_severity_side_level"
       ],
       "caveats": [
-        "This level-specific field uses the inverse pathology-severity groups, but its exact aggregation across procedure-associated pathology records is unresolved."
+        "Pathology severity uses inverse ordering, so the minimum value is the most severe."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "maintainer_confirmed",
-        "unresolved"
+        "maintainer_confirmed"
       ],
       "vocabulary": "pathology.severity"
     },
@@ -195,18 +194,19 @@
         "laterality"
       ],
       "caveats": [
-        "Null-side semantics and the relationship of bilateral rows to left and right rows are unresolved."
+        "For a side attached to a clinical finding, null represents a bilateral finding.",
+        "Outside the finding-side context, null generally represents unknown laterality; in particular, a null biopsy or procedure side must not be interpreted as bilateral."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
-        "unresolved"
+        "maintainer_confirmed"
       ],
       "vocabulary": "breast.side"
     },
     "demographics.age_at_exam": {
       "label": "Anonymized age at exam",
-      "definition": "Numeric field whose name suggests age at the exam.",
+      "definition": "Age in years at the exam, calculated from the consistently shifted patient birth date and study date.",
       "feature_kind": "numeric",
       "domains": [
         "demographics",
@@ -219,17 +219,17 @@
         "age at study"
       ],
       "caveats": [
-        "Unit and anonymization behavior are not confirmed."
+        "Age is otherwise unchanged, but values greater than or equal to 90 are top-coded to 89 for deidentification.",
+        "Values such as zero are data-quality errors, not documented sentinel codes."
       ],
       "evidence": [
         "release_schema",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "demographics.age_at_menarche": {
       "label": "Anonymized menarche age",
-      "definition": "Numeric field whose name suggests age at menarche.",
+      "definition": "Age at menarche in years.",
       "feature_kind": "numeric",
       "domains": [
         "demographics",
@@ -240,17 +240,17 @@
         "menarcheage_anon"
       ],
       "caveats": [
-        "Unit and zero semantics are unresolved."
+        "Values such as zero are data-quality errors, not documented sentinel codes."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "demographics.age_at_menopause": {
       "label": "Anonymized menopause age",
-      "definition": "Numeric field whose name suggests age at menopause.",
+      "definition": "Age at menopause in years.",
       "feature_kind": "numeric",
       "domains": [
         "demographics",
@@ -261,17 +261,17 @@
         "menopauseage_anon"
       ],
       "caveats": [
-        "Unit and zero semantics are unresolved."
+        "Values such as zero are data-quality errors, not documented sentinel codes."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "demographics.age_at_pregnancy": {
       "label": "Anonymized pregnancy age",
-      "definition": "Numeric field whose name suggests age associated with an unspecified pregnancy event.",
+      "definition": "Age in years associated with an unspecified pregnancy event.",
       "feature_kind": "numeric",
       "domains": [
         "demographics",
@@ -282,17 +282,19 @@
         "pregnancyage_anon"
       ],
       "caveats": [
-        "The pregnancy event, unit, and zero semantics are unresolved."
+        "The represented pregnancy event is unresolved.",
+        "Values such as zero are data-quality errors, not documented sentinel codes."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
     "demographics.ashkenazi_indicator": {
       "label": "Ashkenazi ancestry indicator",
-      "definition": "Field whose name suggests an Ashkenazi ancestry indicator.",
+      "definition": "Indicator of self-identified Ashkenazi Jewish heritage recorded as a breast-cancer risk factor.",
       "feature_kind": "flag",
       "domains": [
         "demographics"
@@ -303,11 +305,11 @@
         "ancestry"
       ],
       "caveats": [
-        "Definition, provenance, and null semantics are unresolved."
+        "Completeness, reliability, encoding, and null semantics are not established."
       ],
       "evidence": [
         "release_schema",
-        "inference",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
@@ -374,7 +376,7 @@
     },
     "demographics.gender_description": {
       "label": "Gender description",
-      "definition": "Released patient gender-description field; the represented construct and provenance are not documented.",
+      "definition": "Patient legal sex recorded at the time of the exam.",
       "feature_kind": "categorical",
       "domains": [
         "demographics"
@@ -386,12 +388,11 @@
         "sex"
       ],
       "caveats": [
-        "Do not infer sex, gender identity, or category completeness from the physical name alone."
+        "This field does not represent gender identity; category completeness and null semantics are not established."
       ],
       "evidence": [
         "release_schema",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "demographics.language": {
@@ -463,7 +464,7 @@
     },
     "exam.architectural_distortion_aggregate": {
       "label": "Exam-level architectural distortion aggregate",
-      "definition": "Exam-level count-like architectural-distortion aggregate.",
+      "definition": "Exam-level Boolean summary of mammography finding-level architectural-distortion presence.",
       "feature_kind": "aggregate",
       "domains": [
         "exam",
@@ -474,17 +475,17 @@
         "arch_distortion_exam_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "exam.asymmetry_aggregate": {
       "label": "Exam-level asymmetry aggregate",
-      "definition": "Exam-level count-like asymmetry aggregate.",
+      "definition": "Exam-level Boolean summary of mammography finding-level asymmetry presence.",
       "feature_kind": "aggregate",
       "domains": [
         "exam",
@@ -495,12 +496,12 @@
         "asymmetry_exam_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "exam.biopsy_related_flag": {
@@ -526,7 +527,7 @@
     },
     "exam.calcification_aggregate": {
       "label": "Exam-level calcification aggregate",
-      "definition": "Exam-level count-like calcification aggregate.",
+      "definition": "Exam-level Boolean summary of mammography finding-level calcification presence.",
       "feature_kind": "aggregate",
       "domains": [
         "exam",
@@ -537,12 +538,12 @@
         "calc_exam_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "exam.extraction_eligibility_flag": {
@@ -567,7 +568,7 @@
     },
     "exam.left_finding_total": {
       "label": "Left finding total",
-      "definition": "Count-like aggregate whose name suggests the total number of left-breast findings.",
+      "definition": "Count of distinct findings recorded on the left breast during the exam.",
       "feature_kind": "aggregate",
       "domains": [
         "exam",
@@ -579,12 +580,11 @@
         "total_L_find"
       ],
       "caveats": [
-        "Derivation and repetition across side-level rows are unresolved."
+        "This exam-wide side-specific total is stored on breast-side-grain rows; repeated storage does not change its meaning."
       ],
       "evidence": [
         "release_schema",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "exam.location": {
@@ -634,7 +634,7 @@
     },
     "exam.mass_aggregate": {
       "label": "Exam-level mass aggregate",
-      "definition": "Exam-level count-like mass aggregate.",
+      "definition": "Exam-level Boolean summary of mammography finding-level mass presence.",
       "feature_kind": "aggregate",
       "domains": [
         "exam",
@@ -645,12 +645,12 @@
         "mass_exam_level"
       ],
       "caveats": [
-        "This level-specific aggregate is not equivalent to the finding-level presence flag; its derivation is unresolved."
+        "This summary is aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT; it does not summarize non-mammography modalities."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "exam.modality": {
@@ -676,7 +676,7 @@
     },
     "exam.pathology_severity_aggregate": {
       "label": "Exam-level pathology severity aggregate",
-      "definition": "Exam-level coded pathology-severity aggregate.",
+      "definition": "Minimum, and therefore most severe, pathology-severity value among procedure-associated pathology records in the exam aggregate group.",
       "feature_kind": "aggregate",
       "domains": [
         "exam",
@@ -687,13 +687,12 @@
         "path_severity_exam_level"
       ],
       "caveats": [
-        "This level-specific field uses the inverse pathology-severity groups, but its exact aggregation across procedure-associated pathology records is unresolved."
+        "Pathology severity uses inverse ordering, so the minimum value is the most severe."
       ],
       "evidence": [
         "release_schema",
         "observed_v2_values",
-        "maintainer_confirmed",
-        "unresolved"
+        "maintainer_confirmed"
       ],
       "vocabulary": "pathology.severity"
     },
@@ -740,7 +739,7 @@
     },
     "exam.release_version": {
       "label": "EMBED data version",
-      "definition": "Code indicating EMBED data-version membership.",
+      "definition": "Code identifying the first EMBED release version in which the element was included.",
       "feature_kind": "coded",
       "domains": [
         "exam",
@@ -751,18 +750,18 @@
         "version"
       ],
       "caveats": [
-        "Whether this denotes source membership, processing lineage, or schema version requires clarification."
+        "This records first inclusion in EMBED, not a per-row processing-lineage or schema-version guarantee."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
-        "unresolved"
+        "maintainer_confirmed"
       ],
       "vocabulary": "exam.release_version"
     },
     "exam.right_finding_total": {
       "label": "Right finding total",
-      "definition": "Count-like aggregate whose name suggests the total number of right-breast findings.",
+      "definition": "Count of distinct findings recorded on the right breast during the exam.",
       "feature_kind": "aggregate",
       "domains": [
         "exam",
@@ -774,12 +773,11 @@
         "total_R_find"
       ],
       "caveats": [
-        "Derivation and repetition across side-level rows are unresolved."
+        "This exam-wide side-specific total is stored on breast-side-grain rows; repeated storage does not change its meaning."
       ],
       "evidence": [
         "release_schema",
-        "inference",
-        "unresolved"
+        "maintainer_confirmed"
       ]
     },
     "exam.study_date": {
@@ -870,7 +868,7 @@
     },
     "imaging.addendum_flag": {
       "label": "Addendum flag",
-      "definition": "Flag identifying an addended exam.",
+      "definition": "Processing-derived flag intended to identify an addended exam.",
       "feature_kind": "flag",
       "domains": [
         "imaging",
@@ -882,11 +880,14 @@
         "addendum_flag"
       ],
       "caveats": [
-        "The legend supplies no code meanings, and null is not documented as No."
+        "This flag was added during EMBED data processing rather than extracted directly from MagView.",
+        "Null reflects processing behavior and is not inherently informative; do not interpret null as No.",
+        "Its exact encoding and overlap with report-version sequence have not been directly validated."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
@@ -979,7 +980,7 @@
     },
     "imaging.finding_number": {
       "label": "Finding number",
-      "definition": "Finding-number or key-component field.",
+      "definition": "Ordinal finding number within an accession, except for reserved synthetic entries.",
       "feature_kind": "identifier",
       "domains": [
         "identity",
@@ -990,12 +991,15 @@
         "numfind"
       ],
       "caveats": [
-        "Negative and zero values have undocumented semantics; do not assume every value is an ordinal finding number."
+        "The reserved value -9 identifies a derived synthetic contralateral negative finding implied by a non-negative finding on the other breast but not explicitly entered in MagView.",
+        "Synthetic contralateral negatives are derived records rather than manually entered findings.",
+        "Semantics of zero and any other nonpositive values remain unresolved."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
         "observed_v2_values",
+        "maintainer_confirmed",
         "unresolved"
       ]
     },
@@ -7675,13 +7679,15 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "EMBED maintainer clarification recorded 2026-07-29",
-      "version_scope": "Open-v2 linked-exam, multimodal descriptor, pathology, report, risk, and date semantics reviewed on 2026-07-29.",
+      "version_scope": "Open-v2 linked-exam, multimodal descriptor, aggregation, pathology, report, risk, demographic, laterality, and date semantics reviewed on 2026-07-29.",
       "profiles": [
         "open-v2"
       ],
       "notes": [
-        "Confirms same-episode linked accessions, descriptor-versus-modality boundaries, procedure-associated pathology-code behavior, report-version sequencing, clinical-time risk calculation, and consistent within-patient date shifts.",
-        "Retains unknown MagView code mappings, report addendum linkage, risk-field variants, percentage formatting, sentinel meanings, and model versions for later internal investigation."
+        "Confirms same-episode linked accessions, descriptor-versus-modality boundaries, mammography-only Boolean aggregates, minimum pathology-severity rollups, synthetic contralateral findings, age handling, legal-sex and release-version meanings, context-dependent null laterality, procedure-associated pathology-code behavior, report-version sequencing, clinical-time risk calculation, and consistent within-patient date shifts.",
+        "Ordinary risk outputs are tentatively believed to use percentage points, but the risk table has not been validated in depth.",
+        "Retains unknown system-specific code mappings, report addendum linkage, risk-field variants, most sentinel meanings, measurement units, MRI ambiguities, and model versions for later internal investigation.",
+        "There is no universal delimiter, ordering, or null convention across loosely structured coded fields; absent field-specific evidence, preserve source strings and treat null as unknown or missing."
       ]
     },
     "open-v2.release-legend": {
@@ -7989,14 +7995,14 @@
         },
         {
           "id": "recommendation-code-mappings",
-          "statement": "Mappings for valid recommendation codes absent from the released legend are currently unknown and require investigation with the MagView reporting teams.",
+          "statement": "Mappings for valid recommendation codes absent from the released legend are currently unknown; there is no single authoritative owner or versioned dictionary across the contributing clinical systems.",
           "status": "unresolved",
           "sources": [
             "open-v2.release-legend",
             "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Do not guess or silently normalize undocumented recommendation codes."
+            "Resolving a code requires system-specific investigation and data processing; do not guess or silently normalize undocumented recommendation codes."
           ]
         },
         {
@@ -8016,6 +8022,120 @@
       "caveats": [
         "Do not derive an outcome label from assessment or recommendation without a declared task and temporal anchor.",
         "Public pathway guidance does not establish that open-v2 rows form a complete screening-to-diagnostic sequence."
+      ]
+    },
+    "open-v2.demographic-administrative-context": {
+      "title": "Open-v2 demographic and administrative semantics",
+      "kind": "data_representation",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Open-v2 age, ancestry, legal-sex, and release-version fields retain source-specific definitions and deidentification caveats.",
+      "domains": [
+        "demographics",
+        "exam",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "age deidentification",
+        "age top coding",
+        "Ashkenazi heritage",
+        "legal sex",
+        "EMBED version"
+      ],
+      "related_concepts": [
+        "demographics.age_at_exam",
+        "demographics.age_at_menarche",
+        "demographics.age_at_menopause",
+        "demographics.age_at_pregnancy",
+        "demographics.ashkenazi_indicator",
+        "demographics.gender_description",
+        "exam.release_version"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "patients_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "exam_level_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "combined_anon"
+        }
+      ],
+      "related_relationships": [],
+      "claims": [
+        {
+          "id": "age-years-and-quality",
+          "statement": "The age-at-exam, menarche-age, menopause-age, and pregnancy-age fields are measured in years; values such as zero are data-quality errors rather than documented sentinel codes.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "The specific pregnancy event represented by pregnancy age remains unresolved."
+          ]
+        },
+        {
+          "id": "age-at-exam-deidentification",
+          "statement": "Age at exam is calculated from the patient birth date and study date after both dates receive the same within-patient shift; it is otherwise unchanged except that ages greater than or equal to 90 are top-coded to 89.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "The shifted calendar dates must not be interpreted literally."
+          ]
+        },
+        {
+          "id": "ashkenazi-heritage",
+          "statement": "The Ashkenazi indicator represents self-identified Ashkenazi Jewish heritage recorded as a known breast-cancer risk factor.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "Completeness, reliability, encoding, and null semantics are not established."
+          ]
+        },
+        {
+          "id": "legal-sex",
+          "statement": "The released gender-description field represents patient legal sex at the time of the exam.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "This field does not represent gender identity."
+          ]
+        },
+        {
+          "id": "release-version-meaning",
+          "statement": "The EMBED data-version field records the first EMBED release version in which the element was included.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "It is not a per-row processing-lineage or schema-version guarantee."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "Do not convert data-quality errors into sentinel meanings without field-specific evidence.",
+        "Administrative legal sex, gender identity, and self-identified heritage are distinct constructs."
       ]
     },
     "open-v2.linked-exam-context": {
@@ -8141,7 +8261,11 @@
         "not applicable null"
       ],
       "related_concepts": [
+        "breast.side",
+        "breast_side.mass_aggregate",
+        "exam.mass_aggregate",
         "exam.modality",
+        "imaging.finding_number",
         "mammography.mass_present",
         "ultrasound.finding",
         "mri.other_finding"
@@ -8195,6 +8319,53 @@
           "caveats": [
             "Use the separate exam/modality features for modality availability."
           ]
+        },
+        {
+          "id": "mammography-aggregate-semantics",
+          "statement": "Exam-level and breast-side-level mass, calcification, asymmetry, and architectural-distortion fields are Boolean summaries aggregated only from mammography findings, including FFDM, synthetic 2D, and DBT.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "These summaries do not aggregate ultrasound or MRI descriptors."
+          ]
+        },
+        {
+          "id": "synthetic-contralateral-finding",
+          "statement": "Ordinary finding numbers are ordinal within an accession; finding number -9 identifies a derived synthetic contralateral negative finding implied by a non-negative finding on the other breast but not explicitly entered in MagView.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "Synthetic contralateral negatives are derived records, and semantics of zero or other nonpositive finding numbers remain unresolved."
+          ]
+        },
+        {
+          "id": "finding-side-null",
+          "statement": "A null side attached to a clinical finding represents a bilateral finding; outside that context, null generally means unknown laterality and a null biopsy or procedure side is not bilateral.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "Interpret null laterality according to the field's clinical role rather than applying a catalog-wide null rule."
+          ]
+        },
+        {
+          "id": "field-specific-parsing",
+          "statement": "Loosely structured coded fields do not share one guaranteed delimiter, ordering, repetition, composition, or null convention.",
+          "status": "verified",
+          "sources": [
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "Without field-specific evidence, preserve source strings, treat ordering as non-informative, and treat null as unknown or missing."
+          ]
         }
       ],
       "workflow_steps": [],
@@ -8231,7 +8402,9 @@
         "pathology.procedure_date",
         "pathology.report_date",
         "pathology.severity",
-        "pathology.surgery_type"
+        "pathology.surgery_type",
+        "breast_side.pathology_severity_aggregate",
+        "exam.pathology_severity_aggregate"
       ],
       "related_tables": [
         {
@@ -8305,14 +8478,14 @@
         },
         {
           "id": "pathology-code-mappings",
-          "statement": "Pathology descriptor codes observed in open-v2 but absent from the released legend are valid source-system codes with mappings that are currently unknown.",
+          "statement": "Pathology descriptor codes observed in open-v2 but absent from the released legend are valid source-system codes with mappings that are currently unknown; there is no single authoritative owner or versioned dictionary across the contributing clinical systems.",
           "status": "unresolved",
           "sources": [
             "open-v2.release-legend",
             "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Retain unknown codes as observed and defer their interpretation to internal MagView mapping investigation."
+            "Retain unknown codes as observed; resolving one requires system-specific investigation and data processing."
           ]
         },
         {
@@ -8325,6 +8498,18 @@
           ],
           "caveats": [
             "Lower values are more severe; null means no attached pathology and is not benign or negative."
+          ]
+        },
+        {
+          "id": "severity-aggregation",
+          "statement": "Exam-level and breast-side-level pathology severity are aggregated by taking the minimum, and therefore most severe, value among procedure-associated pathology records in the applicable group.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.maintainer-clarification-2026-07-29"
+          ],
+          "caveats": [
+            "The inverse ordering means an ordinary numeric maximum would select the least severe value."
           ]
         }
       ],
@@ -8418,7 +8603,7 @@
         },
         {
           "id": "addendum-link",
-          "statement": "Reports with rseq greater than the accession minimum are expected to be addended versions, but the relationship to imaging addendum_flag has not been manually verified.",
+          "statement": "Reports with rseq greater than the accession minimum are expected to be later report versions and generally addendums, but real-world exceptions and the relationship to the processing-derived imaging addendum_flag have not been directly validated.",
           "status": "unresolved",
           "sources": [
             "open-v2.release-schema",
@@ -8427,7 +8612,7 @@
             "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Do not infer that one flag identifies a particular report revision."
+            "A later report version may not constitute an addendum in the strict clinical sense; do not infer that one flag identifies a particular report revision."
           ]
         },
         {
@@ -8455,7 +8640,7 @@
       "profiles": [
         "open-v2"
       ],
-      "summary": "Risk outputs were calculated during clinical care in MagView, but several field variants, percentage formatting, exceptional values, and model versions require internal investigation.",
+      "summary": "Risk outputs were calculated during clinical care in MagView and ordinary values are tentatively believed to use percentage points, but the risk table, field variants, exceptional values, and model versions require internal investigation.",
       "domains": [
         "risk",
         "temporal",
@@ -8506,7 +8691,7 @@
         },
         {
           "id": "risk-semantics",
-          "statement": "IBISPOP10, IBISPOPL, and IBIS_TD1 through IBIS_TD4 lack confirmed definitions; percentage-point formatting, meanings of -35, -2, and 100, and the generating NCI and IBIS model versions are also unvalidated.",
+          "statement": "Ordinary NCI and IBIS outputs are tentatively believed to use percentage points, but the risk table has not been validated in depth. IBISPOP10, IBISPOPL, and IBIS_TD1 through IBIS_TD4 lack confirmed definitions; meanings of -35, -2, and 100 and the generating model versions are also unknown.",
           "status": "unresolved",
           "sources": [
             "open-v2.release-schema",
@@ -8514,7 +8699,7 @@
             "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Do not infer a probability scale or comparable range from numeric physical type."
+            "Treat percentage-point formatting as tentative and do not infer a comparable range from numeric physical type."
           ]
         },
         {

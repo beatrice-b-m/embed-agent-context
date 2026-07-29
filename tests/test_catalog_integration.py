@@ -77,6 +77,7 @@ class CheckedInCatalogTests(unittest.TestCase):
             "clinical.screening-diagnostic-pathway",
             "embed.finding-procedure-recording",
             "open-v2.assessment-recommendation-context",
+            "open-v2.demographic-administrative-context",
             "open-v2.linked-exam-context",
             "open-v2.multimodal-finding-context",
             "open-v2.pathology-procedure-context",
@@ -165,8 +166,16 @@ class CheckedInCatalogTests(unittest.TestCase):
             "verified",
         )
         self.assertEqual(
+            pathology_claims["severity-aggregation"]["status"],
+            "verified",
+        )
+        self.assertEqual(
             pathology_claims["pathology-code-mappings"]["status"],
             "unresolved",
+        )
+        self.assertIn(
+            "no single authoritative owner",
+            pathology_claims["pathology-code-mappings"]["statement"],
         )
 
         report = self.catalog.get_context("open-v2.report-context")["context"]
@@ -180,11 +189,106 @@ class CheckedInCatalogTests(unittest.TestCase):
             report_claims["sequence-meaning"]["statement"],
         )
         self.assertEqual(report_claims["addendum-link"]["status"], "unresolved")
+        self.assertIn(
+            "real-world exceptions",
+            report_claims["addendum-link"]["statement"],
+        )
 
         risk = self.catalog.get_context("open-v2.risk-context")["context"]
         risk_claims = {claim["id"]: claim for claim in risk["claims"]}
         self.assertEqual(risk_claims["risk-availability"]["status"], "verified")
         self.assertEqual(risk_claims["risk-semantics"]["status"], "unresolved")
+        self.assertIn(
+            "tentatively believed to use percentage points",
+            risk_claims["risk-semantics"]["statement"],
+        )
+
+        demographics = self.catalog.get_context(
+            "open-v2.demographic-administrative-context"
+        )["context"]
+        demographic_claims = {
+            claim["id"]: claim for claim in demographics["claims"]
+        }
+        self.assertEqual(
+            {
+                claim_id: claim["status"]
+                for claim_id, claim in demographic_claims.items()
+            },
+            {
+                "age-years-and-quality": "verified",
+                "age-at-exam-deidentification": "verified",
+                "ashkenazi-heritage": "verified",
+                "legal-sex": "verified",
+                "release-version-meaning": "verified",
+            },
+        )
+
+    def test_maintainer_review_semantics_are_registered(self) -> None:
+        multimodal = self.catalog.get_context(
+            "open-v2.multimodal-finding-context"
+        )["context"]
+        claims = {claim["id"]: claim for claim in multimodal["claims"]}
+        self.assertEqual(
+            claims["mammography-aggregate-semantics"]["status"],
+            "verified",
+        )
+        self.assertIn(
+            "finding number -9",
+            claims["synthetic-contralateral-finding"]["statement"],
+        )
+        self.assertIn(
+            "null side attached to a clinical finding",
+            claims["finding-side-null"]["statement"],
+        )
+        self.assertIn(
+            "do not share one guaranteed delimiter",
+            claims["field-specific-parsing"]["statement"],
+        )
+
+        assessment = self.catalog.get_context(
+            "open-v2.assessment-recommendation-context"
+        )["context"]
+        assessment_claims = {
+            claim["id"]: claim for claim in assessment["claims"]
+        }
+        self.assertIn(
+            "no single authoritative owner",
+            assessment_claims["recommendation-code-mappings"]["statement"],
+        )
+
+        finding_number = self.catalog.get_feature(
+            "imaging.finding_number"
+        )["concept"]
+        self.assertIn("Ordinal finding number", finding_number["definition"])
+        self.assertTrue(
+            any(
+                "synthetic contralateral negative" in caveat
+                for caveat in finding_number["caveats"]
+            )
+        )
+
+        age = self.catalog.get_feature("demographics.age_at_exam")["concept"]
+        self.assertIn("Age in years", age["definition"])
+        self.assertTrue(
+            any("top-coded to 89" in caveat for caveat in age["caveats"])
+        )
+
+        gender = self.catalog.get_feature(
+            "demographics.gender_description"
+        )["concept"]
+        self.assertIn("legal sex", gender["definition"])
+
+        release = self.catalog.get_feature("exam.release_version")["concept"]
+        self.assertIn("first EMBED release", release["definition"])
+
+        for concept_id in (
+            "breast_side.pathology_severity_aggregate",
+            "exam.pathology_severity_aggregate",
+        ):
+            with self.subTest(concept=concept_id):
+                concept = self.catalog.get_feature(concept_id)["concept"]
+                self.assertIn("Minimum", concept["definition"])
+                self.assertNotIn("unresolved", concept["evidence"])
 
     def test_phase_three_requirement_level_context_queries(self) -> None:
         temporal = self.catalog.search_contexts("temporal leakage")
@@ -390,7 +494,7 @@ class CheckedInCatalogTests(unittest.TestCase):
             any("mass" in identifier for identifier in mass_identifiers)
         )
 
-    def test_pathology_severity_aggregates_share_codes_but_not_derivation(self) -> None:
+    def test_pathology_severity_aggregates_share_codes_and_derivation(self) -> None:
         for concept_id in (
             "breast_side.pathology_severity_aggregate",
             "exam.pathology_severity_aggregate",
@@ -399,15 +503,18 @@ class CheckedInCatalogTests(unittest.TestCase):
                 concept = self.catalog.concepts[concept_id]
                 caveats = concept.caveats
                 self.assertEqual(concept.vocabulary, "pathology.severity")
+                self.assertIn("Minimum", concept.definition)
                 self.assertTrue(
                     any(
-                        "exact aggregation across procedure-associated"
-                        in item
+                        "minimum value is the most severe" in item
                         for item in caveats
                     )
                 )
                 self.assertTrue(
-                    all("finding-level presence flag" not in item for item in caveats)
+                    all(
+                        "finding-level presence flag" not in item
+                        for item in caveats
+                    )
                 )
 
     def test_schema_facets_match_the_dependency_free_core(self) -> None:
