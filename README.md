@@ -28,6 +28,9 @@ turning one release's measurements into apparent contracts.
   extension rules, and portability policy.
 - [`docs/project-scope.md`](docs/project-scope.md) — project boundaries and
   authoring requirements.
+- [`docs/manual-review-batches.md`](docs/manual-review-batches.md) — concise
+  maintainer decision batches for semantic questions that cannot be resolved
+  mechanically.
 - `reference_files/` — local EMBED V2 source artifacts used to build and verify
   profile bindings. This directory is intentionally ignored by Git.
 - `AGENTS.md` — repository contribution, commit, and documentation-sync rules.
