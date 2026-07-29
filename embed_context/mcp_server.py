@@ -1,4 +1,4 @@
-"""Optional stdio MCP adapter for the EMBED V2 feature catalog.
+"""Optional stdio MCP adapter for the EMBED clinical-semantic catalog.
 
 The MCP SDK is imported lazily so importing the core package or CLI does not
 require the optional dependency.
@@ -12,27 +12,65 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from .catalog import (
-    ANALYSIS_PATTERN_STATUSES,
-    CLAIM_STATUSES,
-    CONTEXT_KINDS,
-    CONTEXT_SCOPES,
-    DOMAINS,
-    FEATURE_KINDS,
-    GRAINS,
-    RELATIONSHIP_KINDS,
+from . import catalog as _catalog
+
+
+def _values(name: str, fallback: Sequence[str]) -> tuple[str, ...]:
+    """Read a v5 controlled constant with deterministic branch fallback."""
+
+    value = getattr(_catalog, name, fallback)
+    if isinstance(value, (set, frozenset)):
+        return tuple(sorted(value))
+    return tuple(value)
+
+
+# Fallbacks allow this isolated interface branch to run before the parallel v5
+# core branch lands. The integrated server reads every value from these v5
+# catalog constants.
+BINDING_GRAINS = _values(
+    "BINDING_GRAINS",
+    tuple(getattr(_catalog, "GRAINS", ())),
+)
+FEATURE_KINDS = _values("FEATURE_KINDS", tuple(_catalog.FEATURE_KINDS))
+DOMAINS = _values("DOMAINS", tuple(_catalog.DOMAINS))
+SEMANTIC_RELATIONSHIP_KINDS = _values(
+    "SEMANTIC_RELATIONSHIP_KINDS",
+    ("hierarchy", "association", "attribution", "documentation", "derivation"),
+)
+TEMPORAL_KINDS = _values(
+    "TEMPORAL_KINDS",
+    ("event_time", "documentation_time", "availability_time"),
+)
+AGGREGATION_STATUSES = _values(
+    "AGGREGATION_STATUSES",
+    ("provided", "analyst_defined", "unsupported", "unresolved"),
+)
+COVERAGE_STATUSES = _values(
+    "COVERAGE_STATUSES",
+    ("supported", "unsupported", "unresolved", "not_cataloged"),
+)
+RELATIONSHIP_BINDING_KINDS = _values(
+    "RELATIONSHIP_BINDING_KINDS",
+    tuple(getattr(_catalog, "RELATIONSHIP_KINDS", ())),
+)
+DISCOVERY_KINDS = _values(
+    "DISCOVERY_KINDS",
+    (
+        "clinical_object",
+        "feature",
+        "semantic_relationship",
+        "temporal_semantic",
+        "aggregation",
+        "guardrail",
+        "coverage",
+        "context",
+    ),
 )
 
-
-GrainFilter = Literal[*GRAINS]
 DomainFilter = Literal[*DOMAINS]
-FeatureKindFilter = Literal[*FEATURE_KINDS]
-_RELATIONSHIP_KIND_VALUES = tuple(sorted(RELATIONSHIP_KINDS))
-RelationshipKindFilter = Literal[*_RELATIONSHIP_KIND_VALUES]
-ContextKindFilter = Literal[*CONTEXT_KINDS]
-ContextScopeFilter = Literal[*CONTEXT_SCOPES]
-ClaimStatusFilter = Literal[*CLAIM_STATUSES]
-AnalysisPatternStatusFilter = Literal[*ANALYSIS_PATTERN_STATUSES]
+DiscoveryKindFilter = Literal[*DISCOVERY_KINDS]
+_RELATIONSHIP_BINDING_KIND_VALUES = tuple(sorted(RELATIONSHIP_BINDING_KINDS))
+RelationshipBindingKindFilter = Literal[*_RELATIONSHIP_BINDING_KIND_VALUES]
 
 
 MCP_INSTALL_HINT = (
@@ -42,13 +80,48 @@ MCP_INSTALL_HINT = (
 
 
 class CatalogProtocol(Protocol):
-    """Catalog operations exposed through the protocol adapter."""
+    """Clinical-semantic catalog operations exposed through MCP."""
 
-    def get_table(self, profile: str, table: str) -> dict[str, Any]: ...
+    def discover(
+        self,
+        query: str,
+        *,
+        profile: str | None = None,
+        kinds: Sequence[str] | None = None,
+        domain: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]: ...
 
-    def get_relationship(self, identifier: str) -> dict[str, Any]: ...
+    def get_clinical_object(self, identifier: str) -> dict[str, Any]: ...
 
-    def search_relationships(
+    def get_feature(
+        self,
+        identifier: str,
+        *,
+        include_codes: bool = False,
+    ) -> dict[str, Any]: ...
+
+    def get_semantic_relationship(self, identifier: str) -> dict[str, Any]: ...
+
+    def get_temporal_semantic(self, identifier: str) -> dict[str, Any]: ...
+
+    def get_aggregation(self, identifier: str) -> dict[str, Any]: ...
+
+    def get_guardrail(self, identifier: str) -> dict[str, Any]: ...
+
+    def get_coverage(self, identifier: str) -> dict[str, Any]: ...
+
+    def lookup_code(
+        self,
+        feature_or_vocabulary: str,
+        code: str,
+    ) -> dict[str, Any]: ...
+
+    def get_profile_table(self, profile: str, table: str) -> dict[str, Any]: ...
+
+    def get_relationship_binding(self, identifier: str) -> dict[str, Any]: ...
+
+    def search_relationship_bindings(
         self,
         *,
         profile: str | None = None,
@@ -56,58 +129,6 @@ class CatalogProtocol(Protocol):
         source_table: str | None = None,
         target_table: str | None = None,
         kind: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]: ...
-
-    def get_feature(
-        self, identifier: str, *, include_codes: bool = False
-    ) -> dict[str, Any]: ...
-
-    def search_features(
-        self,
-        query: str,
-        *,
-        profile: str | None = None,
-        table: str | None = None,
-        grain: str | None = None,
-        domain: str | None = None,
-        feature_kind: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]: ...
-
-    def lookup_code(
-        self, feature_or_vocabulary: str, code: str
-    ) -> dict[str, Any]: ...
-
-    def get_context(self, identifier: str) -> dict[str, Any]: ...
-
-    def search_contexts(
-        self,
-        query: str = "",
-        *,
-        kind: str | None = None,
-        scope: str | None = None,
-        profile: str | None = None,
-        domain: str | None = None,
-        concept: str | None = None,
-        table: str | None = None,
-        relationship: str | None = None,
-        status: str | None = None,
-        source: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]: ...
-
-    def get_analysis_pattern(self, identifier: str) -> dict[str, Any]: ...
-
-    def search_analysis_patterns(
-        self,
-        query: str = "",
-        *,
-        status: str | None = None,
-        scope: str | None = None,
-        profile: str | None = None,
-        domain: str | None = None,
-        grain: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]: ...
 
@@ -122,40 +143,40 @@ def _require_mcp() -> tuple[type[Any], type[Any]]:
 
 
 def _catalog_scope_description(catalog: CatalogProtocol) -> str:
-    """Describe catalog-specific profiles and tables without another tool."""
+    """Describe catalog-specific profiles without implying a semantic schema."""
 
-    parts = []
-    profiles = sorted(
-        {
-            value
-            for value in getattr(catalog, "profiles", ())
-            if isinstance(value, str)
-        }
-    )
-    if profiles:
-        parts.append(f"profiles in this catalog: {', '.join(profiles)}")
-
-    tables: set[str] = set()
-    for binding in getattr(catalog, "bindings", ()):
-        table = (
-            binding.get("table")
-            if isinstance(binding, Mapping)
-            else getattr(binding, "table", None)
+    profiles: set[str] = set()
+    raw_profiles = getattr(catalog, "profiles", ())
+    if isinstance(raw_profiles, Mapping):
+        profiles.update(
+            value for value in raw_profiles if isinstance(value, str)
         )
-        if isinstance(table, str):
-            tables.add(table)
-    if tables:
-        parts.append(f"tables in this catalog: {', '.join(sorted(tables))}")
-    return "; ".join(parts)
+    else:
+        profiles.update(
+            value for value in raw_profiles if isinstance(value, str)
+        )
+
+    raw_bindings = getattr(catalog, "profile_bindings", ())
+    if isinstance(raw_bindings, Mapping):
+        profiles.update(
+            value for value in raw_bindings if isinstance(value, str)
+        )
+    else:
+        for binding in raw_bindings:
+            profile = (
+                binding.get("profile")
+                if isinstance(binding, Mapping)
+                else getattr(binding, "profile", None)
+            )
+            if isinstance(profile, str):
+                profiles.add(profile)
+    if not profiles:
+        return ""
+    return f"profiles in this catalog: {', '.join(sorted(profiles))}"
 
 
 def _require_exact_tool_arguments(server: Any, tool_name: str) -> None:
-    """Reject undeclared arguments in one pinned-SDK function tool.
-
-    MCP SDK 2.0 function tools derive a Pydantic argument model that ignores
-    extra fields by default. Rebuilding the registered model with ``extra``
-    forbidden keeps the advertised JSON Schema and runtime behavior aligned.
-    """
+    """Reject undeclared arguments in one pinned-SDK function tool."""
 
     tool = server._tool_manager.get_tool(tool_name)
     if tool is None:  # pragma: no cover - called immediately after registration.
@@ -167,76 +188,62 @@ def _require_exact_tool_arguments(server: Any, tool_name: str) -> None:
 
 
 def build_server(catalog: CatalogProtocol) -> Any:
-    """Build an MCP server over an already-loaded catalog.
-
-    Accepting the catalog as a dependency keeps protocol tests in memory and
-    leaves catalog loading and validation in the core package.
-    """
+    """Build a read-only MCP server over an already-loaded catalog."""
 
     MCPServer, ToolAnnotations = _require_mcp()
     catalog_scope = _catalog_scope_description(catalog)
-    feature_filter_description = "; ".join(
+    discovery_filter_description = "; ".join(
         part
         for part in (
-            f"grains: {', '.join(GRAINS)}",
-            f"domains: {', '.join(DOMAINS)}",
-            f"feature kinds: {', '.join(FEATURE_KINDS)}",
-            catalog_scope,
-        )
-        if part
-    )
-    relationship_filter_description = "; ".join(
-        part
-        for part in (
-            f"relationship kinds: {', '.join(_RELATIONSHIP_KIND_VALUES)}",
-            catalog_scope,
-        )
-        if part
-    )
-    context_filter_description = "; ".join(
-        part
-        for part in (
-            f"context kinds: {', '.join(CONTEXT_KINDS)}",
-            f"context scopes: {', '.join(CONTEXT_SCOPES)}",
-            f"domains: {', '.join(DOMAINS)}",
-            f"claim statuses: {', '.join(CLAIM_STATUSES)}",
-            catalog_scope,
-        )
-        if part
-    )
-    pattern_filter_description = "; ".join(
-        part
-        for part in (
-            f"statuses: {', '.join(ANALYSIS_PATTERN_STATUSES)}",
-            f"scopes: {', '.join(CONTEXT_SCOPES)}",
-            f"grains: {', '.join(GRAINS)}",
+            f"entity kinds: {', '.join(DISCOVERY_KINDS)}",
             f"domains: {', '.join(DOMAINS)}",
             catalog_scope,
         )
         if part
+    )
+    binding_filter_description = "; ".join(
+        part
+        for part in (
+            (
+                "physical relationship kinds: "
+                f"{', '.join(_RELATIONSHIP_BINDING_KIND_VALUES)}"
+            ),
+            catalog_scope,
+        )
+        if part
+    )
+    semantic_scope_description = (
+        "semantic relationship kinds: "
+        f"{', '.join(SEMANTIC_RELATIONSHIP_KINDS)}; temporal kinds: "
+        f"{', '.join(TEMPORAL_KINDS)}; aggregation statuses: "
+        f"{', '.join(AGGREGATION_STATUSES)}; coverage statuses: "
+        f"{', '.join(COVERAGE_STATUSES)}; binding grains: "
+        f"{', '.join(BINDING_GRAINS)}; feature kinds: "
+        f"{', '.join(FEATURE_KINDS)}"
     )
     server = MCPServer(
-        "embed-v2-feature-context",
+        "embed-clinical-context",
         description=(
-            "Read-only EMBED V2 feature, table-linkage, and clinical context "
-            "metadata and non-executable analysis guidance lookup"
+            "Read-only clinical-semantic context for the Emory Breast Imaging "
+            "Dataset, with secondary release-specific implementation bindings"
         ),
-        version="0.4.0",
+        version="0.5.0",
         instructions=(
-            "Use these read-only tools for EMBED V2 feature meanings, table "
-            "linkages, sourced clinical and workflow context, evidence, caveats, "
-            "join hazards, and coded values. Context claims carry review status "
-            "and explicit scope; do not treat unresolved claims as verified or "
-            "general clinical background as EMBED-specific behavior. "
-            "Relationships are descriptive metadata, not executable joins; honor "
-            "their documented optionality, cardinality, and hazards. The catalog "
-            "does not provide clinical rows, report text, or clinical advice. "
-            "Analysis patterns present alternatives and mandatory policy "
-            "questions; they do not choose a default or execute a cohort. "
-            f"Feature search filters — {feature_filter_description}. "
-            f"Relationship search filters — {relationship_filter_description}. "
-            f"Context search filters — {context_filter_description}. "
-            f"Analysis-pattern search filters — {pattern_filter_description}."
+            "Begin with discover using a clinical question. Follow exact "
+            "semantic references to understand clinical objects, features, "
+            "relationships, competing time meanings, aggregation behavior, "
+            "guardrails, coverage, provenance, and unresolved limitations. "
+            "Do not infer that absent pathology is negative, treat an imaging "
+            "assessment as pathology truth, or move between finding, side, "
+            "exam, and patient grain without an explicit policy. No date is a "
+            "universal diagnosis date. Use secondary profile-table and physical "
+            "relationship-binding tools only after selecting semantic concepts; "
+            "they describe storage implementation and never execute a join. "
+            "The catalog does not emit SQL, pipelines, canonical cohorts, "
+            "scientific-validity claims, clinical rows, or empirical counts. "
+            f"Discovery filters — {discovery_filter_description}. "
+            f"Binding filters — {binding_filter_description}. "
+            f"Controlled semantic facets — {semantic_scope_description}."
         ),
     )
     read_only = ToolAnnotations(
@@ -246,79 +253,117 @@ def build_server(catalog: CatalogProtocol) -> Any:
         openWorldHint=False,
     )
 
-    @server.tool(annotations=read_only, structured_output=True)
-    def get_feature(identifier: str, include_codes: bool = False) -> dict[str, Any]:
-        """Get one concept ID or physical table-column feature alias."""
-
-        return catalog.get_feature(identifier, include_codes=include_codes)
-
     @server.tool(
         annotations=read_only,
         structured_output=True,
         description=(
-            "Search features by text and/or controlled facets. Valid filters — "
-            f"{feature_filter_description}."
+            "Search the portable clinical-semantic model using a clinical "
+            "question. Results explain why they matched and distinguish filter, "
+            "vocabulary, profile-support, and catalog-coverage diagnostics. "
+            f"Valid filters — {discovery_filter_description}."
         ),
     )
-    def search_features(
-        query: str = "",
+    def discover(
+        query: str,
         profile: str | None = None,
-        table: str | None = None,
-        grain: GrainFilter | None = None,
+        kinds: list[DiscoveryKindFilter] | None = None,
         domain: DomainFilter | None = None,
-        feature_kind: FeatureKindFilter | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        """Search features by text and/or profile, table, grain, domain, and kind."""
+        """Discover relevant semantics without knowing tables or stable IDs."""
 
-        return catalog.search_features(
+        return catalog.discover(
             query,
             profile=profile,
-            table=table,
-            grain=grain,
+            kinds=kinds,
             domain=domain,
-            feature_kind=feature_kind,
             limit=limit,
         )
 
     @server.tool(annotations=read_only, structured_output=True)
+    def get_clinical_object(identifier: str) -> dict[str, Any]:
+        """Get one clinical object, its grain, adjacency, and limitations."""
+
+        return catalog.get_clinical_object(identifier)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_feature(
+        identifier: str,
+        include_codes: bool = False,
+    ) -> dict[str, Any]:
+        """Get one semantic feature and optional complete vocabulary code map."""
+
+        return catalog.get_feature(identifier, include_codes=include_codes)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_semantic_relationship(identifier: str) -> dict[str, Any]:
+        """Get a storage-independent clinical relationship and attribution limits."""
+
+        return catalog.get_semantic_relationship(identifier)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_temporal_semantic(identifier: str) -> dict[str, Any]:
+        """Get what a candidate event, documentation, or availability time means."""
+
+        return catalog.get_temporal_semantic(identifier)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_aggregation(identifier: str) -> dict[str, Any]:
+        """Get supplied or unresolved behavior across clinical grains."""
+
+        return catalog.get_aggregation(identifier)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_guardrail(identifier: str) -> dict[str, Any]:
+        """Get one reusable interpretation constraint, not a workflow recipe."""
+
+        return catalog.get_guardrail(identifier)
+
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_coverage(identifier: str) -> dict[str, Any]:
+        """Get a supported, unsupported, unresolved, or uncataloged scope record."""
+
+        return catalog.get_coverage(identifier)
+
+    @server.tool(annotations=read_only, structured_output=True)
     def lookup_code(feature_or_vocabulary: str, code: str) -> dict[str, Any]:
-        """Look up a code using a vocabulary ID, concept ID, or physical feature."""
+        """Look up one exact code without interpreting missing values as negative."""
 
         return catalog.lookup_code(feature_or_vocabulary, code)
 
     @server.tool(annotations=read_only, structured_output=True)
-    def get_table(profile: str, table: str) -> dict[str, Any]:
-        """Get one profile-specific table, its keys, and incident relationships."""
+    def get_profile_table(profile: str, table: str) -> dict[str, Any]:
+        """Get one secondary profile-specific table implementation binding."""
 
-        return catalog.get_table(profile, table)
+        return catalog.get_profile_table(profile, table)
 
     @server.tool(annotations=read_only, structured_output=True)
-    def get_relationship(identifier: str) -> dict[str, Any]:
-        """Get one table relationship by its stable identifier."""
+    def get_relationship_binding(identifier: str) -> dict[str, Any]:
+        """Get one secondary physical relationship binding by stable identifier."""
 
-        return catalog.get_relationship(identifier)
+        return catalog.get_relationship_binding(identifier)
 
     @server.tool(
         annotations=read_only,
         structured_output=True,
         description=(
-            "Filter table relationships by profile, either endpoint table, "
-            "directional endpoint table, and/or relationship kind. Valid "
-            f"filters — {relationship_filter_description}."
+            "Filter secondary physical relationship bindings by profile and "
+            "endpoint table. These are descriptive storage mappings, not "
+            f"clinical relationships or executable joins. Valid filters — "
+            f"{binding_filter_description}."
         ),
     )
-    def search_relationships(
+    def search_relationship_bindings(
         profile: str | None = None,
         table: str | None = None,
         source_table: str | None = None,
         target_table: str | None = None,
-        kind: RelationshipKindFilter | None = None,
+        kind: RelationshipBindingKindFilter | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        """Filter structured table relationships without executing joins."""
+        """Filter physical relationship bindings without executing joins."""
 
-        return catalog.search_relationships(
+        return catalog.search_relationship_bindings(
             profile=profile,
             table=table,
             source_table=source_table,
@@ -327,104 +372,28 @@ def build_server(catalog: CatalogProtocol) -> Any:
             limit=limit,
         )
 
-    @server.tool(annotations=read_only, structured_output=True)
-    def get_context(identifier: str) -> dict[str, Any]:
-        """Get one sourced clinical or workflow context by stable identifier."""
-
-        return catalog.get_context(identifier)
-
-    @server.tool(
-        annotations=read_only,
-        structured_output=True,
-        description=(
-            "Search sourced clinical and workflow contexts by text and/or "
-            "controlled facets. Claim-level filters return only matching claims. "
-            f"Valid filters — {context_filter_description}."
-        ),
-    )
-    def search_contexts(
-        query: str = "",
-        kind: ContextKindFilter | None = None,
-        scope: ContextScopeFilter | None = None,
-        profile: str | None = None,
-        domain: DomainFilter | None = None,
-        concept: str | None = None,
-        table: str | None = None,
-        relationship: str | None = None,
-        status: ClaimStatusFilter | None = None,
-        source: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        """Search contexts without interpreting unresolved claims as facts."""
-
-        return catalog.search_contexts(
-            query,
-            kind=kind,
-            scope=scope,
-            profile=profile,
-            domain=domain,
-            concept=concept,
-            table=table,
-            relationship=relationship,
-            status=status,
-            source=source,
-            limit=limit,
-        )
-
-    @server.tool(annotations=read_only, structured_output=True)
-    def get_analysis_pattern(identifier: str) -> dict[str, Any]:
-        """Get one non-executable cohort or analysis guidance pattern."""
-
-        return catalog.get_analysis_pattern(identifier)
-
-    @server.tool(
-        annotations=read_only,
-        structured_output=True,
-        description=(
-            "Search non-executable cohort and analysis guidance. Patterns "
-            "present alternatives, required decisions, and prohibited "
-            f"shortcuts. Valid filters — {pattern_filter_description}."
-        ),
-    )
-    def search_analysis_patterns(
-        query: str = "",
-        status: AnalysisPatternStatusFilter | None = None,
-        scope: ContextScopeFilter | None = None,
-        profile: str | None = None,
-        domain: DomainFilter | None = None,
-        grain: GrainFilter | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        """Search guidance without choosing or executing an analysis policy."""
-
-        return catalog.search_analysis_patterns(
-            query,
-            status=status,
-            scope=scope,
-            profile=profile,
-            domain=domain,
-            grain=grain,
-            limit=limit,
-        )
-
-    _require_exact_tool_arguments(server, "search_relationships")
-    _require_exact_tool_arguments(server, "get_context")
-    _require_exact_tool_arguments(server, "search_contexts")
-    _require_exact_tool_arguments(server, "get_analysis_pattern")
-    _require_exact_tool_arguments(server, "search_analysis_patterns")
+    for tool_name in (
+        "discover",
+        "get_clinical_object",
+        "get_feature",
+        "get_semantic_relationship",
+        "get_temporal_semantic",
+        "get_aggregation",
+        "get_guardrail",
+        "get_coverage",
+        "lookup_code",
+        "get_profile_table",
+        "get_relationship_binding",
+        "search_relationship_bindings",
+    ):
+        _require_exact_tool_arguments(server, tool_name)
     return server
 
 
 def _load_catalog(path: Path | None) -> CatalogProtocol:
     try:
-        from .catalog import CatalogError, load_catalog
-    except ImportError as exc:
-        raise RuntimeError(
-            "The core catalog loader is unavailable; install the complete project."
-        ) from exc
-    try:
-        return load_catalog(path)
-    except CatalogError as exc:
+        return _catalog.load_catalog(path)
+    except _catalog.CatalogError as exc:
         raise RuntimeError(str(exc)) from exc
 
 

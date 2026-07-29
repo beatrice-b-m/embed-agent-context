@@ -1,4 +1,4 @@
-"""Focused contract tests for the optional MCP adapter."""
+"""Focused contract tests for the schema-v5 MCP adapter."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 from unittest.mock import Mock, patch
 
-from embed_context import load_catalog
 from embed_context.mcp_server import MCP_INSTALL_HINT, build_server, main
 
 
@@ -34,11 +33,71 @@ def schema_enums(value: object) -> set[str]:
 
 
 class FakeCatalog:
+    profiles = ("open-v2",)
+
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
+    def discover(
+        self,
+        query: str,
+        *,
+        profile: str | None = None,
+        kinds: list[str] | None = None,
+        domain: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        arguments = {
+            "query": query,
+            "profile": profile,
+            "kinds": kinds,
+            "domain": domain,
+            "limit": limit,
+        }
+        self.calls.append(("discover", arguments))
+        return {
+            "query": query,
+            "filters": {
+                "profile": profile,
+                "kinds": kinds,
+                "domain": domain,
+            },
+            "count": 1,
+            "total": 1,
+            "matches": [
+                {
+                    "kind": "guardrail",
+                    "identifier": "pathology.null-not-negative",
+                    "score": 12,
+                    "label": "Null is not negative",
+                    "entity": {"id": "pathology.null-not-negative"},
+                    "match_reasons": [
+                        {"field": "label", "terms": ["negative"]}
+                    ],
+                    "matched_terms": ["negative"],
+                    "unmatched_terms": [],
+                }
+            ],
+            "diagnostics": {
+                "filters_excluded_matches": False,
+                "unknown_filter_or_vocabulary_value": [],
+                "unsupported_in_profile": [],
+                "no_catalog_coverage": False,
+            },
+        }
+
+    def get_clinical_object(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_clinical_object",
+            identifier,
+            "clinical_object",
+        )
+
     def get_feature(
-        self, identifier: str, *, include_codes: bool = False
+        self,
+        identifier: str,
+        *,
+        include_codes: bool = False,
     ) -> dict[str, Any]:
         self.calls.append(
             (
@@ -47,193 +106,67 @@ class FakeCatalog:
             )
         )
         return {
+            "kind": "feature",
             "identifier": identifier,
-            "meaning": "Synthetic feature",
+            "feature": {"id": identifier},
             "codes_included": include_codes,
         }
 
-    def search_features(
-        self,
-        query: str,
-        *,
-        profile: str | None = None,
-        table: str | None = None,
-        grain: str | None = None,
-        domain: str | None = None,
-        feature_kind: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        self.calls.append(
-            (
-                "search_features",
-                {
-                    "query": query,
-                    "profile": profile,
-                    "table": table,
-                    "grain": grain,
-                    "domain": domain,
-                    "feature_kind": feature_kind,
-                    "limit": limit,
-                },
-            )
+    def get_semantic_relationship(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_semantic_relationship",
+            identifier,
+            "semantic_relationship",
         )
-        return {
-            "matches": [
-                {
-                    "name": "synthetic_table.synthetic_column",
-                    "meaning": "Synthetic match",
-                }
-            ],
-            "count": 1,
-        }
+
+    def get_temporal_semantic(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_temporal_semantic",
+            identifier,
+            "temporal_semantic",
+        )
+
+    def get_aggregation(self, identifier: str) -> dict[str, Any]:
+        return self._exact("get_aggregation", identifier, "aggregation")
+
+    def get_guardrail(self, identifier: str) -> dict[str, Any]:
+        return self._exact("get_guardrail", identifier, "guardrail")
+
+    def get_coverage(self, identifier: str) -> dict[str, Any]:
+        return self._exact("get_coverage", identifier, "coverage")
 
     def lookup_code(
-        self, feature_or_vocabulary: str, code: str
+        self,
+        feature_or_vocabulary: str,
+        code: str,
     ) -> dict[str, Any]:
-        self.calls.append(
-            (
-                "lookup_code",
-                {
-                    "feature_or_vocabulary": feature_or_vocabulary,
-                    "code": code,
-                },
-            )
-        )
-        return {
+        arguments = {
             "feature_or_vocabulary": feature_or_vocabulary,
             "code": code,
-            "meaning": "Synthetic code",
+        }
+        self.calls.append(("lookup_code", arguments))
+        return {
+            **arguments,
+            "meaning": "Synthetic meaning",
         }
 
-    def get_context(self, identifier: str) -> dict[str, Any]:
-        self.calls.append(
-            (
-                "get_context",
-                {"identifier": identifier},
-            )
-        )
+    def get_profile_table(self, profile: str, table: str) -> dict[str, Any]:
+        arguments = {"profile": profile, "table": table}
+        self.calls.append(("get_profile_table", arguments))
         return {
-            "kind": "context",
-            "identifier": identifier,
-            "context": {
-                "title": "Synthetic context",
-                "claims": [],
-            },
-            "sources": [],
-        }
-
-    def search_contexts(
-        self,
-        query: str = "",
-        *,
-        kind: str | None = None,
-        scope: str | None = None,
-        profile: str | None = None,
-        domain: str | None = None,
-        concept: str | None = None,
-        table: str | None = None,
-        relationship: str | None = None,
-        status: str | None = None,
-        source: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        arguments = {
-            "query": query,
-            "kind": kind,
-            "scope": scope,
-            "profile": profile,
-            "domain": domain,
-            "concept": concept,
-            "table": table,
-            "relationship": relationship,
-            "status": status,
-            "source": source,
-            "limit": limit,
-        }
-        self.calls.append(("search_contexts", arguments))
-        return {
-            "filters": {
-                name: value
-                for name, value in arguments.items()
-                if name not in {"query", "limit"}
-            },
-            "query": query,
-            "count": 1,
-            "total": 1,
-            "matches": [
-                {
-                    "identifier": "synthetic.context",
-                    "title": "Synthetic context",
-                    "claims": [],
-                }
-            ],
-        }
-
-    def get_analysis_pattern(self, identifier: str) -> dict[str, Any]:
-        self.calls.append(
-            ("get_analysis_pattern", {"identifier": identifier})
-        )
-        return {
-            "kind": "analysis_pattern",
-            "identifier": identifier,
-            "pattern": {"title": "Synthetic pattern"},
-        }
-
-    def search_analysis_patterns(
-        self,
-        query: str = "",
-        *,
-        status: str | None = None,
-        scope: str | None = None,
-        profile: str | None = None,
-        domain: str | None = None,
-        grain: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        arguments = {
-            "query": query,
-            "status": status,
-            "scope": scope,
-            "profile": profile,
-            "domain": domain,
-            "grain": grain,
-            "limit": limit,
-        }
-        self.calls.append(("search_analysis_patterns", arguments))
-        return {
-            "query": query,
-            "count": 1,
-            "matches": [{"id": "synthetic.pattern"}],
-        }
-
-    def get_table(self, profile: str, table: str) -> dict[str, Any]:
-        self.calls.append(
-            (
-                "get_table",
-                {
-                    "profile": profile,
-                    "table": table,
-                },
-            )
-        )
-        return {
-            "kind": "table",
+            "kind": "profile_table",
             "identifier": f"{profile}:{table}",
+            "table": {"id": table},
         }
 
-    def get_relationship(self, identifier: str) -> dict[str, Any]:
-        self.calls.append(
-            (
-                "get_relationship",
-                {"identifier": identifier},
-            )
+    def get_relationship_binding(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_relationship_binding",
+            identifier,
+            "relationship_binding",
         )
-        return {
-            "kind": "relationship",
-            "identifier": identifier,
-        }
 
-    def search_relationships(
+    def search_relationship_bindings(
         self,
         *,
         profile: str | None = None,
@@ -251,25 +184,36 @@ class FakeCatalog:
             "kind": kind,
             "limit": limit,
         }
-        self.calls.append(("search_relationships", arguments))
+        self.calls.append(("search_relationship_bindings", arguments))
         return {
             "filters": {
-                name: value
-                for name, value in arguments.items()
-                if name != "limit"
+                key: value for key, value in arguments.items() if key != "limit"
             },
             "count": 1,
             "total": 1,
-            "matches": [{"id": "synthetic.relationship"}],
+            "matches": [{"id": "synthetic.binding"}],
+        }
+
+    def _exact(
+        self,
+        method: str,
+        identifier: str,
+        key: str,
+    ) -> dict[str, Any]:
+        self.calls.append((method, {"identifier": identifier}))
+        return {
+            "kind": key,
+            "identifier": identifier,
+            key: {"id": identifier},
         }
 
 
-class RelationshipKindSchemaStabilityTests(unittest.TestCase):
+class RelationshipBindingKindSchemaStabilityTests(unittest.TestCase):
     def test_kind_order_does_not_depend_on_python_hash_seed(self) -> None:
         script = (
             "from typing import get_args; "
-            "from embed_context.mcp_server import RelationshipKindFilter; "
-            "print(','.join(get_args(RelationshipKindFilter)))"
+            "from embed_context.mcp_server import RelationshipBindingKindFilter; "
+            "print(','.join(get_args(RelationshipBindingKindFilter)))"
         )
         orders = set()
         for seed in ("1", "2", "3"):
@@ -344,72 +288,31 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.catalog = FakeCatalog()
         self.server = build_server(self.catalog)
 
-    def test_server_metadata_describes_phase_three_context(self) -> None:
-        self.assertEqual(self.server.version, "0.4.0")
-        self.assertIn("clinical context", self.server.description)
-        self.assertIn("Context claims carry review status", self.server.instructions)
-        self.assertIn(
-            "do not treat unresolved claims as verified",
-            self.server.instructions,
-        )
+    def test_server_metadata_is_clinical_semantic_first(self) -> None:
+        self.assertEqual(self.server.version, "0.5.0")
+        self.assertIn("clinical-semantic context", self.server.description)
+        self.assertIn("Begin with discover", self.server.instructions)
+        self.assertIn("No date is a universal diagnosis date", self.server.instructions)
+        self.assertIn("secondary", self.server.instructions)
+        self.assertNotIn("analysis patterns", self.server.instructions.lower())
 
-    async def test_lists_only_read_only_closed_world_tools(self) -> None:
+    async def test_lists_only_read_only_closed_schema_v5_tools(self) -> None:
         async with Client(self.server) as client:
             result = await client.list_tools()
 
-        self.assertEqual(
-            {tool.name for tool in result.tools},
-            {
-                "get_feature",
-                "search_features",
-                "lookup_code",
-                "get_table",
-                "get_relationship",
-                "search_relationships",
-                "get_context",
-                "search_contexts",
-                "get_analysis_pattern",
-                "search_analysis_patterns",
-            },
-        )
-        for tool in result.tools:
-            self.assertTrue(tool.annotations.read_only_hint)
-            self.assertFalse(tool.annotations.destructive_hint)
-            self.assertTrue(tool.annotations.idempotent_hint)
-            self.assertFalse(tool.annotations.open_world_hint)
-            self.assertIsNotNone(tool.output_schema)
-        schemas = {tool.name: tool.input_schema for tool in result.tools}
-        self.assertEqual(
-            set(schemas["get_feature"]["properties"]),
-            {"identifier", "include_codes"},
-        )
-        self.assertEqual(
-            set(schemas["search_features"]["properties"]),
-            {
-                "query",
-                "profile",
-                "table",
-                "grain",
-                "domain",
-                "feature_kind",
-                "limit",
-            },
-        )
-        self.assertEqual(
-            set(schemas["lookup_code"]["properties"]),
-            {"feature_or_vocabulary", "code"},
-        )
-        self.assertEqual(
-            set(schemas["get_table"]["properties"]),
-            {"profile", "table"},
-        )
-        self.assertEqual(
-            set(schemas["get_relationship"]["properties"]),
-            {"identifier"},
-        )
-        self.assertEqual(
-            set(schemas["search_relationships"]["properties"]),
-            {
+        expected_properties = {
+            "discover": {"query", "profile", "kinds", "domain", "limit"},
+            "get_clinical_object": {"identifier"},
+            "get_feature": {"identifier", "include_codes"},
+            "get_semantic_relationship": {"identifier"},
+            "get_temporal_semantic": {"identifier"},
+            "get_aggregation": {"identifier"},
+            "get_guardrail": {"identifier"},
+            "get_coverage": {"identifier"},
+            "lookup_code": {"feature_or_vocabulary", "code"},
+            "get_profile_table": {"profile", "table"},
+            "get_relationship_binding": {"identifier"},
+            "search_relationship_bindings": {
                 "profile",
                 "table",
                 "source_table",
@@ -417,599 +320,230 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 "kind",
                 "limit",
             },
-        )
+        }
         self.assertEqual(
-            set(schemas["get_context"]["properties"]),
-            {"identifier"},
+            {tool.name for tool in result.tools},
+            set(expected_properties),
         )
+        for tool in result.tools:
+            self.assertTrue(tool.annotations.read_only_hint)
+            self.assertFalse(tool.annotations.destructive_hint)
+            self.assertTrue(tool.annotations.idempotent_hint)
+            self.assertFalse(tool.annotations.open_world_hint)
+            self.assertIsNotNone(tool.output_schema)
+            self.assertEqual(
+                set(tool.input_schema["properties"]),
+                expected_properties[tool.name],
+            )
+            self.assertIs(tool.input_schema["additionalProperties"], False)
+
+        schemas = {tool.name: tool.input_schema for tool in result.tools}
+        discover_properties = schemas["discover"]["properties"]
         self.assertEqual(
-            set(schemas["search_contexts"]["properties"]),
+            schema_enums(discover_properties["kinds"]),
             {
-                "query",
-                "kind",
-                "scope",
-                "profile",
-                "domain",
-                "concept",
-                "table",
-                "relationship",
-                "status",
-                "source",
-                "limit",
+                "clinical_object",
+                "feature",
+                "semantic_relationship",
+                "temporal_semantic",
+                "aggregation",
+                "guardrail",
+                "coverage",
+                "context",
             },
         )
+        self.assertIn(
+            "pathology",
+            schema_enums(discover_properties["domain"]),
+        )
+        binding_kind = schemas["search_relationship_bindings"]["properties"][
+            "kind"
+        ]
         self.assertEqual(
-            set(schemas["get_analysis_pattern"]["properties"]),
-            {"identifier"},
-        )
-        self.assertEqual(
-            set(schemas["search_analysis_patterns"]["properties"]),
-            {
-                "query",
-                "status",
-                "scope",
-                "profile",
-                "domain",
-                "grain",
-                "limit",
-            },
-        )
-        self.assertIs(
-            schemas["search_relationships"]["additionalProperties"],
-            False,
-        )
-        self.assertIs(
-            schemas["get_context"]["additionalProperties"],
-            False,
-        )
-        self.assertIs(
-            schemas["search_contexts"]["additionalProperties"],
-            False,
-        )
-        self.assertIs(
-            schemas["search_analysis_patterns"]["additionalProperties"],
-            False,
-        )
-        search_properties = schemas["search_features"]["properties"]
-        self.assertIn("pathology_finding", schema_enums(search_properties["grain"]))
-        self.assertIn(
-            "social_determinants_of_health",
-            schema_enums(search_properties["domain"]),
-        )
-        self.assertIn(
-            "model_output",
-            schema_enums(search_properties["feature_kind"]),
-        )
-        relationship_properties = schemas["search_relationships"]["properties"]
-        self.assertEqual(
-            relationship_properties["kind"]["anyOf"][0]["enum"],
-            ["hierarchy", "projection", "reference"],
-        )
-        context_properties = schemas["search_contexts"]["properties"]
-        self.assertIn(
-            "clinical_workflow",
-            schema_enums(context_properties["kind"]),
-        )
-        self.assertIn(
-            "profile_specific",
-            schema_enums(context_properties["scope"]),
-        )
-        self.assertIn(
-            "workflow",
-            schema_enums(context_properties["domain"]),
-        )
-        self.assertIn(
-            "unresolved",
-            schema_enums(context_properties["status"]),
+            schema_enums(binding_kind),
+            {"hierarchy", "projection", "reference"},
         )
 
-    async def test_get_feature_returns_structured_content(self) -> None:
+    async def test_discover_returns_core_result_unchanged(self) -> None:
+        arguments = {
+            "query": "negative pathology",
+            "profile": "open-v2",
+            "kinds": ["guardrail", "coverage"],
+            "domain": "pathology",
+            "limit": 3,
+        }
         async with Client(self.server) as client:
-            result = await client.call_tool(
+            result = await client.call_tool("discover", arguments)
+
+        self.assertFalse(result.is_error)
+        self.assertEqual(result.structured_content["count"], 1)
+        self.assertEqual(
+            result.structured_content["matches"][0]["match_reasons"],
+            [{"field": "label", "terms": ["negative"]}],
+        )
+        self.assertEqual(
+            self.catalog.calls,
+            [("discover", arguments)],
+        )
+
+    async def test_exact_semantic_tools_dispatch_without_reinterpretation(self) -> None:
+        cases = (
+            ("get_clinical_object", "imaging_finding"),
+            ("get_semantic_relationship", "finding.pathology"),
+            ("get_temporal_semantic", "pathology.report_date"),
+            ("get_aggregation", "pathology.exam_severity"),
+            ("get_guardrail", "pathology.null-not-negative"),
+            ("get_coverage", "pathology.specimen_time"),
+        )
+        async with Client(self.server) as client:
+            for tool_name, identifier in cases:
+                result = await client.call_tool(
+                    tool_name,
+                    {"identifier": identifier},
+                )
+                self.assertFalse(result.is_error)
+                self.assertEqual(
+                    result.structured_content["identifier"],
+                    identifier,
+                )
+
+        self.assertEqual(
+            self.catalog.calls,
+            [
+                (tool_name, {"identifier": identifier})
+                for tool_name, identifier in cases
+            ],
+        )
+
+    async def test_feature_and_code_tools_preserve_explicit_arguments(self) -> None:
+        async with Client(self.server) as client:
+            feature = await client.call_tool(
                 "get_feature",
                 {
-                    "identifier": "synthetic_table.synthetic_column",
+                    "identifier": "pathology.severity",
                     "include_codes": True,
                 },
             )
+            code = await client.call_tool(
+                "lookup_code",
+                {
+                    "feature_or_vocabulary": "pathology-severity",
+                    "code": "MiXeD,Value",
+                },
+            )
 
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "identifier": "synthetic_table.synthetic_column",
-                "meaning": "Synthetic feature",
-                "codes_included": True,
-            },
-        )
+        self.assertFalse(feature.is_error)
+        self.assertTrue(feature.structured_content["codes_included"])
+        self.assertFalse(code.is_error)
+        self.assertEqual(code.structured_content["code"], "MiXeD,Value")
         self.assertEqual(
             self.catalog.calls,
             [
                 (
                     "get_feature",
                     {
-                        "identifier": "synthetic_table.synthetic_column",
+                        "identifier": "pathology.severity",
                         "include_codes": True,
                     },
-                )
+                ),
+                (
+                    "lookup_code",
+                    {
+                        "feature_or_vocabulary": "pathology-severity",
+                        "code": "MiXeD,Value",
+                    },
+                ),
             ],
         )
 
-    async def test_search_returns_core_result_unchanged(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "search_features",
-                {
-                    "query": "",
-                    "profile": "open-v2",
-                    "table": "synthetic_table",
-                    "grain": "exam",
-                    "domain": "demographics",
-                    "feature_kind": "categorical",
-                    "limit": 3,
-                },
-            )
-
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "matches": [
-                    {
-                        "name": "synthetic_table.synthetic_column",
-                        "meaning": "Synthetic match",
-                    }
-                ],
-                "count": 1,
-            },
-        )
-        self.assertEqual(
-            self.catalog.calls[-1],
-            (
-                "search_features",
-                {
-                    "query": "",
-                    "profile": "open-v2",
-                    "table": "synthetic_table",
-                    "grain": "exam",
-                    "domain": "demographics",
-                    "feature_kind": "categorical",
-                    "limit": 3,
-                },
-            ),
-        )
-
-    async def test_lookup_code_preserves_exact_code(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "lookup_code",
-                {
-                    "feature_or_vocabulary": "synthetic_vocabulary",
-                    "code": "MiXeD,Value",
-                },
-            )
-
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "feature_or_vocabulary": "synthetic_vocabulary",
-                "code": "MiXeD,Value",
-                "meaning": "Synthetic code",
-            },
-        )
-
-    async def test_get_table_returns_core_result_unchanged(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "get_table",
-                {
-                    "profile": "open-v2",
-                    "table": "synthetic_table",
-                },
-            )
-
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "kind": "table",
-                "identifier": "open-v2:synthetic_table",
-            },
-        )
-        self.assertEqual(
-            self.catalog.calls[-1],
-            (
-                "get_table",
-                {
-                    "profile": "open-v2",
-                    "table": "synthetic_table",
-                },
-            ),
-        )
-
-    async def test_get_relationship_returns_core_result_unchanged(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "get_relationship",
-                {"identifier": "synthetic.relationship"},
-            )
-
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "kind": "relationship",
-                "identifier": "synthetic.relationship",
-            },
-        )
-        self.assertEqual(
-            self.catalog.calls[-1],
-            (
-                "get_relationship",
-                {"identifier": "synthetic.relationship"},
-            ),
-        )
-
-    async def test_search_relationships_returns_core_result_unchanged(self) -> None:
+    async def test_profile_binding_tools_are_explicit_and_secondary(self) -> None:
         arguments = {
             "profile": "open-v2",
             "table": "exam_level_anon",
-            "source_table": "combined_anon",
-            "target_table": "exam_level_anon",
-            "kind": "projection",
+            "source_table": "exam_level_anon",
+            "target_table": "clinical_data_anon",
+            "kind": "hierarchy",
             "limit": 3,
         }
         async with Client(self.server) as client:
-            result = await client.call_tool(
-                "search_relationships",
+            table = await client.call_tool(
+                "get_profile_table",
+                {"profile": "open-v2", "table": "exam_level_anon"},
+            )
+            binding = await client.call_tool(
+                "get_relationship_binding",
+                {"identifier": "exam.patient"},
+            )
+            bindings = await client.call_tool(
+                "search_relationship_bindings",
                 arguments,
             )
+            tools = await client.list_tools()
 
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "filters": {
-                    name: value
-                    for name, value in arguments.items()
-                    if name != "limit"
-                },
-                "count": 1,
-                "total": 1,
-                "matches": [{"id": "synthetic.relationship"}],
-            },
+        self.assertFalse(table.is_error)
+        self.assertFalse(binding.is_error)
+        self.assertFalse(bindings.is_error)
+        self.assertEqual(bindings.structured_content["count"], 1)
+        descriptions = {tool.name: tool.description for tool in tools.tools}
+        self.assertIn("secondary", descriptions["get_profile_table"])
+        self.assertIn(
+            "not clinical relationships or executable joins",
+            descriptions["search_relationship_bindings"],
         )
         self.assertEqual(
-            self.catalog.calls[-1],
-            ("search_relationships", arguments),
+            self.catalog.calls,
+            [
+                (
+                    "get_profile_table",
+                    {"profile": "open-v2", "table": "exam_level_anon"},
+                ),
+                (
+                    "get_relationship_binding",
+                    {"identifier": "exam.patient"},
+                ),
+                ("search_relationship_bindings", arguments),
+            ],
         )
 
-    async def test_get_context_returns_core_result_unchanged(self) -> None:
+    async def test_invalid_controlled_filters_are_schema_errors(self) -> None:
         async with Client(self.server) as client:
-            result = await client.call_tool(
-                "get_context",
-                {"identifier": "synthetic.context"},
+            invalid_discovery_kind = await client.call_tool(
+                "discover",
+                {"query": "pathology", "kinds": ["table"]},
             )
-
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "kind": "context",
-                "identifier": "synthetic.context",
-                "context": {
-                    "title": "Synthetic context",
-                    "claims": [],
-                },
-                "sources": [],
-            },
-        )
-        self.assertEqual(
-            self.catalog.calls[-1],
-            (
-                "get_context",
-                {"identifier": "synthetic.context"},
-            ),
-        )
-
-    async def test_search_contexts_returns_core_result_unchanged(self) -> None:
-        arguments = {
-            "query": "pathology",
-            "kind": "interpretation_guardrail",
-            "scope": "profile_specific",
-            "profile": "open-v2",
-            "domain": "pathology",
-            "concept": "pathology.severity",
-            "table": "pathology_findings_anon",
-            "relationship": "open-v2.pathology_findings_anon.imaging_finding",
-            "status": "unresolved",
-            "source": "open-v2.release-schema",
-            "limit": 3,
-        }
-        async with Client(self.server) as client:
-            result = await client.call_tool("search_contexts", arguments)
-
-        self.assertFalse(result.is_error)
-        self.assertEqual(
-            result.structured_content,
-            {
-                "filters": {
-                    name: value
-                    for name, value in arguments.items()
-                    if name not in {"query", "limit"}
-                },
-                "query": "pathology",
-                "count": 1,
-                "total": 1,
-                "matches": [
-                    {
-                        "identifier": "synthetic.context",
-                        "title": "Synthetic context",
-                        "claims": [],
-                    }
-                ],
-            },
-        )
-        self.assertEqual(
-            self.catalog.calls[-1],
-            ("search_contexts", arguments),
-        )
-
-    async def test_invalid_limit_from_core_is_a_tool_error(self) -> None:
-        server = build_server(load_catalog())
-        async with Client(server) as client:
-            result = await client.call_tool(
-                "search_features",
-                {"query": "density", "limit": 501},
+            invalid_domain = await client.call_tool(
+                "discover",
+                {"query": "pathology", "domain": "cohort"},
             )
-
-        self.assertTrue(result.is_error)
-
-    async def test_invalid_controlled_filter_is_a_schema_error(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "search_features",
-                {"query": "density", "grain": "not-a-grain"},
-            )
-
-        self.assertTrue(result.is_error)
-        self.assertEqual(self.catalog.calls, [])
-
-    async def test_invalid_relationship_kind_is_a_schema_error(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "search_relationships",
+            invalid_binding_kind = await client.call_tool(
+                "search_relationship_bindings",
                 {"kind": "foreign_key"},
             )
 
-        self.assertTrue(result.is_error)
+        self.assertTrue(invalid_discovery_kind.is_error)
+        self.assertTrue(invalid_domain.is_error)
+        self.assertTrue(invalid_binding_kind.is_error)
         self.assertEqual(self.catalog.calls, [])
 
-    async def test_unknown_relationship_filter_is_a_schema_error(self) -> None:
+    async def test_unknown_arguments_are_schema_errors_for_every_surface(self) -> None:
         async with Client(self.server) as client:
-            result = await client.call_tool(
-                "search_relationships",
-                {"sourceTable": "combined_anon"},
+            discovery = await client.call_tool(
+                "discover",
+                {"query": "pathology", "table": "pathology_findings_anon"},
+            )
+            getter = await client.call_tool(
+                "get_guardrail",
+                {"identifier": "guardrail", "include_sources": True},
+            )
+            binding = await client.call_tool(
+                "search_relationship_bindings",
+                {"sourceTable": "exam_level_anon"},
             )
 
-        self.assertTrue(result.is_error)
+        self.assertTrue(discovery.is_error)
+        self.assertTrue(getter.is_error)
+        self.assertTrue(binding.is_error)
         self.assertEqual(self.catalog.calls, [])
-
-    async def test_invalid_context_filter_is_a_schema_error(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "search_contexts",
-                {"kind": "diagnosis"},
-            )
-
-        self.assertTrue(result.is_error)
-        self.assertEqual(self.catalog.calls, [])
-
-    async def test_unknown_context_filter_is_a_schema_error(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "search_contexts",
-                {"claimStatus": "verified"},
-            )
-
-        self.assertTrue(result.is_error)
-        self.assertEqual(self.catalog.calls, [])
-
-    async def test_unknown_get_context_argument_is_a_schema_error(self) -> None:
-        async with Client(self.server) as client:
-            result = await client.call_tool(
-                "get_context",
-                {
-                    "identifier": "synthetic.context",
-                    "include_sources": True,
-                },
-            )
-
-        self.assertTrue(result.is_error)
-        self.assertEqual(self.catalog.calls, [])
-
-    async def test_empty_query_without_filters_is_a_tool_error(self) -> None:
-        server = build_server(load_catalog())
-        async with Client(server) as client:
-            result = await client.call_tool("search_features", {})
-
-        self.assertTrue(result.is_error)
-
-
-@unittest.skipUnless(MCP_AVAILABLE, "optional MCP SDK is not installed")
-class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_search_tool_describes_catalog_specific_filters(self) -> None:
-        server = build_server(load_catalog())
-        async with Client(server) as client:
-            result = await client.list_tools()
-
-        search = next(
-            tool for tool in result.tools if tool.name == "search_features"
-        )
-        self.assertIn("profiles in this catalog: open-v2", search.description)
-        self.assertIn("tables in this catalog:", search.description)
-        self.assertIn("pathology_findings_anon", search.description)
-        relationship_search = next(
-            tool
-            for tool in result.tools
-            if tool.name == "search_relationships"
-        )
-        self.assertIn(
-            "hierarchy, projection, reference",
-            relationship_search.description,
-        )
-        self.assertIn(
-            "profiles in this catalog: open-v2",
-            relationship_search.description,
-        )
-        self.assertIn(
-            "tables in this catalog:",
-            relationship_search.description,
-        )
-        self.assertNotIn("grains:", relationship_search.description)
-        self.assertNotIn("domains:", relationship_search.description)
-        self.assertNotIn("feature kinds:", relationship_search.description)
-        context_search = next(
-            tool for tool in result.tools if tool.name == "search_contexts"
-        )
-        self.assertIn(
-            "clinical_workflow, data_representation, "
-            "interpretation_guardrail, known_issue",
-            context_search.description,
-        )
-        self.assertIn(
-            "general_clinical, embed_general, profile_specific",
-            context_search.description,
-        )
-        self.assertIn(
-            "verified, reconciled, unverified, unresolved, contradicted",
-            context_search.description,
-        )
-        self.assertIn(
-            "profiles in this catalog: open-v2",
-            context_search.description,
-        )
-
-    async def test_all_tools_query_the_checked_in_catalog(self) -> None:
-        server = build_server(load_catalog())
-        async with Client(server) as client:
-            feature = await client.call_tool(
-                "get_feature",
-                {"identifier": "exam.accession_identifier"},
-            )
-            search = await client.call_tool(
-                "search_features",
-                {"domain": "social_determinants_of_health"},
-            )
-            code = await client.call_tool(
-                "lookup_code",
-                {
-                    "feature_or_vocabulary": "imaging.assessment",
-                    "code": "N",
-                },
-            )
-            table = await client.call_tool(
-                "get_table",
-                {
-                    "profile": "open-v2",
-                    "table": "exam_level_anon",
-                },
-            )
-            relationship = await client.call_tool(
-                "get_relationship",
-                {"identifier": "open-v2.exam_level_anon.patient"},
-            )
-            relationships = await client.call_tool(
-                "search_relationships",
-                {
-                    "table": "exam_level_anon",
-                    "kind": "hierarchy",
-                },
-            )
-            context = await client.call_tool(
-                "get_context",
-                {"identifier": "open-v2.pathology-procedure-context"},
-            )
-            contexts = await client.call_tool(
-                "search_contexts",
-                {
-                    "profile": "open-v2",
-                    "domain": "pathology",
-                    "status": "unresolved",
-                },
-            )
-            pattern = await client.call_tool(
-                "get_analysis_pattern",
-                {
-                    "identifier": (
-                        "open-v2.pathology-cancer-vs-noncancer"
-                    )
-                },
-            )
-            patterns = await client.call_tool(
-                "search_analysis_patterns",
-                {
-                    "profile": "open-v2",
-                    "domain": "pathology",
-                    "status": "draft",
-                },
-            )
-
-        self.assertFalse(feature.is_error)
-        self.assertEqual(
-            feature.structured_content["concept"]["id"],
-            "exam.accession_identifier",
-        )
-        self.assertFalse(search.is_error)
-        identifiers = [
-            match["identifier"]
-            for match in search.structured_content["matches"]
-        ]
-        self.assertEqual(len(identifiers), len(set(identifiers)))
-        self.assertIn("demographics.race", identifiers)
-        self.assertFalse(code.is_error)
-        self.assertEqual(code.structured_content["meaning"], "Negative")
-        self.assertFalse(table.is_error)
-        self.assertEqual(
-            table.structured_content["identifier"],
-            "open-v2:exam_level_anon",
-        )
-        self.assertTrue(
-            table.structured_content["relationships"]["outgoing"]
-        )
-        self.assertFalse(relationship.is_error)
-        self.assertEqual(
-            relationship.structured_content["relationship"]["kind"],
-            "hierarchy",
-        )
-        self.assertFalse(relationships.is_error)
-        relationship_ids = {
-            match["id"]
-            for match in relationships.structured_content["matches"]
-        }
-        self.assertIn("open-v2.exam_level_anon.patient", relationship_ids)
-        self.assertFalse(context.is_error)
-        self.assertEqual(
-            context.structured_content["identifier"],
-            "open-v2.pathology-procedure-context",
-        )
-        self.assertTrue(context.structured_content["sources"])
-        self.assertFalse(contexts.is_error)
-        self.assertFalse(pattern.is_error)
-        self.assertEqual(
-            pattern.structured_content["pattern"]["status"], "draft"
-        )
-        self.assertFalse(patterns.is_error)
-        self.assertEqual(patterns.structured_content["count"], 1)
-        context_ids = {
-            match["identifier"]
-            for match in contexts.structured_content["matches"]
-        }
-        self.assertIn("open-v2.pathology-procedure-context", context_ids)
-        for match in contexts.structured_content["matches"]:
-            for claim in match["matching_claims"]:
-                self.assertEqual(claim["status"], "unresolved")
 
 
 if __name__ == "__main__":

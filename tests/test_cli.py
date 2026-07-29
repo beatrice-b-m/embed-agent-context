@@ -1,65 +1,391 @@
-"""Tests for stable JSON envelopes and concise CLI text."""
+"""Contract tests for the schema-v5 clinical-semantic CLI."""
 
 from __future__ import annotations
 
 import io
 import json
-import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
-from pathlib import Path
+from typing import Any
+from unittest.mock import patch
 
-from embed_context.cli import main
-from tests.catalog_fixture import synthetic_catalog, write_catalog
+from embed_context.cli import _format_text, build_parser, main
+
+
+class FakeCatalog:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def summary(self) -> dict[str, Any]:
+        self.calls.append(("summary", {}))
+        return {
+            "schema_version": 5,
+            "profiles": ["open-v2"],
+            "binding_grains": ["patient", "exam", "imaging_finding"],
+            "feature_kinds": ["date", "coded"],
+            "domains": ["exam", "pathology"],
+            "semantic_relationship_kinds": ["hierarchy", "attribution"],
+            "temporal_kinds": ["event_time", "documentation_time"],
+            "aggregation_statuses": ["provided", "unresolved"],
+            "coverage_statuses": ["supported", "unsupported"],
+            "relationship_binding_kinds": ["hierarchy", "projection"],
+            "clinical_objects": 3,
+            "concepts": 4,
+            "semantic_relationships": 2,
+            "temporal_semantics": 2,
+            "aggregations": 1,
+            "guardrails": 2,
+            "coverage": 1,
+            "vocabularies": 1,
+            "sources": 1,
+            "contexts": 1,
+            "profile_bindings": 1,
+            "feature_bindings": 3,
+            "tables": 2,
+            "relationship_bindings": 1,
+        }
+
+    def discover(
+        self,
+        query: str,
+        *,
+        profile: str | None = None,
+        kinds: tuple[str, ...] | None = None,
+        domain: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        arguments = {
+            "query": query,
+            "profile": profile,
+            "kinds": kinds,
+            "domain": domain,
+            "limit": limit,
+        }
+        self.calls.append(("discover", arguments))
+        filters = {
+            "profile": profile,
+            "kinds": list(kinds) if kinds else None,
+            "domain": domain,
+        }
+        if query == "unrepresented specimen":
+            return {
+                "query": query,
+                "filters": filters,
+                "count": 0,
+                "total": 0,
+                "matches": [],
+                "diagnostics": {
+                    "no_catalog_coverage": True,
+                    "unsupported_in_profile": ["open-v2"],
+                },
+            }
+        return {
+            "query": query,
+            "filters": filters,
+            "count": 1,
+            "total": 2,
+            "matches": [
+                {
+                    "kind": "guardrail",
+                    "identifier": "pathology.null-not-negative",
+                    "score": 14,
+                    "label": "Absent pathology is not negative",
+                    "entity": {
+                        "id": "pathology.null-not-negative",
+                        "statement": "Missing attachment is not benign.",
+                    },
+                    "match_reasons": [
+                        {"field": "search_terms", "terms": ["pathology"]},
+                        {"field": "statement", "terms": ["negative"]},
+                    ],
+                    "matched_terms": ["negative", "pathology"],
+                    "unmatched_terms": ["outcome"],
+                }
+            ],
+            "diagnostics": {
+                "filters_excluded_matches": 1,
+                "unknown_filter_or_vocabulary_value": [],
+                "unsupported_in_profile": [],
+                "no_catalog_coverage": False,
+            },
+        }
+
+    def get_clinical_object(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_clinical_object",
+            identifier,
+            "clinical_object",
+            {
+                "id": identifier,
+                "label": "Imaging finding",
+                "definition": "A localized imaging observation.",
+                "grain": "imaging_finding",
+            },
+        )
+
+    def get_feature(
+        self,
+        identifier: str,
+        *,
+        include_codes: bool = False,
+    ) -> dict[str, Any]:
+        self.calls.append(
+            (
+                "get_feature",
+                {"identifier": identifier, "include_codes": include_codes},
+            )
+        )
+        result: dict[str, Any] = {
+            "kind": "feature",
+            "identifier": identifier,
+            "feature": {
+                "id": identifier,
+                "label": "Pathology severity",
+                "definition": "An inverse ordered diagnosis group.",
+                "kind": "coded",
+            },
+            "profile_bindings": [{"profile": "open-v2"}],
+            "vocabulary": {
+                "id": "pathology-severity",
+                "completeness": "complete",
+                "parsing": "atomic",
+            },
+        }
+        if include_codes:
+            result["vocabulary"]["codes"] = {
+                "0": "Invasive breast cancer",
+                "5": "Non-breast cancer",
+            }
+        return result
+
+    def get_semantic_relationship(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_semantic_relationship",
+            identifier,
+            "semantic_relationship",
+            {
+                "id": identifier,
+                "label": "Finding attributed to pathology",
+                "kind": "attribution",
+                "source_object": "imaging_finding",
+                "target_object": "pathology_observation",
+                "cardinality": {
+                    "targets_per_source": "zero_or_more",
+                    "sources_per_target": "zero_or_more",
+                },
+                "optionality": {
+                    "source": "optional",
+                    "target": "optional",
+                },
+                "attribution": "optional_many_to_many",
+                "attribution_limitations": [
+                    "Attribution may be absent or many-to-many."
+                ],
+                "temporal_qualification": (
+                    "A downstream link does not make pathology available "
+                    "at imaging time."
+                ),
+            },
+        )
+
+    def get_temporal_semantic(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_temporal_semantic",
+            identifier,
+            "temporal_semantic",
+            {
+                "id": identifier,
+                "label": "Pathology report date",
+                "meaning": "Documentation time, not a universal diagnosis date.",
+                "kind": "documentation_time",
+                "objects": ["pathology_observation"],
+                "feature_refs": ["pathology.report_date"],
+                "relative_to": ["time.procedure-event"],
+            },
+        )
+
+    def get_aggregation(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_aggregation",
+            identifier,
+            "aggregation",
+            {
+                "id": identifier,
+                "label": "Exam severity",
+                "description": "Minimum code reflects maximum severity.",
+                "status": "provided",
+                "source_object": "pathology_observation",
+                "target_object": "imaging_exam",
+                "source_concept": "pathology.severity",
+                "result_concept": "pathology.exam_severity",
+                "method": "minimum represented numeric code",
+                "ordering": "inverse severity",
+            },
+        )
+
+    def get_guardrail(self, identifier: str) -> dict[str, Any]:
+        if identifier == "missing.guardrail":
+            raise ValueError("guardrail was not found")
+        return self._exact(
+            "get_guardrail",
+            identifier,
+            "guardrail",
+            {
+                "id": identifier,
+                "label": "Null is not negative",
+                "statement": "Absent attached pathology is not a benign outcome.",
+                "rationale": "Attachment and follow-up may be incomplete.",
+            },
+        )
+
+    def get_coverage(self, identifier: str) -> dict[str, Any]:
+        return self._exact(
+            "get_coverage",
+            identifier,
+            "coverage",
+            {
+                "id": identifier,
+                "label": "Specimen collection time",
+                "description": "Not represented by a supported open-v2 feature.",
+                "status": "unsupported",
+            },
+        )
+
+    def lookup_code(
+        self,
+        feature_or_vocabulary: str,
+        code: str,
+    ) -> dict[str, Any]:
+        self.calls.append(
+            (
+                "lookup_code",
+                {
+                    "feature_or_vocabulary": feature_or_vocabulary,
+                    "code": code,
+                },
+            )
+        )
+        return {
+            "vocabulary": "pathology-severity",
+            "code": code,
+            "meaning": "Invasive breast cancer",
+        }
+
+    def get_profile_table(self, profile: str, table: str) -> dict[str, Any]:
+        self.calls.append(
+            ("get_profile_table", {"profile": profile, "table": table})
+        )
+        return {
+            "kind": "profile_table",
+            "identifier": f"{profile}:{table}",
+            "table": {
+                "id": table,
+                "label": table,
+                "grain": "exam",
+                "keys": [
+                    {
+                        "id": "exam.accession",
+                        "columns": ["acc_anon"],
+                        "kind": "natural",
+                        "uniqueness": "unique",
+                        "completeness": "complete",
+                    }
+                ],
+            },
+            "relationship_bindings": {
+                "outgoing": [{"id": "exam.patient"}],
+                "incoming": [],
+            },
+        }
+
+    def get_relationship_binding(self, identifier: str) -> dict[str, Any]:
+        self.calls.append(
+            ("get_relationship_binding", {"identifier": identifier})
+        )
+        return {
+            "kind": "relationship_binding",
+            "identifier": identifier,
+            "relationship_binding": self._relationship_binding(identifier),
+        }
+
+    def search_relationship_bindings(
+        self,
+        *,
+        profile: str | None = None,
+        table: str | None = None,
+        source_table: str | None = None,
+        target_table: str | None = None,
+        kind: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        arguments = {
+            "profile": profile,
+            "table": table,
+            "source_table": source_table,
+            "target_table": target_table,
+            "kind": kind,
+            "limit": limit,
+        }
+        self.calls.append(("search_relationship_bindings", arguments))
+        return {
+            "filters": {
+                key: value for key, value in arguments.items() if key != "limit"
+            },
+            "count": 1,
+            "total": 1,
+            "matches": [self._relationship_binding("exam.patient")],
+        }
+
+    def _exact(
+        self,
+        method: str,
+        identifier: str,
+        entity_key: str,
+        entity: dict[str, Any],
+    ) -> dict[str, Any]:
+        self.calls.append((method, {"identifier": identifier}))
+        return {
+            "kind": entity_key,
+            "identifier": identifier,
+            entity_key: entity,
+        }
+
+    @staticmethod
+    def _relationship_binding(identifier: str) -> dict[str, Any]:
+        return {
+            "id": identifier,
+            "profile": "open-v2",
+            "kind": "hierarchy",
+            "source": {"table": "exam_level_anon", "columns": ["empi_anon"]},
+            "target": {"table": "clinical_data_anon", "columns": ["empi_anon"]},
+            "cardinality": {
+                "targets_per_source": "one",
+                "sources_per_target": "zero_or_more",
+            },
+            "join_hazards": ["Patient identifiers are profile-scoped."],
+        }
 
 
 class CatalogCLITests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
-        data = synthetic_catalog()
-        data["relationships"].append(
-            {
-                "id": "wide.tissue-density-projection",
-                "profile": "open-v2",
-                "kind": "projection",
-                "source": {
-                    "table": "combined_anon",
-                    "columns": ["tissueden"],
-                    "completeness": "unknown",
-                },
-                "target": {
-                    "table": "exam_level_anon",
-                    "columns": ["tissueden"],
-                },
-                "cardinality": {
-                    "targets_per_source": "unknown",
-                    "sources_per_target": "unknown",
-                },
-                "evidence": ["release_schema"],
-                "caveats": ["Projection equality is not established."],
-                "join_hazards": [
-                    "Do not use the wide projection as an authoritative join."
-                ],
-            }
-        )
-        self.catalog_path = write_catalog(
-            Path(self.temporary.name) / "catalog.json",
-            data,
-        )
+        self.catalog = FakeCatalog()
 
-    def run_cli(self, *arguments: str):
+    def run_cli(self, *arguments: str) -> tuple[int, str, str]:
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            status = main(
-                ["--catalog", str(self.catalog_path), *arguments]
-            )
+        with (
+            patch("embed_context.cli.load_catalog", return_value=self.catalog),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            status = main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
 
-    def test_validate_json_uses_stable_envelope(self) -> None:
+    def test_validate_json_uses_stable_envelope_and_v5_inventory(self) -> None:
         status, stdout, stderr = self.run_cli(
-            "--format", "json", "validate"
+            "--format",
+            "json",
+            "validate",
         )
 
         self.assertEqual(status, 0)
@@ -67,597 +393,383 @@ class CatalogCLITests(unittest.TestCase):
         envelope = json.loads(stdout)
         self.assertEqual(envelope["ok"], True)
         self.assertEqual(envelope["command"], "validate")
-        self.assertEqual(
-            envelope["data"],
-            {
-                "schema_version": 4,
-                "profiles": ["open-v2"],
-                "grains": [
-                    "patient",
-                    "exam",
-                    "breast_side",
-                    "imaging_finding",
-                    "pathology_finding",
-                    "report",
-                    "risk_assessment",
-                    "wide_row",
-                ],
-                "feature_kinds": [
-                    "identifier",
-                    "date",
-                    "categorical",
-                    "coded",
-                    "flag",
-                    "numeric",
-                    "text",
-                    "aggregate",
-                    "model_output",
-                    "technical",
-                ],
-                "domains": [
-                    "identity",
-                    "demographics",
-                    "social_determinants_of_health",
-                    "exam",
-                    "breast_side",
-                    "imaging",
-                    "mammography",
-                    "ultrasound",
-                    "mri",
-                    "pathology",
-                    "procedure",
-                    "report",
-                    "risk",
-                    "temporal",
-                    "workflow",
-                    "technical",
-                ],
-                "context_kinds": [
-                    "clinical_workflow",
-                    "data_representation",
-                    "interpretation_guardrail",
-                    "known_issue",
-                ],
-                "context_scopes": [
-                    "general_clinical",
-                    "embed_general",
-                    "profile_specific",
-                ],
-                "source_kinds": [
-                    "maintainer_confirmed",
-                    "release_schema",
-                    "release_legend",
-                    "supporting_internal",
-                    "public_documentation",
-                ],
-                "source_locator_kinds": [
-                    "url",
-                    "repository_path",
-                    "logical_artifact",
-                ],
-                "claim_statuses": [
-                    "verified",
-                    "reconciled",
-                    "unverified",
-                    "unresolved",
-                    "contradicted",
-                ],
-                "analysis_pattern_statuses": [
-                    "draft",
-                    "reviewed",
-                ],
-                "concepts": 2,
-                "bindings": 3,
-                "vocabularies": 1,
-                "tables": 2,
-                "relationships": 1,
-                "sources": 1,
-                "contexts": 1,
-                "analysis_patterns": 1,
-            },
-        )
+        self.assertEqual(envelope["data"]["schema_version"], 5)
+        self.assertEqual(envelope["data"]["clinical_objects"], 3)
+        self.assertEqual(envelope["data"]["relationship_bindings"], 1)
 
-    def test_validate_text_includes_structural_and_context_counts(self) -> None:
+    def test_validate_text_exposes_semantic_and_binding_facets(self) -> None:
         status, stdout, stderr = self.run_cli("validate")
 
         self.assertEqual(status, 0)
         self.assertEqual(stderr, "")
-        self.assertIn("2 tables, 1 relationship", stdout)
-        self.assertIn("1 source, 1 context", stdout)
-        self.assertIn("1 analysis pattern", stdout)
+        self.assertIn("3 clinical objects", stdout)
+        self.assertIn("2 semantic relationships", stdout)
+        self.assertIn("1 relationship bindings", stdout)
+        self.assertIn("temporal kinds: event_time, documentation_time", stdout)
 
-    def test_get_text_is_concise(self) -> None:
+    def test_discover_passes_clinical_filters_and_explains_matches(self) -> None:
         status, stdout, stderr = self.run_cli(
-            "get", "exam_level_anon.tissueden"
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        self.assertIn(
-            "exam_level_anon.tissueden — Breast tissue density", stdout
-        )
-        self.assertIn("open-v2 · exam · int8 · canonical", stdout)
-        self.assertNotIn('"ok"', stdout)
-
-    def test_get_text_includes_codes_only_when_requested(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "get", "exam_level_anon.tissueden", "--include-codes"
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        self.assertIn("codes:\n", stdout)
-        self.assertIn("  2 — Scattered fibroglandular densities", stdout)
-
-    def test_search_help_lists_controlled_filters(self) -> None:
-        stdout = io.StringIO()
-        with self.assertRaises(SystemExit) as raised, redirect_stdout(stdout):
-            main(["search", "--help"])
-
-        self.assertEqual(raised.exception.code, 0)
-        help_text = stdout.getvalue()
-        self.assertIn("social_determinants_of_health", help_text)
-        self.assertIn("pathology_finding", help_text)
-        self.assertIn("model_output", help_text)
-
-    def test_search_json_passes_filters_and_limit(self) -> None:
-        status, stdout, _ = self.run_cli(
-            "--format",
-            "json",
-            "search",
-            "density",
-            "--table",
-            "exam_level_anon",
+            "discover",
+            "negative pathology outcome",
+            "--profile",
+            "open-v2",
+            "--kind",
+            "guardrail",
+            "--kind",
+            "coverage",
             "--domain",
-            "mammography",
+            "pathology",
             "--limit",
             "1",
         )
 
         self.assertEqual(status, 0)
-        data = json.loads(stdout)["data"]
-        self.assertEqual(data["count"], 1)
+        self.assertEqual(stderr, "")
         self.assertEqual(
-            data["matches"][0]["identifier"],
-            "exam.tissue_density",
+            self.catalog.calls[-1],
+            (
+                "discover",
+                {
+                    "query": "negative pathology outcome",
+                    "profile": "open-v2",
+                    "kinds": ("guardrail", "coverage"),
+                    "domain": "pathology",
+                    "limit": 1,
+                },
+            ),
         )
-        self.assertEqual(
-            data["matches"][0]["bindings"][0]["identifier"],
-            "exam_level_anon.tissueden",
+        self.assertIn(
+            "pathology.null-not-negative [guardrail] — "
+            "Absent pathology is not negative",
+            stdout,
+        )
+        self.assertIn("matched by search_terms: pathology", stdout)
+        self.assertIn("unmatched terms: outcome", stdout)
+        self.assertIn("diagnostics:", stdout)
+        self.assertIn("filters excluded matches: 1", stdout)
+
+    def test_discover_json_preserves_diagnostics(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "discover",
+            "unrepresented specimen",
+            "--profile",
+            "open-v2",
         )
 
-    def test_code_text_preserves_exact_code(self) -> None:
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        data = json.loads(stdout)["data"]
+        self.assertEqual(data["matches"], [])
+        self.assertTrue(data["diagnostics"]["no_catalog_coverage"])
+        self.assertEqual(
+            data["diagnostics"]["unsupported_in_profile"],
+            ["open-v2"],
+        )
+
+    def test_discover_allows_a_filter_without_free_text(self) -> None:
         status, stdout, stderr = self.run_cli(
-            "code", "exam.tissue_density", "2"
+            "--format",
+            "json",
+            "discover",
+            "--kind",
+            "guardrail",
         )
 
         self.assertEqual(status, 0)
         self.assertEqual(stderr, "")
         self.assertEqual(
-            stdout,
-            "exam.tissue_density 2 — Scattered fibroglandular densities\n",
+            self.catalog.calls[-1],
+            (
+                "discover",
+                {
+                    "query": "",
+                    "profile": None,
+                    "kinds": ("guardrail",),
+                    "domain": None,
+                    "limit": 50,
+                },
+            ),
+        )
+        self.assertEqual(json.loads(stdout)["data"]["count"], 1)
+
+    def test_exact_semantic_commands_dispatch_to_distinct_getters(self) -> None:
+        cases = (
+            ("object", "imaging_finding", "get_clinical_object"),
+            ("semantic-relationship", "finding.pathology", "get_semantic_relationship"),
+            ("temporal", "pathology.report_date", "get_temporal_semantic"),
+            ("aggregation", "pathology.exam_severity", "get_aggregation"),
+            ("guardrail", "pathology.null-not-negative", "get_guardrail"),
+            ("coverage", "pathology.specimen_time", "get_coverage"),
+        )
+        for command, identifier, expected_method in cases:
+            with self.subTest(command=command):
+                self.catalog.calls.clear()
+                status, stdout, stderr = self.run_cli(command, identifier)
+                self.assertEqual(status, 0)
+                self.assertEqual(stderr, "")
+                self.assertEqual(
+                    self.catalog.calls,
+                    [(expected_method, {"identifier": identifier})],
+                )
+                self.assertIn(identifier, stdout)
+
+    def test_feature_includes_codes_only_when_requested(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "feature",
+            "pathology.severity",
+            "--include-codes",
         )
 
-    def test_table_json_returns_core_result(self) -> None:
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertEqual(
+            self.catalog.calls[-1],
+            (
+                "get_feature",
+                {
+                    "identifier": "pathology.severity",
+                    "include_codes": True,
+                },
+            ),
+        )
+        self.assertIn("codes:", stdout)
+        self.assertIn("0 — Invasive breast cancer", stdout)
+
+    def test_text_semantic_getters_expose_choices_and_limitations(self) -> None:
+        _, relationship, _ = self.run_cli(
+            "semantic-relationship",
+            "clinical.finding-pathology-observation",
+        )
+        self.assertIn("targets_per_source=zero_or_more", relationship)
+        self.assertIn("optionality: source=optional; target=optional", relationship)
+        self.assertIn("attribution: optional_many_to_many", relationship)
+        self.assertIn("temporal qualification:", relationship)
+        self.assertIn("many-to-many", relationship)
+
+        _, temporal, _ = self.run_cli(
+            "temporal",
+            "time.pathology-report-documentation",
+        )
+        self.assertIn("documentation_time", temporal)
+        self.assertIn("features: pathology.report_date", temporal)
+        self.assertIn("relative to: time.procedure-event", temporal)
+
+        _, aggregation, _ = self.run_cli(
+            "aggregation",
+            "aggregation.pathology-severity-to-exam",
+        )
+        self.assertIn(
+            "grain transition: pathology_observation → imaging_exam",
+            aggregation,
+        )
+        self.assertIn("method: minimum represented numeric code", aggregation)
+        self.assertIn("ordering: inverse severity", aggregation)
+
+        _, guardrail, _ = self.run_cli(
+            "guardrail",
+            "guardrail.null-pathology-not-negative",
+        )
+        self.assertIn("Absent attached pathology is not a benign outcome", guardrail)
+        self.assertIn(
+            "rationale: Attachment and follow-up may be incomplete",
+            guardrail,
+        )
+
+    def test_code_preserves_exact_code_string(self) -> None:
         status, stdout, stderr = self.run_cli(
-            "--format",
-            "json",
-            "table",
+            "code",
+            "pathology-severity",
+            "MiXeD,Value",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertEqual(
+            self.catalog.calls[-1],
+            (
+                "lookup_code",
+                {
+                    "feature_or_vocabulary": "pathology-severity",
+                    "code": "MiXeD,Value",
+                },
+            ),
+        )
+        self.assertIn("MiXeD,Value", stdout)
+
+    def test_profile_table_is_explicitly_a_binding_surface(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "profile-table",
             "open-v2",
             "exam_level_anon",
         )
 
         self.assertEqual(status, 0)
         self.assertEqual(stderr, "")
-        envelope = json.loads(stdout)
-        self.assertEqual(envelope["command"], "table")
-        data = envelope["data"]
-        self.assertEqual(data["kind"], "table")
-        self.assertEqual(data["identifier"], "open-v2:exam_level_anon")
-        self.assertEqual(data["table"]["keys"][0]["id"], "exam.accession")
-        self.assertEqual(
-            [item["id"] for item in data["relationships"]["incoming"]],
-            ["wide.tissue-density-projection"],
-        )
+        self.assertIn("open-v2:exam_level_anon", stdout)
+        self.assertIn("exam.accession — acc_anon", stdout)
+        self.assertIn("relationship bindings: 1 outgoing, 0 incoming", stdout)
 
-    def test_table_text_summarizes_keys_and_relationships(self) -> None:
+    def test_relationship_binding_commands_preserve_physical_filters(self) -> None:
         status, stdout, stderr = self.run_cli(
-            "table", "open-v2", "exam_level_anon"
+            "relationship-binding",
+            "exam.patient",
         )
-
         self.assertEqual(status, 0)
         self.assertEqual(stderr, "")
-        self.assertIn("open-v2:exam_level_anon — exam table", stdout)
         self.assertIn(
-            "exam.accession — acc_anon (natural; unique; complete)",
+            "exam_level_anon(empi_anon) → clinical_data_anon(empi_anon)",
             stdout,
         )
-        self.assertIn("relationships: 0 outgoing, 1 incoming", stdout)
-
-    def test_relationship_json_returns_core_result(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "--format",
-            "json",
-            "relationship",
-            "wide.tissue-density-projection",
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        envelope = json.loads(stdout)
-        self.assertEqual(envelope["command"], "relationship")
-        self.assertEqual(envelope["data"]["kind"], "relationship")
-        self.assertEqual(
-            envelope["data"]["relationship"]["source"]["table"],
-            "combined_anon",
-        )
-
-    def test_relationship_text_preserves_direction_and_hazards(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "relationship", "wide.tissue-density-projection"
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        self.assertIn("wide.tissue-density-projection — projection", stdout)
-        self.assertIn(
-            "combined_anon(tissueden) → exam_level_anon(tissueden)",
-            stdout,
-        )
-        self.assertIn("unknown target(s) per source", stdout)
         self.assertIn("hazards:", stdout)
 
-    def test_relationships_help_lists_directional_and_kind_filters(self) -> None:
-        stdout = io.StringIO()
-        with self.assertRaises(SystemExit) as raised, redirect_stdout(stdout):
-            main(["relationships", "--help"])
-
-        self.assertEqual(raised.exception.code, 0)
-        help_text = stdout.getvalue()
-        self.assertIn("--source-table", help_text)
-        self.assertIn("--target-table", help_text)
-        self.assertIn("hierarchy", help_text)
-        self.assertIn("projection", help_text)
-        self.assertIn("reference", help_text)
-
-    def test_relationships_json_passes_filters_and_limit(self) -> None:
+        self.catalog.calls.clear()
         status, stdout, stderr = self.run_cli(
             "--format",
             "json",
-            "relationships",
+            "relationship-bindings",
             "--profile",
             "open-v2",
             "--table",
-            "combined_anon",
+            "exam_level_anon",
             "--source-table",
-            "combined_anon",
+            "exam_level_anon",
             "--target-table",
-            "exam_level_anon",
+            "clinical_data_anon",
             "--kind",
-            "projection",
+            "hierarchy",
             "--limit",
-            "1",
+            "2",
         )
-
         self.assertEqual(status, 0)
         self.assertEqual(stderr, "")
-        data = json.loads(stdout)["data"]
         self.assertEqual(
-            data["filters"],
-            {
-                "profile": "open-v2",
-                "table": "combined_anon",
-                "source_table": "combined_anon",
-                "target_table": "exam_level_anon",
-                "kind": "projection",
-            },
+            self.catalog.calls,
+            [
+                (
+                    "search_relationship_bindings",
+                    {
+                        "profile": "open-v2",
+                        "table": "exam_level_anon",
+                        "source_table": "exam_level_anon",
+                        "target_table": "clinical_data_anon",
+                        "kind": "hierarchy",
+                        "limit": 2,
+                    },
+                )
+            ],
         )
-        self.assertEqual(data["count"], 1)
-        self.assertEqual(data["total"], 1)
-        self.assertEqual(
-            data["matches"][0]["id"],
-            "wide.tissue-density-projection",
-        )
+        self.assertEqual(json.loads(stdout)["data"]["count"], 1)
 
-    def test_relationships_text_handles_matches_and_empty_results(self) -> None:
-        status, stdout, stderr = self.run_cli("relationships")
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        self.assertIn("wide.tissue-density-projection — projection", stdout)
-
-        status, stdout, stderr = self.run_cli(
-            "relationships", "--table", "missing_table"
-        )
-        self.assertEqual(status, 0)
-        self.assertEqual(stdout, "No relationships.\n")
-        self.assertEqual(stderr, "")
-
-    def test_relationship_errors_use_existing_error_envelopes(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "--format",
-            "json",
+    def test_legacy_and_ambiguous_commands_are_removed(self) -> None:
+        parser = build_parser()
+        for command in (
+            "search",
+            "table",
             "relationship",
-            "missing.relationship",
-        )
-
-        self.assertEqual(status, 2)
-        self.assertEqual(stderr, "")
-        envelope = json.loads(stdout)
-        self.assertEqual(envelope["command"], "relationship")
-        self.assertEqual(envelope["error"]["type"], "not_found")
-
-    def test_context_json_returns_exact_core_result(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "--format",
-            "json",
+            "relationships",
             "context",
-            "open-v2.density-interpretation",
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        envelope = json.loads(stdout)
-        self.assertEqual(envelope["command"], "context")
-        self.assertEqual(envelope["data"]["kind"], "context")
-        self.assertEqual(
-            envelope["data"]["context"]["claims"][0]["id"],
-            "coded-feature",
-        )
-        self.assertEqual(
-            list(envelope["data"]["sources"]),
-            ["open-v2.release-schema"],
-        )
-
-    def test_context_text_includes_claim_status_and_source(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "context",
-            "open-v2.density-interpretation",
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        self.assertIn(
-            "open-v2.density-interpretation — "
-            "Density interpretation boundary",
-            stdout,
-        )
-        self.assertIn(
-            "profile_specific · interpretation_guardrail · open-v2",
-            stdout,
-        )
-        self.assertIn(
-            "[verified] coded-feature — The synthetic density field",
-            stdout,
-        )
-        self.assertIn(
-            "open-v2.release-schema — Synthetic open-v2 release schema",
-            stdout,
-        )
-
-    def test_contexts_help_lists_controlled_and_reference_filters(self) -> None:
-        stdout = io.StringIO()
-        with self.assertRaises(SystemExit) as raised, redirect_stdout(stdout):
-            main(["contexts", "--help"])
-
-        self.assertEqual(raised.exception.code, 0)
-        help_text = stdout.getvalue()
-        self.assertIn("clinical_workflow", help_text)
-        self.assertIn("profile_specific", help_text)
-        self.assertIn("contradicted", help_text)
-        self.assertIn("--concept", help_text)
-        self.assertIn("--relationship", help_text)
-        self.assertIn("--source", help_text)
-
-    def test_contexts_json_passes_all_filters_and_limit(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "--format",
-            "json",
             "contexts",
-            "density",
-            "--kind",
-            "interpretation_guardrail",
-            "--scope",
-            "profile_specific",
-            "--profile",
-            "open-v2",
-            "--domain",
-            "mammography",
-            "--concept",
-            "exam.tissue_density",
-            "--table",
-            "exam_level_anon",
-            "--status",
-            "verified",
-            "--source",
-            "open-v2.release-schema",
-            "--limit",
-            "1",
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        data = json.loads(stdout)["data"]
-        self.assertEqual(
-            data["filters"],
-            {
-                "kind": "interpretation_guardrail",
-                "scope": "profile_specific",
-                "profile": "open-v2",
-                "domain": "mammography",
-                "concept": "exam.tissue_density",
-                "table": "exam_level_anon",
-                "relationship": None,
-                "status": "verified",
-                "source": "open-v2.release-schema",
-            },
-        )
-        self.assertEqual(data["count"], 1)
-        self.assertEqual(data["total"], 1)
-        self.assertEqual(
-            data["matches"][0]["identifier"],
-            "open-v2.density-interpretation",
-        )
-        self.assertEqual(
-            [claim["id"] for claim in data["matches"][0]["matching_claims"]],
-            ["coded-feature"],
-        )
-
-    def test_contexts_json_passes_relationship_filter(self) -> None:
-        data = synthetic_catalog()
-        data["relationships"].append(
-            {
-                "id": "wide.tissue-density-projection",
-                "profile": "open-v2",
-                "kind": "projection",
-                "source": {
-                    "table": "combined_anon",
-                    "columns": ["tissueden"],
-                    "completeness": "unknown",
-                },
-                "target": {
-                    "table": "exam_level_anon",
-                    "columns": ["tissueden"],
-                },
-                "cardinality": {
-                    "targets_per_source": "unknown",
-                    "sources_per_target": "unknown",
-                },
-                "evidence": ["release_schema"],
-                "caveats": [],
-                "join_hazards": [],
-            }
-        )
-        data["contexts"][
-            "open-v2.density-interpretation"
-        ]["related_relationships"] = ["wide.tissue-density-projection"]
-        relationship_catalog = write_catalog(
-            Path(self.temporary.name) / "relationship-context.json",
-            data,
-        )
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            status = main(
-                [
-                    "--catalog",
-                    str(relationship_catalog),
-                    "--format",
-                    "json",
-                    "contexts",
-                    "--relationship",
-                    "wide.tissue-density-projection",
-                ]
-            )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr.getvalue(), "")
-        result = json.loads(stdout.getvalue())["data"]
-        self.assertEqual(result["count"], 1)
-        self.assertEqual(
-            result["filters"]["relationship"],
-            "wide.tissue-density-projection",
-        )
-
-    def test_contexts_text_handles_matches_and_empty_results(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "contexts",
-            "--status",
-            "verified",
-        )
-
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        self.assertIn(
-            "open-v2.density-interpretation — "
-            "Density interpretation boundary",
-            stdout,
-        )
-        self.assertIn(
-            "[verified] coded-feature — The synthetic density field",
-            stdout,
-        )
-
-        status, stdout, stderr = self.run_cli(
-            "contexts",
-            "pathology",
-        )
-        self.assertEqual(status, 0)
-        self.assertEqual(stdout, "No contexts.\n")
-        self.assertEqual(stderr, "")
-
-    def test_context_errors_use_existing_error_envelopes(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "--format",
-            "json",
-            "context",
-            "missing.context",
-        )
-
-        self.assertEqual(status, 2)
-        self.assertEqual(stderr, "")
-        envelope = json.loads(stdout)
-        self.assertEqual(envelope["command"], "context")
-        self.assertEqual(envelope["error"]["type"], "not_found")
-
-    def test_contexts_require_query_or_filter(self) -> None:
-        status, stdout, stderr = self.run_cli("contexts")
-
-        self.assertEqual(status, 2)
-        self.assertEqual(stdout, "")
-        self.assertIn(
-            "provide a query or at least one context search filter",
-            stderr,
-        )
-
-    def test_pattern_and_patterns_commands(self) -> None:
-        status, stdout, stderr = self.run_cli(
-            "pattern", "open-v2.density-analysis"
-        )
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        self.assertIn("Synthetic density analysis guidance", stdout)
-        self.assertIn("required decisions:", stdout)
-        self.assertIn("prohibited shortcuts:", stdout)
-
-        status, stdout, stderr = self.run_cli(
-            "--format",
-            "json",
+            "pattern",
             "patterns",
-            "density",
-            "--status",
-            "draft",
-            "--grain",
-            "exam",
-        )
-        self.assertEqual(status, 0)
-        self.assertEqual(stderr, "")
-        envelope = json.loads(stdout)
-        self.assertEqual(envelope["data"]["count"], 1)
-        self.assertEqual(
-            envelope["data"]["matches"][0]["id"],
-            "open-v2.density-analysis",
-        )
+            "get",
+        ):
+            with self.subTest(command=command), self.assertRaises(SystemExit):
+                with redirect_stderr(io.StringIO()):
+                    parser.parse_args([command, "anything"])
 
     def test_json_error_is_machine_readable(self) -> None:
         status, stdout, stderr = self.run_cli(
-            "--format", "json", "get", "missing.feature"
+            "--format",
+            "json",
+            "guardrail",
+            "missing.guardrail",
         )
 
         self.assertEqual(status, 2)
         self.assertEqual(stderr, "")
         envelope = json.loads(stdout)
         self.assertEqual(envelope["ok"], False)
-        self.assertEqual(envelope["command"], "get")
-        self.assertEqual(envelope["error"]["type"], "not_found")
+        self.assertEqual(envelope["command"], "guardrail")
+        self.assertEqual(envelope["error"]["type"], "value")
         self.assertIn("was not found", envelope["error"]["message"])
 
-    def test_text_error_goes_to_stderr(self) -> None:
-        status, stdout, stderr = self.run_cli("search")
+    def test_text_formatters_tolerate_minimal_documented_envelopes(self) -> None:
+        self.assertEqual(
+            _format_text(
+                "coverage",
+                {
+                    "kind": "coverage",
+                    "identifier": "coverage.minimal",
+                    "coverage": {
+                        "id": "coverage.minimal",
+                        "label": "Minimal coverage",
+                    },
+                },
+            ),
+            "coverage.minimal — Minimal coverage",
+        )
+        self.assertEqual(
+            _format_text(
+                "relationship-bindings",
+                {"count": 0, "total": 0, "matches": []},
+            ),
+            "No relationship bindings.",
+        )
 
-        self.assertEqual(status, 2)
-        self.assertEqual(stdout, "")
-        self.assertIn("provide a query", stderr)
+    def test_text_exact_getter_surfaces_navigation_and_provenance(self) -> None:
+        rendered = _format_text(
+            "guardrail",
+            {
+                "kind": "guardrail",
+                "identifier": "pathology.null-not-negative",
+                "guardrail": {
+                    "id": "pathology.null-not-negative",
+                    "label": "Null is not negative",
+                },
+                "related": {
+                    "features": ["pathology.severity"],
+                    "clinical_objects": [{"id": "pathology_observation"}],
+                },
+                "provenance": {
+                    "claims": [{"id": "null-semantics"}],
+                    "sources": {"open-v2.schema": {"title": "Schema"}},
+                },
+            },
+        )
+
+        self.assertIn("related:", rendered)
+        self.assertIn("features: pathology.severity", rendered)
+        self.assertIn("clinical_objects: pathology_observation", rendered)
+        self.assertIn("provenance:", rendered)
+        self.assertIn("claims: null-semantics", rendered)
+        self.assertIn("sources: open-v2.schema", rendered)
+
+    def test_text_discovery_renders_structured_diagnostic_categories(self) -> None:
+        rendered = _format_text(
+            "discover",
+            {
+                "count": 0,
+                "total": 0,
+                "matches": [],
+                "diagnostics": [
+                    {
+                        "category": "no_catalog_coverage",
+                        "message": (
+                            "No indexed entity covers these terms; this does "
+                            "not establish absence from EMBED."
+                        ),
+                    }
+                ],
+            },
+        )
+
+        self.assertIn("diagnostics:", rendered)
+        self.assertIn(
+            "no catalog coverage: No indexed entity covers these terms",
+            rendered,
+        )
 
 
 if __name__ == "__main__":
