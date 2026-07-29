@@ -143,13 +143,20 @@ filters, and file paths.
 
 ## Completion criteria
 
-A feature-context change is complete when it:
+A catalog-context change is complete when it:
 
 - passes strict catalog validation;
 - uses the correct evidence level;
-- identifies relevant profile bindings;
+- identifies relevant profile bindings and declares every bound physical table
+  at the correct grain;
+- records assessed natural and technical key candidates with explicit
+  uniqueness, completeness, evidence, and caveats;
+- records intended relationships with ordered endpoints, source completeness,
+  directional cardinality, evidence, caveats, and join hazards;
 - reuses an existing concept or vocabulary whenever the meaning is shared;
 - keeps inference, missing-value ambiguity, and version caveats explicit;
 - adds no empirical dataset summary;
-- has focused synthetic tests for changed behavior; and
+- has focused synthetic tests for changed behavior and checked-in profile
+  integration assertions for required tables, key caveats, and expected
+  relationships; and
 - includes synchronized documentation and a focused Git commit.

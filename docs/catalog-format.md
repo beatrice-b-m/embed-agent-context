@@ -150,9 +150,20 @@ To support another EMBED variant:
 2. Reuse existing concepts and vocabularies wherever meanings are unchanged.
 3. Add bindings for the profile's physical columns.
 4. Add a new concept only for a genuinely new or changed meaning.
-5. Validate cross-references and compare the profile bindings with the source
-   schema.
-6. Add synthetic tests and update profile documentation.
+5. Add one `tables` declaration for every bound physical table. Record its
+   grain and each assessed natural or technical key candidate, including
+   explicit uniqueness, completeness, evidence, and caveats when a tuple is
+   non-unique or unresolved.
+6. Add `relationships` for the profile's intended joins. Record ordered source
+   and target columns, source completeness, cardinality in both directions,
+   evidence, caveats, and join hazards such as dangling references,
+   row multiplication, nullable components, or temporal leakage.
+7. Validate all cross-references and compare the profile bindings with the
+   source schema. Substantiate key and linkage claims separately because the
+   footer-only source verifier cannot prove them.
+8. Add focused synthetic tests plus checked-in profile integration assertions
+   for required table declarations, key caveats, and the expected relationship
+   inventory, then update profile documentation.
 
 Profile-specific statistics must remain outside the feature catalog. If a
 future use case needs empirical profiling, it should be a separate,
