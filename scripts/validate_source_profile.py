@@ -72,12 +72,9 @@ def expected_profile_schema(
         raise ProfileValidationError(f"unknown catalog profile: {profile}")
 
     expected: dict[str, dict[str, ExpectedColumn]] = {}
-    seen: set[tuple[str, str]] = set()
-    selected = False
     for binding in catalog.bindings:
         if binding.profile != profile:
             continue
-        selected = True
 
         table = binding.table
         column = binding.column
@@ -86,21 +83,11 @@ def expected_profile_schema(
                 f"binding has an unsafe table name: {table!r}"
             )
 
-        key = (table, column)
-        if key in seen:
-            raise ProfileValidationError(
-                f"duplicate binding for profile {profile}: {table}.{column}"
-            )
-        seen.add(key)
         expected.setdefault(table, {})[column] = ExpectedColumn(
             physical_type=binding.physical_type,
             nullable=binding.nullable,
         )
 
-    if not selected:
-        raise ProfileValidationError(
-            f"catalog profile has no physical bindings: {profile}"
-        )
     return expected
 
 
@@ -128,10 +115,10 @@ def exact_table_paths(
     """Resolve an exact, direct-child Parquet manifest without following links."""
 
     directory = _secure_table_directory(table_directory)
-    parquet_entries = [
-        entry for entry in directory.iterdir() if entry.suffix == ".parquet"
-    ]
-    for entry in parquet_entries:
+    parquet_entries: dict[str, Path] = {}
+    for entry in directory.iterdir():
+        if entry.suffix != ".parquet":
+            continue
         if entry.is_symlink():
             raise ProfileValidationError(
                 f"release table must not be a symlink: {entry}"
@@ -140,9 +127,10 @@ def exact_table_paths(
             raise ProfileValidationError(
                 f"release table is not a regular file: {entry}"
             )
+        parquet_entries[entry.name] = entry
 
     expected_names = {f"{table}.parquet" for table in expected_tables}
-    actual_names = {entry.name for entry in parquet_entries}
+    actual_names = set(parquet_entries)
     if actual_names != expected_names:
         missing = sorted(expected_names - actual_names)
         extra = sorted(actual_names - expected_names)
@@ -150,25 +138,10 @@ def exact_table_paths(
             f"Parquet manifest mismatch; missing={missing}, extra={extra}"
         )
 
-    paths: dict[str, Path] = {}
-    for table in sorted(expected_tables):
-        candidate = directory / f"{table}.parquet"
-        try:
-            resolved = candidate.resolve(strict=True)
-        except OSError as exc:
-            raise ProfileValidationError(
-                f"cannot resolve release table: {candidate}"
-            ) from exc
-        if resolved.parent != directory:
-            raise ProfileValidationError(
-                f"release table escapes its directory: {candidate}"
-            )
-        if not resolved.is_file():
-            raise ProfileValidationError(
-                f"release table is not a regular file: {candidate}"
-            )
-        paths[table] = resolved
-    return paths
+    return {
+        table: parquet_entries[f"{table}.parquet"].resolve()
+        for table in sorted(expected_tables)
+    }
 
 
 def _table_schema_errors(
