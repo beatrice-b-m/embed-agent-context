@@ -60,13 +60,14 @@ class CatalogLoaderTests(unittest.TestCase):
     def test_loads_and_freezes_synthetic_catalog(self) -> None:
         catalog = self.load()
 
-        self.assertEqual(catalog.schema_version, 3)
+        self.assertEqual(catalog.schema_version, 4)
         self.assertEqual(catalog.profiles, ("open-v2",))
         self.assertEqual(len(catalog.concepts), 2)
         self.assertEqual(len(catalog.bindings), 3)
         self.assertEqual(len(catalog.vocabularies), 1)
         self.assertEqual(len(catalog.sources), 1)
         self.assertEqual(len(catalog.contexts), 1)
+        self.assertEqual(len(catalog.analysis_patterns), 1)
         with self.assertRaises(TypeError):
             catalog.concepts["new"] = catalog.concepts["identity.accession"]
         with self.assertRaises(FrozenInstanceError):
@@ -185,6 +186,26 @@ class CatalogLoaderTests(unittest.TestCase):
         source["scope"] = "embed_general"
         with self.assertRaisesRegex(
             CatalogValidationError, "empty profile list"
+        ):
+            self.load(data)
+
+    def test_rejects_invalid_analysis_pattern_references_and_structure(
+        self,
+    ) -> None:
+        data = synthetic_catalog()
+        pattern = data["analysis_patterns"]["open-v2.density-analysis"]
+        pattern["related_contexts"] = ["missing.context"]
+        with self.assertRaisesRegex(
+            CatalogValidationError, "references unknown contexts"
+        ):
+            self.load(data)
+
+        data = synthetic_catalog()
+        pattern = data["analysis_patterns"]["open-v2.density-analysis"]
+        pattern["prohibited_shortcuts"] = []
+        with self.assertRaisesRegex(
+            CatalogValidationError,
+            "prohibited_shortcuts must not be empty",
         ):
             self.load(data)
 
@@ -448,8 +469,8 @@ class CatalogLoaderTests(unittest.TestCase):
     def test_rejects_duplicate_json_object_keys(self) -> None:
         serialized = json.dumps(synthetic_catalog())
         serialized = serialized.replace(
-            '"schema_version": 3',
-            '"schema_version": 3, "schema_version": 3',
+            '"schema_version": 4',
+            '"schema_version": 4, "schema_version": 4',
             1,
         )
         path = self.directory / "duplicate.json"
@@ -467,15 +488,15 @@ class CatalogLoaderTests(unittest.TestCase):
         version_one.pop("relationships")
 
         future = synthetic_catalog()
-        future["schema_version"] = 4
+        future["schema_version"] = 5
         future["future_extension"] = {}
 
-        for version, data in ((1, version_one), (4, future)):
+        for version, data in ((1, version_one), (5, future)):
             with self.subTest(version=version):
                 with self.assertRaisesRegex(
                     CatalogValidationError,
                     rf"unsupported catalog schema_version {version}; "
-                    "expected integer 3",
+                    "expected integer 4",
                 ):
                     self.load(data)
 
@@ -869,6 +890,43 @@ class CatalogQueryTests(unittest.TestCase):
             "...", domain="mammography"
         )
         self.assertEqual(filtered_punctuation["total"], 1)
+
+    def test_gets_and_searches_analysis_patterns(self) -> None:
+        exact = self.catalog.get_analysis_pattern(
+            "open-v2.density-analysis"
+        )
+        self.assertEqual(exact["kind"], "analysis_pattern")
+        self.assertEqual(exact["pattern"]["status"], "draft")
+        self.assertEqual(
+            exact["pattern"]["alternatives"][0]["id"], "coded-groups"
+        )
+
+        result = self.catalog.search_analysis_patterns(
+            "density policy",
+            status="draft",
+            scope="profile_specific",
+            profile="open-v2",
+            domain="mammography",
+            grain="exam",
+        )
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(
+            result["matches"][0]["id"], "open-v2.density-analysis"
+        )
+        self.assertEqual(
+            result["matches"][0]["prohibited_shortcuts"][0]["id"],
+            "null-as-category",
+        )
+
+    def test_analysis_pattern_queries_validate_inputs(self) -> None:
+        with self.assertRaises(CatalogNotFoundError):
+            self.catalog.get_analysis_pattern("missing.pattern")
+        with self.assertRaises(CatalogValidationError):
+            self.catalog.search_analysis_patterns("")
+        with self.assertRaisesRegex(CatalogValidationError, "unknown status"):
+            self.catalog.search_analysis_patterns("", status="final")
+        with self.assertRaisesRegex(CatalogValidationError, "limit"):
+            self.catalog.search_analysis_patterns("density", limit=0)
 
     def relationship_catalog(self):
         data = synthetic_catalog()

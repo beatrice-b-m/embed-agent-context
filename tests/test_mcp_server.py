@@ -169,6 +169,43 @@ class FakeCatalog:
             ],
         }
 
+    def get_analysis_pattern(self, identifier: str) -> dict[str, Any]:
+        self.calls.append(
+            ("get_analysis_pattern", {"identifier": identifier})
+        )
+        return {
+            "kind": "analysis_pattern",
+            "identifier": identifier,
+            "pattern": {"title": "Synthetic pattern"},
+        }
+
+    def search_analysis_patterns(
+        self,
+        query: str = "",
+        *,
+        status: str | None = None,
+        scope: str | None = None,
+        profile: str | None = None,
+        domain: str | None = None,
+        grain: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        arguments = {
+            "query": query,
+            "status": status,
+            "scope": scope,
+            "profile": profile,
+            "domain": domain,
+            "grain": grain,
+            "limit": limit,
+        }
+        self.calls.append(("search_analysis_patterns", arguments))
+        return {
+            "query": query,
+            "count": 1,
+            "matches": [{"id": "synthetic.pattern"}],
+        }
+
     def get_table(self, profile: str, table: str) -> dict[str, Any]:
         self.calls.append(
             (
@@ -308,7 +345,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.server = build_server(self.catalog)
 
     def test_server_metadata_describes_phase_three_context(self) -> None:
-        self.assertEqual(self.server.version, "0.3.0")
+        self.assertEqual(self.server.version, "0.4.0")
         self.assertIn("clinical context", self.server.description)
         self.assertIn("Context claims carry review status", self.server.instructions)
         self.assertIn(
@@ -331,6 +368,8 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 "search_relationships",
                 "get_context",
                 "search_contexts",
+                "get_analysis_pattern",
+                "search_analysis_patterns",
             },
         )
         for tool in result.tools:
@@ -399,6 +438,22 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 "limit",
             },
         )
+        self.assertEqual(
+            set(schemas["get_analysis_pattern"]["properties"]),
+            {"identifier"},
+        )
+        self.assertEqual(
+            set(schemas["search_analysis_patterns"]["properties"]),
+            {
+                "query",
+                "status",
+                "scope",
+                "profile",
+                "domain",
+                "grain",
+                "limit",
+            },
+        )
         self.assertIs(
             schemas["search_relationships"]["additionalProperties"],
             False,
@@ -409,6 +464,10 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIs(
             schemas["search_contexts"]["additionalProperties"],
+            False,
+        )
+        self.assertIs(
+            schemas["search_analysis_patterns"]["additionalProperties"],
             False,
         )
         search_properties = schemas["search_features"]["properties"]
@@ -880,6 +939,22 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     "status": "unresolved",
                 },
             )
+            pattern = await client.call_tool(
+                "get_analysis_pattern",
+                {
+                    "identifier": (
+                        "open-v2.pathology-cancer-vs-noncancer"
+                    )
+                },
+            )
+            patterns = await client.call_tool(
+                "search_analysis_patterns",
+                {
+                    "profile": "open-v2",
+                    "domain": "pathology",
+                    "status": "draft",
+                },
+            )
 
         self.assertFalse(feature.is_error)
         self.assertEqual(
@@ -921,6 +996,12 @@ class MCPRealCatalogIntegrationTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(context.structured_content["sources"])
         self.assertFalse(contexts.is_error)
+        self.assertFalse(pattern.is_error)
+        self.assertEqual(
+            pattern.structured_content["pattern"]["status"], "draft"
+        )
+        self.assertFalse(patterns.is_error)
+        self.assertEqual(patterns.structured_content["count"], 1)
         context_ids = {
             match["identifier"]
             for match in contexts.structured_content["matches"]

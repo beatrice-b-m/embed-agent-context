@@ -57,7 +57,10 @@ procedure-associated pathology-code ordering, report-version chronology,
 clinical-time risk calculation, and consistent within-patient date shifts.
 Unknown recommendation and pathology code mappings, report-addendum linkage,
 and risk-field definitions and sentinel meanings remain explicit. The canonical
-catalog is schema version 3.
+catalog is schema version 4. Schema version 4 adds non-executable analysis
+patterns that expose policy alternatives, decisions an analyst must make, and
+shortcuts that must not be treated as valid defaults. The initial draft pattern
+covers pathology-defined breast cancer versus non-cancer cohorts.
 
 ## Command-line queries
 
@@ -77,6 +80,8 @@ uv run --locked --no-dev python -m embed_context relationships --table imaging_f
 uv run --locked --no-dev python -m embed_context context open-v2.temporal-availability-context
 uv run --locked --no-dev python -m embed_context contexts "temporal leakage"
 uv run --locked --no-dev python -m embed_context contexts --profile open-v2 --domain pathology --status unresolved
+uv run --locked --no-dev python -m embed_context pattern open-v2.pathology-cancer-vs-noncancer
+uv run --locked --no-dev python -m embed_context patterns "cancer versus no cancer"
 ```
 
 Use `--format json` before the subcommand for a stable machine-readable
@@ -108,11 +113,19 @@ filters. Claim-level text or provenance filters return only the matching claims
 and their sources. Context output remains descriptive: it does not perform a
 join, construct a cohort, derive an outcome, or prescribe care.
 
+Analysis-pattern lookup returns common policy alternatives, required decisions,
+prohibited shortcuts, and links back to the feature, table, relationship, and
+context records that support interpretation. Pattern search supports text,
+status, scope, profile, domain, and applicable-grain filters. Patterns are
+guidance rather than recipes: they do not select an alternative, emit
+predicates, execute a cohort, or certify its validity.
+
 Run `python -m embed_context --help` or a subcommand's `--help` for the complete
 filter surface. `--format json validate` also returns the controlled grains,
 domains, feature kinds, context facets, source kinds, and claim statuses for
-programmatic discovery. The text validation summary reports both structural
-and context/source inventory counts.
+programmatic discovery, including analysis-pattern maturity statuses. The text
+validation summary reports structural, context/source, and analysis-pattern
+inventory counts.
 
 ## Stdio MCP server
 
@@ -143,9 +156,10 @@ An MCP client configuration can invoke it from any working directory:
 }
 ```
 
-The server exposes eight read-only structured-output tools: `get_feature`,
+The server exposes ten read-only structured-output tools: `get_feature`,
 `search_features`, `lookup_code`, `get_table`, `get_relationship`,
-`search_relationships`, `get_context`, and `search_contexts`. It writes MCP
+`search_relationships`, `get_context`, `search_contexts`,
+`get_analysis_pattern`, and `search_analysis_patterns`. It writes MCP
 protocol messages only to stdout; startup errors and diagnostics go to stderr.
 Search schemas enumerate their controlled feature, relationship, or context
 filters, while descriptions list the profiles and tables present in the loaded

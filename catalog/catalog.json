@@ -1,6 +1,6 @@
 {
   "$schema": "./catalog.schema.json",
-  "schema_version": 3,
+  "schema_version": 4,
   "profiles": [
     "open-v2"
   ],
@@ -73,6 +73,10 @@
     "unverified",
     "unresolved",
     "contradicted"
+  ],
+  "analysis_pattern_statuses": [
+    "draft",
+    "reviewed"
   ],
   "concepts": {
     "breast_side.architectural_distortion_aggregate": {
@@ -8831,7 +8835,184 @@
       ],
       "workflow_steps": [],
       "caveats": [
-        "Task-specific cohort, follow-up, label, and modality-inclusion choices are analysis policies rather than dataset claims and belong outside this context catalog."
+        "Task-specific cohort, follow-up, label, and modality-inclusion choices are analysis policies rather than dataset claims; consult a separate analysis pattern when one is available."
+      ]
+    }
+  },
+  "analysis_patterns": {
+    "open-v2.pathology-cancer-vs-noncancer": {
+      "title": "Pathology-defined breast cancer versus non-cancer cohorts",
+      "status": "draft",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Guidance for choosing an explicit pathology-based cancer case definition and a scientifically appropriate non-cancer comparison group without treating missing pathology as a negative outcome.",
+      "domains": [
+        "exam",
+        "pathology",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "cancer versus no cancer",
+        "cancer cohort",
+        "malignancy outcome",
+        "negative control",
+        "pathology label",
+        "case control"
+      ],
+      "applicable_grains": [
+        "patient",
+        "exam",
+        "breast_side",
+        "pathology_finding"
+      ],
+      "related_concepts": [
+        "pathology.severity",
+        "pathology.diagnosis_code_slot",
+        "pathology.procedure_date",
+        "pathology.report_date",
+        "exam.pathology_severity_aggregate",
+        "breast_side.pathology_severity_aggregate",
+        "exam.study_date",
+        "identity.patient_identifier"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "patients_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "exam_level_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "side_level_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "pathology_findings_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.exam_level_anon.patient",
+        "open-v2.pathology_findings_anon.exam",
+        "open-v2.pathology_findings_anon.imaging_finding",
+        "open-v2.pathology_findings_anon.side"
+      ],
+      "related_contexts": [
+        "clinical.screening-diagnostic-pathway",
+        "embed.finding-procedure-recording",
+        "open-v2.pathology-procedure-context",
+        "open-v2.temporal-availability-context"
+      ],
+      "alternatives": [
+        {
+          "id": "pathology-confirmed-benign-controls",
+          "label": "Pathology-confirmed cancer versus benign",
+          "description": "Treat invasive and in-situ breast cancer severity groups as cases and benign pathology as controls.",
+          "appropriate_when": "Use when the research question requires both groups to have tissue-based outcome ascertainment and a narrow benign comparison.",
+          "limitations": [
+            "Excludes high-risk, borderline, non-breast-cancer, and unattached-pathology records rather than classifying them as controls.",
+            "Conditions the cohort on receiving a procedure that produced attached pathology."
+          ]
+        },
+        {
+          "id": "pathology-observed-nonbreastcancer-controls",
+          "label": "Pathology-confirmed cancer versus other attached pathology",
+          "description": "Treat invasive and in-situ breast cancer severity groups as cases and define a disclosed subset of the remaining attached-pathology groups as controls.",
+          "appropriate_when": "Use when broader pathology-observed controls fit the estimand and the handling of high-risk, borderline, benign, and non-breast cancer groups is specified separately.",
+          "limitations": [
+            "The remaining severity groups are clinically heterogeneous and must not be collapsed without justification.",
+            "Non-breast cancer is not equivalent to absence of malignancy and may be inappropriate for a healthy-control question."
+          ]
+        },
+        {
+          "id": "longitudinal-no-observed-breast-cancer",
+          "label": "Cancer versus no observed breast cancer during follow-up",
+          "description": "Define cases from attached cancer pathology and define comparison eligibility through an explicit observation window in which no qualifying breast-cancer outcome is observed.",
+          "appropriate_when": "Use for longitudinal prediction questions when follow-up opportunity, index time, and outcome-ascertainment surfaces can be justified.",
+          "limitations": [
+            "Absence of a recorded cancer outcome is not proof of disease absence or complete follow-up.",
+            "The catalog does not establish a universal follow-up window, censoring rule, or completeness guarantee."
+          ]
+        }
+      ],
+      "required_decisions": [
+        {
+          "id": "unit-of-analysis",
+          "question": "Is the cohort defined at patient, exam, breast-side, or pathology-finding grain?",
+          "rationale": "Repeated exams, sides, findings, and procedures can otherwise place one person in multiple observations or both outcome groups."
+        },
+        {
+          "id": "case-definition",
+          "question": "Are both invasive and in-situ breast cancer included as cases, and are they pooled or analyzed separately?",
+          "rationale": "The severity vocabulary distinguishes these outcomes and the scientific estimand determines whether pooling is appropriate."
+        },
+        {
+          "id": "control-definition",
+          "question": "Which pathology groups or longitudinal evidence qualify a record as non-cancer, and which groups are excluded?",
+          "rationale": "Benign, high-risk, borderline, non-breast cancer, and no attached pathology are distinct states rather than one negative class."
+        },
+        {
+          "id": "index-time",
+          "question": "What event establishes time zero for each observation?",
+          "rationale": "Exam, procedure, and pathology-report dates represent different clinical stages and determine what information is available."
+        },
+        {
+          "id": "outcome-window",
+          "question": "What follow-up interval, censoring rule, and minimum observation opportunity define outcome ascertainment?",
+          "rationale": "The catalog supplies no universal interval and absence of recorded pathology without adequate follow-up is not a negative label."
+        },
+        {
+          "id": "multiple-record-aggregation",
+          "question": "How are multiple exams, sides, procedures, and pathology rows reduced within the chosen unit?",
+          "rationale": "Pathology-to-imaging links can be many-to-many, while provided severity aggregates use the minimum because the scale is inverse."
+        },
+        {
+          "id": "temporal-feature-boundary",
+          "question": "Which predictors must be known by index time, and which post-index fields are outcome-only?",
+          "rationale": "Procedure and pathology information may postdate imaging and can create target leakage if used as contemporaneous predictors."
+        },
+        {
+          "id": "split-and-overlap-policy",
+          "question": "How are all observations from one patient kept within one analysis partition and reconciled if outcome status changes over time?",
+          "rationale": "Patient overlap across training, validation, or test partitions and cross-time label conflicts can bias performance estimates."
+        }
+      ],
+      "prohibited_shortcuts": [
+        {
+          "id": "null-is-negative",
+          "statement": "Do not classify null pathology severity as benign or no cancer.",
+          "reason": "Null means no pathology is attached; it does not establish a negative tissue result or adequate follow-up."
+        },
+        {
+          "id": "assessment-is-pathology",
+          "statement": "Do not substitute an imaging assessment category for pathology truth.",
+          "reason": "Assessment guides clinical action but is not interchangeable with a tissue diagnosis."
+        },
+        {
+          "id": "maximum-is-most-severe",
+          "statement": "Do not select the numeric maximum as the most severe pathology result.",
+          "reason": "The severity scale is inverse and the registered aggregates select the minimum."
+        },
+        {
+          "id": "uncontrolled-finding-join",
+          "statement": "Do not treat the pathology-to-imaging tuple as a one-to-one join or silently deduplicate multiplied rows.",
+          "reason": "The relationship is optional and many-to-many; incomplete tuples and duplicate imaging matches require an explicit reconciliation policy."
+        },
+        {
+          "id": "wide-row-is-contemporaneous",
+          "statement": "Do not infer that values co-located in the wide table were available at the same clinical time.",
+          "reason": "Wide-table construction and temporal co-availability are not established."
+        }
+      ],
+      "caveats": [
+        "This pattern is non-executable guidance and deliberately does not select a preferred alternative, emit predicates, perform joins, or certify cohort validity.",
+        "The draft status indicates that the structure and initial alternatives should receive research-methods review before being treated as a project standard.",
+        "Cohort counts, class balance, missingness, follow-up completeness, and site-specific behavior must be measured in the authorized analysis environment."
       ]
     }
   }

@@ -18,6 +18,11 @@ context ──< claim >── source
    ├──── concept
    ├──── profile / table
    └──── relationship
+
+analysis pattern ──< alternative / decision / prohibited shortcut
+       │
+       ├──── concept / grain / context
+       └──── profile / table / relationship
 ```
 
 This is intentionally a small registry rather than a generic knowledge graph.
@@ -34,7 +39,8 @@ an ontology engine, database, generated documentation, or probabilistic search.
   profiles; bindings select a profile.
 
 `grains`, `feature_kinds`, `domains`, `context_kinds`, `context_scopes`,
-`source_kinds`, `source_locator_kinds`, and `claim_statuses`
+`source_kinds`, `source_locator_kinds`, `claim_statuses`, and
+`analysis_pattern_statuses`
 : Controlled facets used by validation and filtering. Domains are
   multi-valued, so one concept can be both demographic and a social determinant
   of health, or both imaging and pathology-related. The context facets keep
@@ -84,8 +90,25 @@ an ontology engine, database, generated documentation, or probabilistic search.
   related catalog entities, individually reviewable claims, and caveats.
   Clinical workflows additionally contain ordered stages backed by claim IDs.
 
+`analysis_patterns`
+: Non-executable analysis guidance keyed by stable ID. A pattern declares its
+  draft or reviewed status, scope, profiles, domains, applicable grains, related
+  catalog entities, common alternatives, required decisions, prohibited
+  shortcuts, and caveats. Alternatives describe when a policy may be
+  appropriate and its limitations; they are not predicates or defaults.
+
 The authoritative field constraints are in
 [`catalog/catalog.schema.json`](../catalog/catalog.schema.json).
+
+### Schema version 4 migration
+
+Version 4 adds the required `analysis_pattern_statuses` facet and
+`analysis_patterns` object. Version 3 readers must reject a version 4 catalog
+rather than ignore the new policy layer. A version 3 catalog migrating to
+version 4 must add both top-level fields; an empty `analysis_patterns` object is
+valid while guidance is being authored. Existing concepts, bindings,
+vocabularies, tables, relationships, sources, and contexts retain their version
+3 shapes.
 
 ## Identity and deduplication
 
@@ -127,6 +150,13 @@ matching claims so returned references remain internally resolvable. A context
 matched only through navigation fields such as its title, domain, or search
 terms can therefore have an empty `matching_claims` array and no returned
 sources.
+
+Analysis-pattern lookup accepts a stable pattern ID. Pattern search supports
+text plus status, scope, profile, domain, and applicable-grain filters. Text
+search covers the pattern summary, alternatives, required decisions, prohibited
+shortcuts, caveats, and related identifiers. Results return the complete
+guidance object so an agent cannot see an alternative without its limitations
+and required policy questions.
 
 Search scans the in-memory catalog linearly. It considers concept IDs, physical
 names, labels, definitions, search terms, facets, caveats, and vocabulary

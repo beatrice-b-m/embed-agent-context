@@ -17,7 +17,7 @@ from typing import Any
 
 
 SCHEMA_REFERENCE = "./catalog.schema.json"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 GRAINS = (
     "patient",
     "exam",
@@ -88,6 +88,10 @@ CLAIM_STATUSES = (
     "unresolved",
     "contradicted",
 )
+ANALYSIS_PATTERN_STATUSES = (
+    "draft",
+    "reviewed",
+)
 EVIDENCE_VALUES = frozenset(
     {
         "release_schema",
@@ -150,6 +154,7 @@ _TOP_LEVEL_KEYS = frozenset(
         "source_kinds",
         "source_locator_kinds",
         "claim_statuses",
+        "analysis_pattern_statuses",
         "concepts",
         "bindings",
         "vocabularies",
@@ -157,6 +162,7 @@ _TOP_LEVEL_KEYS = frozenset(
         "relationships",
         "sources",
         "contexts",
+        "analysis_patterns",
     }
 )
 _CATALOG_ENVELOPE_KEYS = frozenset({"$schema", "schema_version"})
@@ -257,6 +263,31 @@ _CONTEXT_CLAIM_KEYS = frozenset(
     {"id", "statement", "status", "sources", "caveats"}
 )
 _WORKFLOW_STEP_KEYS = frozenset({"id", "label", "claims"})
+_ANALYSIS_PATTERN_KEYS = frozenset(
+    {
+        "title",
+        "status",
+        "scope",
+        "profiles",
+        "summary",
+        "domains",
+        "search_terms",
+        "applicable_grains",
+        "related_concepts",
+        "related_tables",
+        "related_relationships",
+        "related_contexts",
+        "alternatives",
+        "required_decisions",
+        "prohibited_shortcuts",
+        "caveats",
+    }
+)
+_ANALYSIS_ALTERNATIVE_KEYS = frozenset(
+    {"id", "label", "description", "appropriate_when", "limitations"}
+)
+_ANALYSIS_DECISION_KEYS = frozenset({"id", "question", "rationale"})
+_PROHIBITED_SHORTCUT_KEYS = frozenset({"id", "statement", "reason"})
 
 
 class CatalogError(Exception):
@@ -602,6 +633,110 @@ class ClinicalContext:
 
 
 @dataclass(frozen=True, slots=True)
+class AnalysisAlternative:
+    """One non-executable policy alternative for an analysis pattern."""
+
+    id: str
+    label: str
+    description: str
+    appropriate_when: str
+    limitations: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "description": self.description,
+            "appropriate_when": self.appropriate_when,
+            "limitations": list(self.limitations),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisDecision:
+    """One decision an analyst must make rather than inherit as a default."""
+
+    id: str
+    question: str
+    rationale: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "id": self.id,
+            "question": self.question,
+            "rationale": self.rationale,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ProhibitedShortcut:
+    """One tempting shortcut that the catalog explicitly disallows."""
+
+    id: str
+    statement: str
+    reason: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "id": self.id,
+            "statement": self.statement,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisPattern:
+    """Non-executable guidance for translating metadata into analysis policy."""
+
+    id: str
+    title: str
+    status: str
+    scope: str
+    profiles: tuple[str, ...]
+    summary: str
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    applicable_grains: tuple[str, ...]
+    related_concepts: tuple[str, ...]
+    related_tables: tuple[ContextTableReference, ...]
+    related_relationships: tuple[str, ...]
+    related_contexts: tuple[str, ...]
+    alternatives: tuple[AnalysisAlternative, ...]
+    required_decisions: tuple[AnalysisDecision, ...]
+    prohibited_shortcuts: tuple[ProhibitedShortcut, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "status": self.status,
+            "scope": self.scope,
+            "profiles": list(self.profiles),
+            "summary": self.summary,
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "applicable_grains": list(self.applicable_grains),
+            "related_concepts": list(self.related_concepts),
+            "related_tables": [
+                table.to_dict() for table in self.related_tables
+            ],
+            "related_relationships": list(self.related_relationships),
+            "related_contexts": list(self.related_contexts),
+            "alternatives": [
+                alternative.to_dict() for alternative in self.alternatives
+            ],
+            "required_decisions": [
+                decision.to_dict() for decision in self.required_decisions
+            ],
+            "prohibited_shortcuts": [
+                shortcut.to_dict() for shortcut in self.prohibited_shortcuts
+            ],
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class _BindingSearchDocument:
     binding: Binding
     identifier_text: str
@@ -637,6 +772,12 @@ class _ContextSearchDocument:
     claims: tuple[_ContextClaimSearchDocument, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _AnalysisPatternSearchDocument:
+    pattern: AnalysisPattern
+    all_tokens: frozenset[str]
+
+
 class Catalog:
     """Validated immutable catalog with deterministic lookup indexes."""
 
@@ -650,6 +791,7 @@ class Catalog:
         "_relationships",
         "_sources",
         "_contexts",
+        "_analysis_patterns",
         "_tables_by_qualified",
         "_relationships_by_id",
         "_by_physical",
@@ -657,6 +799,7 @@ class Catalog:
         "_bindings_by_concept",
         "_search_documents",
         "_context_search_documents",
+        "_analysis_pattern_search_documents",
         "_sealed",
     )
 
@@ -672,6 +815,7 @@ class Catalog:
         relationships: tuple[Relationship, ...],
         sources: Mapping[str, ContextSource],
         contexts: Mapping[str, ClinicalContext],
+        analysis_patterns: Mapping[str, AnalysisPattern],
     ) -> None:
         object.__setattr__(self, "_schema_version", schema_version)
         object.__setattr__(self, "_profiles", profiles)
@@ -691,6 +835,11 @@ class Catalog:
         )
         object.__setattr__(
             self, "_contexts", MappingProxyType(dict(sorted(contexts.items())))
+        )
+        object.__setattr__(
+            self,
+            "_analysis_patterns",
+            MappingProxyType(dict(sorted(analysis_patterns.items()))),
         )
         object.__setattr__(
             self,
@@ -738,6 +887,11 @@ class Catalog:
             self,
             "_context_search_documents",
             self._build_context_search_documents(),
+        )
+        object.__setattr__(
+            self,
+            "_analysis_pattern_search_documents",
+            self._build_analysis_pattern_search_documents(),
         )
         object.__setattr__(self, "_sealed", True)
 
@@ -787,6 +941,10 @@ class Catalog:
         return CLAIM_STATUSES
 
     @property
+    def analysis_pattern_statuses(self) -> tuple[str, ...]:
+        return ANALYSIS_PATTERN_STATUSES
+
+    @property
     def concepts(self) -> Mapping[str, Concept]:
         return self._concepts
 
@@ -813,6 +971,10 @@ class Catalog:
     @property
     def contexts(self) -> Mapping[str, ClinicalContext]:
         return self._contexts
+
+    @property
+    def analysis_patterns(self) -> Mapping[str, AnalysisPattern]:
+        return self._analysis_patterns
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> Catalog:
@@ -860,6 +1022,11 @@ class Catalog:
         )
         _require_constant_array(
             data["claim_statuses"], CLAIM_STATUSES, "$.claim_statuses"
+        )
+        _require_constant_array(
+            data["analysis_pattern_statuses"],
+            ANALYSIS_PATTERN_STATUSES,
+            "$.analysis_pattern_statuses",
         )
 
         raw_concepts = _expect_mapping(data["concepts"], "$.concepts")
@@ -916,6 +1083,17 @@ class Catalog:
             _require_identifier(context_id, f"$.contexts key {context_id!r}")
             contexts[context_id] = _parse_clinical_context(
                 context_id, raw_context, frozenset(profiles)
+            )
+        raw_patterns = _expect_mapping(
+            data["analysis_patterns"], "$.analysis_patterns"
+        )
+        analysis_patterns: dict[str, AnalysisPattern] = {}
+        for pattern_id, raw_pattern in raw_patterns.items():
+            _require_identifier(
+                pattern_id, f"$.analysis_patterns key {pattern_id!r}"
+            )
+            analysis_patterns[pattern_id] = _parse_analysis_pattern(
+                pattern_id, raw_pattern, frozenset(profiles)
             )
 
         for concept in concepts.values():
@@ -1074,6 +1252,21 @@ class Catalog:
                 "context IDs collide with another catalog namespace: "
                 + ", ".join(context_collisions)
             )
+        pattern_collisions = sorted(
+            set(analysis_patterns)
+            & (
+                set(concepts)
+                | set(vocabularies)
+                | relationship_ids
+                | set(sources)
+                | set(contexts)
+            )
+        )
+        if pattern_collisions:
+            raise CatalogValidationError(
+                "analysis pattern IDs collide with another catalog namespace: "
+                + ", ".join(pattern_collisions)
+            )
         _validate_context_references(
             contexts=contexts,
             sources=sources,
@@ -1083,6 +1276,16 @@ class Catalog:
             relationships={
                 relationship.id: relationship for relationship in relationships
             },
+        )
+        _validate_analysis_pattern_references(
+            patterns=analysis_patterns,
+            concepts=concepts,
+            bindings=bindings,
+            table_specs=table_specs,
+            relationships={
+                relationship.id: relationship for relationship in relationships
+            },
+            contexts=contexts,
         )
 
         ordered_bindings = tuple(
@@ -1110,6 +1313,7 @@ class Catalog:
             ),
             sources=sources,
             contexts=contexts,
+            analysis_patterns=analysis_patterns,
         )
 
     def summary(self) -> dict[str, Any]:
@@ -1124,6 +1328,9 @@ class Catalog:
             "source_kinds": list(self.source_kinds),
             "source_locator_kinds": list(self.source_locator_kinds),
             "claim_statuses": list(self.claim_statuses),
+            "analysis_pattern_statuses": list(
+                self.analysis_pattern_statuses
+            ),
             "concepts": len(self.concepts),
             "bindings": len(self.bindings),
             "vocabularies": len(self.vocabularies),
@@ -1131,6 +1338,7 @@ class Catalog:
             "relationships": len(self.relationships),
             "sources": len(self.sources),
             "contexts": len(self.contexts),
+            "analysis_patterns": len(self.analysis_patterns),
         }
 
     def get_table(self, profile: str, table: str) -> dict[str, Any]:
@@ -1496,6 +1704,115 @@ class Catalog:
                 source_id: self.sources[source_id].to_dict()
                 for source_id in selected_source_ids
             },
+        }
+
+    def get_analysis_pattern(self, identifier: str) -> dict[str, Any]:
+        """Get one non-executable analysis guidance pattern."""
+
+        normalized = _lookup_identifier(identifier, "identifier")
+        pattern = self._analysis_patterns.get(normalized)
+        if pattern is None:
+            raise CatalogNotFoundError(
+                f"analysis pattern {normalized!r} was not found"
+            )
+        return {
+            "kind": "analysis_pattern",
+            "identifier": normalized,
+            "pattern": pattern.to_dict(),
+        }
+
+    def search_analysis_patterns(
+        self,
+        query: str = "",
+        *,
+        status: str | None = None,
+        scope: str | None = None,
+        profile: str | None = None,
+        domain: str | None = None,
+        grain: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Search non-executable analysis guidance by text and facets."""
+
+        if not isinstance(query, str):
+            raise CatalogValidationError("query must be a string")
+        query_text = query.strip().casefold()
+        filters = {
+            "status": _optional_filter(status, "status"),
+            "scope": _optional_filter(scope, "scope"),
+            "profile": _optional_filter(profile, "profile"),
+            "domain": _optional_filter(domain, "domain"),
+            "grain": _optional_filter(grain, "grain"),
+        }
+        if not query_text and not any(filters.values()):
+            raise CatalogValidationError(
+                "provide a query or at least one analysis-pattern search filter"
+            )
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or not 1 <= limit <= 500
+        ):
+            raise CatalogValidationError("limit must be an integer from 1 to 500")
+        for name, allowed in {
+            "status": ANALYSIS_PATTERN_STATUSES,
+            "scope": CONTEXT_SCOPES,
+            "profile": self.profiles,
+            "domain": DOMAINS,
+            "grain": GRAINS,
+        }.items():
+            if filters[name] is not None and filters[name] not in allowed:
+                raise CatalogValidationError(
+                    f"unknown {name} filter {filters[name]!r}"
+                )
+        query_tokens = frozenset(
+            token
+            for token in _tokens(query_text)
+            if token not in _SEARCH_STOPWORDS
+        )
+        if query_text and not query_tokens and not any(filters.values()):
+            raise CatalogValidationError(
+                "query must contain at least one meaningful token"
+            )
+
+        candidates: list[tuple[int, str, AnalysisPattern]] = []
+        for document in self._analysis_pattern_search_documents:
+            pattern = document.pattern
+            if filters["status"] and pattern.status != filters["status"]:
+                continue
+            if filters["scope"] and pattern.scope != filters["scope"]:
+                continue
+            if filters["profile"] and filters["profile"] not in pattern.profiles:
+                continue
+            if filters["domain"] and filters["domain"] not in pattern.domains:
+                continue
+            if (
+                filters["grain"]
+                and filters["grain"] not in pattern.applicable_grains
+            ):
+                continue
+            overlap = query_tokens & document.all_tokens
+            if query_tokens and not overlap:
+                continue
+            score = (
+                100
+                if query_tokens and len(overlap) == len(query_tokens)
+                else round(100 * len(overlap) / len(query_tokens))
+                if query_tokens
+                else 0
+            )
+            candidates.append((score, pattern.id, pattern))
+        candidates.sort(key=lambda item: (-item[0], item[1]))
+        selected = candidates[:limit]
+        return {
+            "query": query,
+            "filters": filters,
+            "count": len(selected),
+            "total": len(candidates),
+            "matches": [
+                {"score": score, **pattern.to_dict()}
+                for score, _, pattern in selected
+            ],
         }
 
     def get_feature(
@@ -1900,6 +2217,66 @@ class Catalog:
                         )
                     ),
                     claims=tuple(claim_documents),
+                )
+            )
+        return tuple(documents)
+
+    def _build_analysis_pattern_search_documents(
+        self,
+    ) -> tuple[_AnalysisPatternSearchDocument, ...]:
+        documents = []
+        for pattern in self.analysis_patterns.values():
+            text = " ".join(
+                (
+                    pattern.id,
+                    pattern.title,
+                    pattern.summary,
+                    pattern.status,
+                    pattern.scope,
+                    *pattern.profiles,
+                    *pattern.domains,
+                    *pattern.search_terms,
+                    *pattern.applicable_grains,
+                    *pattern.related_concepts,
+                    *pattern.related_relationships,
+                    *pattern.related_contexts,
+                    *(table.identifier for table in pattern.related_tables),
+                    *(
+                        part
+                        for alternative in pattern.alternatives
+                        for part in (
+                            alternative.id,
+                            alternative.label,
+                            alternative.description,
+                            alternative.appropriate_when,
+                            *alternative.limitations,
+                        )
+                    ),
+                    *(
+                        part
+                        for decision in pattern.required_decisions
+                        for part in (
+                            decision.id,
+                            decision.question,
+                            decision.rationale,
+                        )
+                    ),
+                    *(
+                        part
+                        for shortcut in pattern.prohibited_shortcuts
+                        for part in (
+                            shortcut.id,
+                            shortcut.statement,
+                            shortcut.reason,
+                        )
+                    ),
+                    *pattern.caveats,
+                )
+            )
+            documents.append(
+                _AnalysisPatternSearchDocument(
+                    pattern=pattern,
+                    all_tokens=frozenset(_tokens(text)),
                 )
             )
         return tuple(documents)
@@ -2490,6 +2867,241 @@ def _parse_workflow_step(value: object, path: str) -> WorkflowStep:
     )
 
 
+def _parse_analysis_pattern(
+    pattern_id: str,
+    value: object,
+    profiles: frozenset[str],
+) -> AnalysisPattern:
+    path = f"$.analysis_patterns.{pattern_id}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _ANALYSIS_PATTERN_KEYS, _ANALYSIS_PATTERN_KEYS, path
+    )
+    scope = _controlled_string(
+        data["scope"], f"{path}.scope", CONTEXT_SCOPES
+    )
+    pattern_profiles = _string_array(
+        data["profiles"], f"{path}.profiles", identifier=True
+    )
+    unknown_profiles = sorted(set(pattern_profiles) - profiles)
+    if unknown_profiles:
+        raise CatalogValidationError(
+            f"{path}.profiles references unknown profiles: "
+            + ", ".join(unknown_profiles)
+        )
+    if (scope == "profile_specific") != bool(pattern_profiles):
+        requirement = (
+            "at least one profile"
+            if scope == "profile_specific"
+            else "an empty profile list"
+        )
+        raise CatalogValidationError(
+            f"{path}.profiles must contain {requirement} for scope {scope!r}"
+        )
+    domains = _string_array(
+        data["domains"], f"{path}.domains", minimum=1
+    )
+    unknown_domains = sorted(set(domains) - set(DOMAINS))
+    if unknown_domains:
+        raise CatalogValidationError(
+            f"{path}.domains contains unknown values: "
+            + ", ".join(unknown_domains)
+        )
+    grains = _string_array(
+        data["applicable_grains"], f"{path}.applicable_grains", minimum=1
+    )
+    unknown_grains = sorted(set(grains) - set(GRAINS))
+    if unknown_grains:
+        raise CatalogValidationError(
+            f"{path}.applicable_grains contains unknown values: "
+            + ", ".join(unknown_grains)
+        )
+
+    related_tables = _parse_context_table_references(
+        data["related_tables"], f"{path}.related_tables", profiles
+    )
+    if scope != "profile_specific" and (
+        related_tables or data["related_relationships"]
+    ):
+        raise CatalogValidationError(
+            f"{path} may reference physical tables and relationships only "
+            "when scope is 'profile_specific'"
+        )
+
+    alternatives = tuple(
+        _parse_analysis_alternative(item, f"{path}.alternatives[{index}]")
+        for index, item in enumerate(
+            _expect_list(data["alternatives"], f"{path}.alternatives")
+        )
+    )
+    decisions = tuple(
+        _parse_analysis_decision(
+            item, f"{path}.required_decisions[{index}]"
+        )
+        for index, item in enumerate(
+            _expect_list(
+                data["required_decisions"], f"{path}.required_decisions"
+            )
+        )
+    )
+    shortcuts = tuple(
+        _parse_prohibited_shortcut(
+            item, f"{path}.prohibited_shortcuts[{index}]"
+        )
+        for index, item in enumerate(
+            _expect_list(
+                data["prohibited_shortcuts"],
+                f"{path}.prohibited_shortcuts",
+            )
+        )
+    )
+    for field, items in (
+        ("alternatives", alternatives),
+        ("required_decisions", decisions),
+        ("prohibited_shortcuts", shortcuts),
+    ):
+        if not items:
+            raise CatalogValidationError(f"{path}.{field} must not be empty")
+        ids = [item.id for item in items]
+        if len(ids) != len(set(ids)):
+            raise CatalogValidationError(
+                f"{path}.{field} contains duplicate IDs"
+            )
+
+    return AnalysisPattern(
+        id=pattern_id,
+        title=_nonempty_string(data["title"], f"{path}.title"),
+        status=_controlled_string(
+            data["status"], f"{path}.status", ANALYSIS_PATTERN_STATUSES
+        ),
+        scope=scope,
+        profiles=pattern_profiles,
+        summary=_nonempty_string(data["summary"], f"{path}.summary"),
+        domains=domains,
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        applicable_grains=grains,
+        related_concepts=_string_array(
+            data["related_concepts"],
+            f"{path}.related_concepts",
+            minimum=1,
+            identifier=True,
+        ),
+        related_tables=related_tables,
+        related_relationships=_string_array(
+            data["related_relationships"],
+            f"{path}.related_relationships",
+            identifier=True,
+        ),
+        related_contexts=_string_array(
+            data["related_contexts"],
+            f"{path}.related_contexts",
+            minimum=1,
+            identifier=True,
+        ),
+        alternatives=alternatives,
+        required_decisions=decisions,
+        prohibited_shortcuts=shortcuts,
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_context_table_references(
+    value: object,
+    path: str,
+    profiles: frozenset[str],
+) -> tuple[ContextTableReference, ...]:
+    references: list[ContextTableReference] = []
+    seen: set[str] = set()
+    for index, raw_table in enumerate(_expect_list(value, path)):
+        table_path = f"{path}[{index}]"
+        table_data = _expect_mapping(raw_table, table_path)
+        _require_exact_keys(
+            table_data,
+            _CONTEXT_TABLE_REFERENCE_KEYS,
+            _CONTEXT_TABLE_REFERENCE_KEYS,
+            table_path,
+        )
+        reference = ContextTableReference(
+            profile=_controlled_identifier(
+                table_data["profile"], f"{table_path}.profile", profiles
+            ),
+            table=_physical_component(
+                table_data["table"], f"{table_path}.table"
+            ),
+        )
+        if reference.identifier in seen:
+            raise CatalogValidationError(
+                f"{path} contains duplicate {reference.identifier!r}"
+            )
+        seen.add(reference.identifier)
+        references.append(reference)
+    return tuple(references)
+
+
+def _parse_analysis_alternative(
+    value: object, path: str
+) -> AnalysisAlternative:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data,
+        _ANALYSIS_ALTERNATIVE_KEYS,
+        _ANALYSIS_ALTERNATIVE_KEYS,
+        path,
+    )
+    return AnalysisAlternative(
+        id=_analysis_item_id(data["id"], f"{path}.id"),
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        description=_nonempty_string(
+            data["description"], f"{path}.description"
+        ),
+        appropriate_when=_nonempty_string(
+            data["appropriate_when"], f"{path}.appropriate_when"
+        ),
+        limitations=_string_array(
+            data["limitations"], f"{path}.limitations", minimum=1
+        ),
+    )
+
+
+def _parse_analysis_decision(
+    value: object, path: str
+) -> AnalysisDecision:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _ANALYSIS_DECISION_KEYS, _ANALYSIS_DECISION_KEYS, path
+    )
+    return AnalysisDecision(
+        id=_analysis_item_id(data["id"], f"{path}.id"),
+        question=_nonempty_string(data["question"], f"{path}.question"),
+        rationale=_nonempty_string(data["rationale"], f"{path}.rationale"),
+    )
+
+
+def _parse_prohibited_shortcut(
+    value: object, path: str
+) -> ProhibitedShortcut:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data,
+        _PROHIBITED_SHORTCUT_KEYS,
+        _PROHIBITED_SHORTCUT_KEYS,
+        path,
+    )
+    return ProhibitedShortcut(
+        id=_analysis_item_id(data["id"], f"{path}.id"),
+        statement=_nonempty_string(data["statement"], f"{path}.statement"),
+        reason=_nonempty_string(data["reason"], f"{path}.reason"),
+    )
+
+
+def _analysis_item_id(value: object, path: str) -> str:
+    identifier = _nonempty_string(value, path)
+    _require_identifier(identifier, path)
+    return identifier
+
+
 def _parse_source_endpoint(
     value: object, path: str
 ) -> RelationshipEndpoint:
@@ -2782,6 +3394,82 @@ def _validate_hierarchy_acyclic(
 
     for node in sorted(nodes):
         visit(node)
+
+
+def _validate_analysis_pattern_references(
+    *,
+    patterns: Mapping[str, AnalysisPattern],
+    concepts: Mapping[str, Concept],
+    bindings: Sequence[Binding],
+    table_specs: Mapping[tuple[str, str], TableSpec],
+    relationships: Mapping[str, Relationship],
+    contexts: Mapping[str, ClinicalContext],
+) -> None:
+    concept_profiles: defaultdict[str, set[str]] = defaultdict(set)
+    for binding in bindings:
+        concept_profiles[binding.concept].add(binding.profile)
+
+    for pattern in patterns.values():
+        path = f"$.analysis_patterns.{pattern.id}"
+        missing_concepts = sorted(
+            set(pattern.related_concepts) - set(concepts)
+        )
+        if missing_concepts:
+            raise CatalogValidationError(
+                f"{path}.related_concepts references unknown concepts: "
+                + ", ".join(missing_concepts)
+            )
+        missing_contexts = sorted(
+            set(pattern.related_contexts) - set(contexts)
+        )
+        if missing_contexts:
+            raise CatalogValidationError(
+                f"{path}.related_contexts references unknown contexts: "
+                + ", ".join(missing_contexts)
+            )
+        if pattern.scope == "profile_specific":
+            for concept_id in pattern.related_concepts:
+                if not (
+                    concept_profiles[concept_id] & set(pattern.profiles)
+                ):
+                    raise CatalogValidationError(
+                        f"{path}.related_concepts references concept "
+                        f"{concept_id!r} with no binding in pattern profiles"
+                    )
+        for table in pattern.related_tables:
+            if (table.profile, table.table) not in table_specs:
+                raise CatalogValidationError(
+                    f"{path}.related_tables references unknown table "
+                    f"{table.identifier!r}"
+                )
+            if table.profile not in pattern.profiles:
+                raise CatalogValidationError(
+                    f"{path}.related_tables references table "
+                    f"{table.identifier!r} outside pattern profiles"
+                )
+        for relationship_id in pattern.related_relationships:
+            relationship = relationships.get(relationship_id)
+            if relationship is None:
+                raise CatalogValidationError(
+                    f"{path}.related_relationships references unknown "
+                    f"relationship {relationship_id!r}"
+                )
+            if relationship.profile not in pattern.profiles:
+                raise CatalogValidationError(
+                    f"{path}.related_relationships references relationship "
+                    f"{relationship_id!r} outside pattern profiles"
+                )
+        for context_id in pattern.related_contexts:
+            context = contexts[context_id]
+            if (
+                pattern.scope == "profile_specific"
+                and context.scope == "profile_specific"
+                and not set(pattern.profiles).issubset(context.profiles)
+            ):
+                raise CatalogValidationError(
+                    f"{path}.related_contexts references context "
+                    f"{context_id!r} outside pattern profiles"
+                )
 
 
 def _expect_mapping(value: object, path: str) -> Mapping[str, Any]:

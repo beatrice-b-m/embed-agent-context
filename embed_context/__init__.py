@@ -1,6 +1,9 @@
 """Dependency-free access to the EMBED V2 feature catalog."""
 
 from .catalog import (
+    AnalysisAlternative,
+    AnalysisDecision,
+    AnalysisPattern,
     Binding,
     Catalog,
     CatalogAmbiguousError,
@@ -14,6 +17,7 @@ from .catalog import (
     ContextSource,
     ContextTableReference,
     KeyCandidate,
+    ProhibitedShortcut,
     Relationship,
     RelationshipEndpoint,
     TableSpec,
@@ -23,6 +27,9 @@ from .catalog import (
 )
 
 __all__ = [
+    "AnalysisAlternative",
+    "AnalysisDecision",
+    "AnalysisPattern",
     "Binding",
     "Catalog",
     "CatalogAmbiguousError",
@@ -36,6 +43,7 @@ __all__ = [
     "ContextSource",
     "ContextTableReference",
     "KeyCandidate",
+    "ProhibitedShortcut",
     "Relationship",
     "RelationshipEndpoint",
     "TableSpec",

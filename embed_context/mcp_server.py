@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from .catalog import (
+    ANALYSIS_PATTERN_STATUSES,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
@@ -31,6 +32,7 @@ RelationshipKindFilter = Literal[*_RELATIONSHIP_KIND_VALUES]
 ContextKindFilter = Literal[*CONTEXT_KINDS]
 ContextScopeFilter = Literal[*CONTEXT_SCOPES]
 ClaimStatusFilter = Literal[*CLAIM_STATUSES]
+AnalysisPatternStatusFilter = Literal[*ANALYSIS_PATTERN_STATUSES]
 
 
 MCP_INSTALL_HINT = (
@@ -92,6 +94,20 @@ class CatalogProtocol(Protocol):
         relationship: str | None = None,
         status: str | None = None,
         source: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]: ...
+
+    def get_analysis_pattern(self, identifier: str) -> dict[str, Any]: ...
+
+    def search_analysis_patterns(
+        self,
+        query: str = "",
+        *,
+        status: str | None = None,
+        scope: str | None = None,
+        profile: str | None = None,
+        domain: str | None = None,
+        grain: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]: ...
 
@@ -188,13 +204,24 @@ def build_server(catalog: CatalogProtocol) -> Any:
         )
         if part
     )
+    pattern_filter_description = "; ".join(
+        part
+        for part in (
+            f"statuses: {', '.join(ANALYSIS_PATTERN_STATUSES)}",
+            f"scopes: {', '.join(CONTEXT_SCOPES)}",
+            f"grains: {', '.join(GRAINS)}",
+            f"domains: {', '.join(DOMAINS)}",
+            catalog_scope,
+        )
+        if part
+    )
     server = MCPServer(
         "embed-v2-feature-context",
         description=(
             "Read-only EMBED V2 feature, table-linkage, and clinical context "
-            "metadata lookup"
+            "metadata and non-executable analysis guidance lookup"
         ),
-        version="0.3.0",
+        version="0.4.0",
         instructions=(
             "Use these read-only tools for EMBED V2 feature meanings, table "
             "linkages, sourced clinical and workflow context, evidence, caveats, "
@@ -204,9 +231,12 @@ def build_server(catalog: CatalogProtocol) -> Any:
             "Relationships are descriptive metadata, not executable joins; honor "
             "their documented optionality, cardinality, and hazards. The catalog "
             "does not provide clinical rows, report text, or clinical advice. "
+            "Analysis patterns present alternatives and mandatory policy "
+            "questions; they do not choose a default or execute a cohort. "
             f"Feature search filters — {feature_filter_description}. "
             f"Relationship search filters — {relationship_filter_description}. "
-            f"Context search filters — {context_filter_description}."
+            f"Context search filters — {context_filter_description}. "
+            f"Analysis-pattern search filters — {pattern_filter_description}."
         ),
     )
     read_only = ToolAnnotations(
@@ -341,9 +371,47 @@ def build_server(catalog: CatalogProtocol) -> Any:
             limit=limit,
         )
 
+    @server.tool(annotations=read_only, structured_output=True)
+    def get_analysis_pattern(identifier: str) -> dict[str, Any]:
+        """Get one non-executable cohort or analysis guidance pattern."""
+
+        return catalog.get_analysis_pattern(identifier)
+
+    @server.tool(
+        annotations=read_only,
+        structured_output=True,
+        description=(
+            "Search non-executable cohort and analysis guidance. Patterns "
+            "present alternatives, required decisions, and prohibited "
+            f"shortcuts. Valid filters — {pattern_filter_description}."
+        ),
+    )
+    def search_analysis_patterns(
+        query: str = "",
+        status: AnalysisPatternStatusFilter | None = None,
+        scope: ContextScopeFilter | None = None,
+        profile: str | None = None,
+        domain: DomainFilter | None = None,
+        grain: GrainFilter | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Search guidance without choosing or executing an analysis policy."""
+
+        return catalog.search_analysis_patterns(
+            query,
+            status=status,
+            scope=scope,
+            profile=profile,
+            domain=domain,
+            grain=grain,
+            limit=limit,
+        )
+
     _require_exact_tool_arguments(server, "search_relationships")
     _require_exact_tool_arguments(server, "get_context")
     _require_exact_tool_arguments(server, "search_contexts")
+    _require_exact_tool_arguments(server, "get_analysis_pattern")
+    _require_exact_tool_arguments(server, "search_analysis_patterns")
     return server
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from embed_context.catalog import (
+    ANALYSIS_PATTERN_STATUSES,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
@@ -21,7 +22,7 @@ from embed_context.catalog import (
 def synthetic_catalog() -> dict[str, Any]:
     return {
         "$schema": "./catalog.schema.json",
-        "schema_version": 3,
+        "schema_version": 4,
         "profiles": ["open-v2"],
         "grains": list(GRAINS),
         "feature_kinds": list(FEATURE_KINDS),
@@ -31,6 +32,7 @@ def synthetic_catalog() -> dict[str, Any]:
         "source_kinds": list(SOURCE_KINDS),
         "source_locator_kinds": list(SOURCE_LOCATOR_KINDS),
         "claim_statuses": list(CLAIM_STATUSES),
+        "analysis_pattern_statuses": list(ANALYSIS_PATTERN_STATUSES),
         "concepts": {
             "exam.tissue_density": {
                 "label": "Breast tissue density",
@@ -168,6 +170,51 @@ def synthetic_catalog() -> dict[str, Any]:
                 ],
                 "workflow_steps": [],
                 "caveats": ["Synthetic context for contract tests."],
+            }
+        },
+        "analysis_patterns": {
+            "open-v2.density-analysis": {
+                "title": "Synthetic density analysis guidance",
+                "status": "draft",
+                "scope": "profile_specific",
+                "profiles": ["open-v2"],
+                "summary": "Choose a density analysis policy explicitly.",
+                "domains": ["exam", "mammography"],
+                "search_terms": ["density analysis"],
+                "applicable_grains": ["exam"],
+                "related_concepts": ["exam.tissue_density"],
+                "related_tables": [
+                    {
+                        "profile": "open-v2",
+                        "table": "exam_level_anon",
+                    }
+                ],
+                "related_relationships": [],
+                "related_contexts": ["open-v2.density-interpretation"],
+                "alternatives": [
+                    {
+                        "id": "coded-groups",
+                        "label": "Coded density groups",
+                        "description": "Retain the released categories.",
+                        "appropriate_when": "Category-specific effects matter.",
+                        "limitations": ["Sparse groups may require review."],
+                    }
+                ],
+                "required_decisions": [
+                    {
+                        "id": "grouping",
+                        "question": "How are density groups represented?",
+                        "rationale": "The analysis determines grouping.",
+                    }
+                ],
+                "prohibited_shortcuts": [
+                    {
+                        "id": "null-as-category",
+                        "statement": "Do not assign null to a density category.",
+                        "reason": "Null has no documented code meaning.",
+                    }
+                ],
+                "caveats": ["Synthetic pattern for contract tests."],
             }
         },
     }

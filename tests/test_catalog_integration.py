@@ -9,6 +9,7 @@ from pathlib import Path
 
 from embed_context import load_catalog
 from embed_context.catalog import (
+    ANALYSIS_PATTERN_STATUSES,
     BINDING_PARAMETER_KEYS,
     CARDINALITY_VALUES,
     CLAIM_STATUSES,
@@ -30,12 +31,16 @@ from embed_context.catalog import (
     VOCABULARY_PARSING,
     _BINDING_KEYS,
     _BINDING_REQUIRED_KEYS,
+    _ANALYSIS_ALTERNATIVE_KEYS,
+    _ANALYSIS_DECISION_KEYS,
+    _ANALYSIS_PATTERN_KEYS,
     _CONCEPT_KEYS,
     _CONCEPT_REQUIRED_KEYS,
     _CLINICAL_CONTEXT_KEYS,
     _CONTEXT_CLAIM_KEYS,
     _CONTEXT_SOURCE_KEYS,
     _CONTEXT_TABLE_REFERENCE_KEYS,
+    _PROHIBITED_SHORTCUT_KEYS,
     _VOCABULARY_KEYS,
     _VOCABULARY_REQUIRED_KEYS,
     _WORKFLOW_STEP_KEYS,
@@ -101,6 +106,34 @@ class CheckedInCatalogTests(unittest.TestCase):
                 cited_sources.update(claim_sources)
 
         self.assertEqual(cited_sources, set(self.catalog.sources))
+
+    def test_initial_analysis_pattern_exposes_policy_boundaries(self) -> None:
+        self.assertEqual(
+            set(self.catalog.analysis_patterns),
+            {"open-v2.pathology-cancer-vs-noncancer"},
+        )
+        result = self.catalog.get_analysis_pattern(
+            "open-v2.pathology-cancer-vs-noncancer"
+        )
+        pattern = result["pattern"]
+        self.assertEqual(pattern["status"], "draft")
+        self.assertEqual(len(pattern["alternatives"]), 3)
+        self.assertIn(
+            "null-is-negative",
+            {
+                item["id"] for item in pattern["prohibited_shortcuts"]
+            },
+        )
+        self.assertIn(
+            "control-definition",
+            {item["id"] for item in pattern["required_decisions"]},
+        )
+        search = self.catalog.search_analysis_patterns(
+            "cancer versus no cancer",
+            profile="open-v2",
+            domain="pathology",
+        )
+        self.assertEqual(search["total"], 1)
 
     def test_phase_three_context_keeps_scope_and_maintainer_boundaries(self) -> None:
         self.assertEqual(
@@ -545,6 +578,10 @@ class CheckedInCatalogTests(unittest.TestCase):
         self.assertEqual(
             properties["claim_statuses"]["const"], list(CLAIM_STATUSES)
         )
+        self.assertEqual(
+            properties["analysis_pattern_statuses"]["const"],
+            list(ANALYSIS_PATTERN_STATUSES),
+        )
         definitions = schema["$defs"]
         self.assertEqual(
             set(definitions["evidence"]["enum"]), EVIDENCE_VALUES
@@ -623,12 +660,32 @@ class CheckedInCatalogTests(unittest.TestCase):
             set(definitions["workflow_step"]["properties"]),
             _WORKFLOW_STEP_KEYS,
         )
+        self.assertEqual(
+            set(definitions["analysis_pattern"]["properties"]),
+            _ANALYSIS_PATTERN_KEYS,
+        )
+        self.assertEqual(
+            set(definitions["analysis_alternative"]["properties"]),
+            _ANALYSIS_ALTERNATIVE_KEYS,
+        )
+        self.assertEqual(
+            set(definitions["analysis_decision"]["properties"]),
+            _ANALYSIS_DECISION_KEYS,
+        )
+        self.assertEqual(
+            set(definitions["prohibited_shortcut"]["properties"]),
+            _PROHIBITED_SHORTCUT_KEYS,
+        )
         for definition in (
             "context_source",
             "clinical_context",
             "context_claim",
             "context_table_reference",
             "workflow_step",
+            "analysis_pattern",
+            "analysis_alternative",
+            "analysis_decision",
+            "prohibited_shortcut",
         ):
             with self.subTest(definition=definition):
                 self.assertEqual(

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "catalog.schema.json",
-  "title": "EMBED V2 count-free feature and clinical context catalog",
+  "title": "EMBED V2 count-free feature, context, and analysis guidance catalog",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,20 +16,22 @@
     "source_kinds",
     "source_locator_kinds",
     "claim_statuses",
+    "analysis_pattern_statuses",
     "concepts",
     "bindings",
     "vocabularies",
     "tables",
     "relationships",
     "sources",
-    "contexts"
+    "contexts",
+    "analysis_patterns"
   ],
   "properties": {
     "$schema": {
       "const": "./catalog.schema.json"
     },
     "schema_version": {
-      "const": 3
+      "const": 4
     },
     "profiles": {
       "type": "array",
@@ -126,6 +128,12 @@
         "contradicted"
       ]
     },
+    "analysis_pattern_statuses": {
+      "const": [
+        "draft",
+        "reviewed"
+      ]
+    },
     "concepts": {
       "type": "object",
       "minProperties": 1,
@@ -179,6 +187,15 @@
       "patternProperties": {
         "^[a-z][a-z0-9_.-]*$": {
           "$ref": "#/$defs/clinical_context"
+        }
+      },
+      "additionalProperties": false
+    },
+    "analysis_patterns": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*$": {
+          "$ref": "#/$defs/analysis_pattern"
         }
       },
       "additionalProperties": false
@@ -1120,6 +1137,282 @@
               "workflow_steps": {
                 "maxItems": 0
               }
+            }
+          }
+        }
+      ]
+    },
+    "analysis_alternative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "description",
+        "appropriate_when",
+        "limitations"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "appropriate_when": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    "analysis_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "rationale"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "prohibited_shortcut": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "reason"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "analysis_pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "status",
+        "scope",
+        "profiles",
+        "summary",
+        "domains",
+        "search_terms",
+        "applicable_grains",
+        "related_concepts",
+        "related_tables",
+        "related_relationships",
+        "related_contexts",
+        "alternatives",
+        "required_decisions",
+        "prohibited_shortcuts",
+        "caveats"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "status": {
+          "enum": ["draft", "reviewed"]
+        },
+        "scope": {
+          "enum": [
+            "general_clinical",
+            "embed_general",
+            "profile_specific"
+          ]
+        },
+        "profiles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "domains": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "identity",
+              "demographics",
+              "social_determinants_of_health",
+              "exam",
+              "breast_side",
+              "imaging",
+              "mammography",
+              "ultrasound",
+              "mri",
+              "pathology",
+              "procedure",
+              "report",
+              "risk",
+              "temporal",
+              "workflow",
+              "technical"
+            ]
+          }
+        },
+        "search_terms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "applicable_grains": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "patient",
+              "exam",
+              "breast_side",
+              "imaging_finding",
+              "pathology_finding",
+              "report",
+              "risk_assessment",
+              "wide_row"
+            ]
+          }
+        },
+        "related_concepts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "related_tables": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/context_table_reference"
+          }
+        },
+        "related_relationships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "related_contexts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/analysis_alternative"
+          }
+        },
+        "required_decisions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/analysis_decision"
+          }
+        },
+        "prohibited_shortcuts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/prohibited_shortcut"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scope": {"const": "profile_specific"}
+            },
+            "required": ["scope"]
+          },
+          "then": {
+            "properties": {
+              "profiles": {"minItems": 1}
+            }
+          },
+          "else": {
+            "properties": {
+              "profiles": {"maxItems": 0},
+              "related_tables": {"maxItems": 0},
+              "related_relationships": {"maxItems": 0}
             }
           }
         }

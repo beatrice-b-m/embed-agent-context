@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .catalog import (
+    ANALYSIS_PATTERN_STATUSES,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
@@ -114,6 +115,26 @@ def build_parser() -> argparse.ArgumentParser:
     contexts_parser.add_argument("--status", choices=CLAIM_STATUSES)
     contexts_parser.add_argument("--source")
     contexts_parser.add_argument("--limit", type=int, default=50)
+
+    pattern_parser = subparsers.add_parser(
+        "pattern",
+        help="get one exact non-executable analysis pattern",
+    )
+    pattern_parser.add_argument("identifier")
+
+    patterns_parser = subparsers.add_parser(
+        "patterns",
+        help="search and filter non-executable analysis patterns",
+    )
+    patterns_parser.add_argument("query", nargs="?", default="")
+    patterns_parser.add_argument(
+        "--status", choices=ANALYSIS_PATTERN_STATUSES
+    )
+    patterns_parser.add_argument("--scope", choices=CONTEXT_SCOPES)
+    patterns_parser.add_argument("--profile")
+    patterns_parser.add_argument("--domain", choices=DOMAINS)
+    patterns_parser.add_argument("--grain", choices=GRAINS)
+    patterns_parser.add_argument("--limit", type=int, default=50)
     return parser
 
 
@@ -167,6 +188,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 relationship=args.relationship,
                 status=args.status,
                 source=args.source,
+                limit=args.limit,
+            )
+        elif args.command == "pattern":
+            data = catalog.get_analysis_pattern(args.identifier)
+        elif args.command == "patterns":
+            data = catalog.search_analysis_patterns(
+                args.query,
+                status=args.status,
+                scope=args.scope,
+                profile=args.profile,
+                domain=args.domain,
+                grain=args.grain,
                 limit=args.limit,
             )
         else:  # pragma: no cover - argparse constrains this branch.
@@ -239,7 +272,9 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
             f"{data['sources']} "
             f"{'source' if data['sources'] == 1 else 'sources'}, "
             f"{data['contexts']} "
-            f"{'context' if data['contexts'] == 1 else 'contexts'}"
+            f"{'context' if data['contexts'] == 1 else 'contexts'}, "
+            f"{data['analysis_patterns']} analysis "
+            f"{'pattern' if data['analysis_patterns'] == 1 else 'patterns'}"
         )
     if command == "get":
         concept = data["concept"]
@@ -365,6 +400,44 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
         if data["total"] > len(matches):
             lines.append(
                 f"Showing {len(matches)} of {data['total']} contexts."
+            )
+        return "\n".join(lines)
+    if command == "pattern":
+        pattern = data["pattern"]
+        lines = [
+            f"{data['identifier']} — {pattern['title']}",
+            pattern["summary"],
+            f"{pattern['status']} · {pattern['scope']} · "
+            f"{', '.join(pattern['applicable_grains'])}",
+            "alternatives:",
+        ]
+        lines.extend(
+            f"  {item['id']} — {item['label']}"
+            for item in pattern["alternatives"]
+        )
+        lines.append("required decisions:")
+        lines.extend(
+            f"  {item['id']} — {item['question']}"
+            for item in pattern["required_decisions"]
+        )
+        lines.append("prohibited shortcuts:")
+        lines.extend(
+            f"  {item['id']} — {item['statement']}"
+            for item in pattern["prohibited_shortcuts"]
+        )
+        return "\n".join(lines)
+    if command == "patterns":
+        matches = data["matches"]
+        if not matches:
+            return "No analysis patterns."
+        lines = [
+            f"{item['score']:>4}  {item['id']} — {item['title']} "
+            f"[{item['status']}]"
+            for item in matches
+        ]
+        if data["total"] > len(matches):
+            lines.append(
+                f"Showing {len(matches)} of {data['total']} analysis patterns."
             )
         return "\n".join(lines)
     raise ValueError(f"unsupported command {command!r}")

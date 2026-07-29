@@ -124,12 +124,33 @@ maintainer-confirmed representation semantics are distinguished from remaining
 unknown MagView code mappings, unverified report-addendum linkage, and
 unvalidated risk-field variants, percentage formatting, sentinel meanings, and
 model versions. Task-specific follow-up, cohort, label, and modality-inclusion
-choices are analysis policy and are not tracked as dataset claims awaiting
-verification.
+choices are analysis policy rather than dataset claims. They may be represented
+as non-executable analysis-pattern alternatives and required decisions, but
+must not be promoted to verified dataset behavior or silently selected as
+defaults.
 
 This layer is descriptive and read-only. It does not perform joins, define
 cohorts, derive labels, exclude records, prescribe care, or replace a versioned
 data toolkit.
+
+### 4. Non-executable analysis patterns
+
+Implemented as a separate advisory layer. An analysis pattern connects a
+research intent to relevant concepts, grains, tables, relationships, and
+sourced contexts. Each pattern must provide:
+
+- common policy alternatives when the scientific question admits materially
+  different cohort definitions;
+- the decisions an analyst must make before implementation;
+- shortcuts that are prohibited because they contradict catalog semantics or
+  would create an invalid inference; and
+- a maturity status distinguishing draft guidance from reviewed guidance.
+
+Patterns must not contain SQL, dataframe expressions, executable predicates,
+automatic defaults, empirical cohort measurements, or claims that a cohort is
+valid. The initial draft pattern covers pathology-defined breast cancer versus
+non-cancer cohorts and keeps null pathology, control composition, grain,
+follow-up, aggregation, and temporal leakage as explicit decisions.
 
 ## Evidence and source priority
 
@@ -190,6 +211,9 @@ A catalog-context change is complete when it:
   profile-specific behavior;
 - preserves unresolved workflow and temporal policy as unresolved rather than
   encoding an executable default;
+- gives each analysis pattern a maturity status, explicit alternatives,
+  required decisions, prohibited shortcuts, and resolvable links to its
+  supporting catalog context without embedding executable cohort logic;
 - adds no empirical dataset summary;
 - has focused synthetic tests for changed behavior and checked-in profile
   integration assertions for required tables, key caveats, expected

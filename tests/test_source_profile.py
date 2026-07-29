@@ -15,6 +15,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from embed_context.catalog import (
+    ANALYSIS_PATTERN_STATUSES,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
@@ -72,7 +73,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
             json.dumps(
                 {
                     "$schema": "./catalog.schema.json",
-                    "schema_version": 3,
+                    "schema_version": 4,
                     "profiles": profiles or ["sample"],
                     "grains": list(GRAINS),
                     "feature_kinds": list(FEATURE_KINDS),
@@ -82,6 +83,9 @@ class SourceProfileVerifierTests(unittest.TestCase):
                     "source_kinds": list(SOURCE_KINDS),
                     "source_locator_kinds": list(SOURCE_LOCATOR_KINDS),
                     "claim_statuses": list(CLAIM_STATUSES),
+                    "analysis_pattern_statuses": list(
+                        ANALYSIS_PATTERN_STATUSES
+                    ),
                     "concepts": {
                         "synthetic.feature": {
                             "label": "Synthetic feature",
@@ -115,6 +119,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
                     "relationships": [],
                     "sources": {},
                     "contexts": {},
+                    "analysis_patterns": {},
                 }
             ),
             encoding="utf-8",

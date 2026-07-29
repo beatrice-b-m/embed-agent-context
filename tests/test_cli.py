@@ -70,7 +70,7 @@ class CatalogCLITests(unittest.TestCase):
         self.assertEqual(
             envelope["data"],
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "profiles": ["open-v2"],
                 "grains": [
                     "patient",
@@ -142,6 +142,10 @@ class CatalogCLITests(unittest.TestCase):
                     "unresolved",
                     "contradicted",
                 ],
+                "analysis_pattern_statuses": [
+                    "draft",
+                    "reviewed",
+                ],
                 "concepts": 2,
                 "bindings": 3,
                 "vocabularies": 1,
@@ -149,6 +153,7 @@ class CatalogCLITests(unittest.TestCase):
                 "relationships": 1,
                 "sources": 1,
                 "contexts": 1,
+                "analysis_patterns": 1,
             },
         )
 
@@ -159,6 +164,7 @@ class CatalogCLITests(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assertIn("2 tables, 1 relationship", stdout)
         self.assertIn("1 source, 1 context", stdout)
+        self.assertIn("1 analysis pattern", stdout)
 
     def test_get_text_is_concise(self) -> None:
         status, stdout, stderr = self.run_cli(
@@ -602,6 +608,35 @@ class CatalogCLITests(unittest.TestCase):
         self.assertIn(
             "provide a query or at least one context search filter",
             stderr,
+        )
+
+    def test_pattern_and_patterns_commands(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "pattern", "open-v2.density-analysis"
+        )
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("Synthetic density analysis guidance", stdout)
+        self.assertIn("required decisions:", stdout)
+        self.assertIn("prohibited shortcuts:", stdout)
+
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "patterns",
+            "density",
+            "--status",
+            "draft",
+            "--grain",
+            "exam",
+        )
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        envelope = json.loads(stdout)
+        self.assertEqual(envelope["data"]["count"], 1)
+        self.assertEqual(
+            envelope["data"]["matches"][0]["id"],
+            "open-v2.density-analysis",
         )
 
     def test_json_error_is_machine_readable(self) -> None:
