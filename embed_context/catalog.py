@@ -122,6 +122,7 @@ _TOP_LEVEL_KEYS = frozenset(
         "relationships",
     }
 )
+_CATALOG_ENVELOPE_KEYS = frozenset({"$schema", "schema_version"})
 _CONCEPT_KEYS = frozenset(
     {
         "label",
@@ -561,20 +562,22 @@ class Catalog:
         """Validate an already-decoded mapping and freeze its contents."""
 
         data = _expect_mapping(value, "$")
-        _require_exact_keys(data, _TOP_LEVEL_KEYS, _TOP_LEVEL_KEYS, "$")
+        _require_keys(data, _CATALOG_ENVELOPE_KEYS, "$")
 
-        if data["$schema"] != SCHEMA_REFERENCE:
-            raise CatalogValidationError(
-                f"$.$schema must equal {SCHEMA_REFERENCE!r}"
-            )
         if (
             not isinstance(data["schema_version"], int)
             or isinstance(data["schema_version"], bool)
             or data["schema_version"] != SCHEMA_VERSION
         ):
             raise CatalogValidationError(
-                f"$.schema_version must equal integer {SCHEMA_VERSION}"
+                "unsupported catalog schema_version "
+                f"{data['schema_version']!r}; expected integer {SCHEMA_VERSION}"
             )
+        if data["$schema"] != SCHEMA_REFERENCE:
+            raise CatalogValidationError(
+                f"$.$schema must equal {SCHEMA_REFERENCE!r}"
+            )
+        _require_exact_keys(data, _TOP_LEVEL_KEYS, _TOP_LEVEL_KEYS, "$")
 
         profiles = _string_array(
             data["profiles"], "$.profiles", minimum=1, identifier=True
@@ -1743,15 +1746,23 @@ def _require_exact_keys(
     path: str,
 ) -> None:
     actual = frozenset(data)
-    missing = sorted(required - actual)
+    _require_keys(data, required, path)
     unexpected = sorted(actual - allowed)
-    if missing:
-        raise CatalogValidationError(
-            f"{path} is missing required fields: {', '.join(missing)}"
-        )
     if unexpected:
         raise CatalogValidationError(
             f"{path} has unexpected fields: {', '.join(unexpected)}"
+        )
+
+
+def _require_keys(
+    data: Mapping[str, Any],
+    required: frozenset[str],
+    path: str,
+) -> None:
+    missing = sorted(required - frozenset(data))
+    if missing:
+        raise CatalogValidationError(
+            f"{path} is missing required fields: {', '.join(missing)}"
         )
 
 

@@ -179,7 +179,9 @@ Compatible content additions keep the current schema version. A change that
 alters required fields, field meaning, identifier resolution, or query
 semantics requires a version decision and migration note. Consumers must fail
 clearly on an unsupported schema version rather than silently interpreting it
-as the current format.
+as the current format. Readers inspect `schema_version` before applying
+version-specific required-field and extension-field rules, so both legacy and
+future documents receive an explicit unsupported-version error.
 
 Schema version 2 adds required `tables` and `relationships` collections.
 Version-1 consumers must upgrade before loading a version-2 catalog. Existing

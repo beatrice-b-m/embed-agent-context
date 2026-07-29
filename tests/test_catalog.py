@@ -279,6 +279,25 @@ class CatalogLoaderTests(unittest.TestCase):
         ):
             load_catalog(path)
 
+    def test_rejects_unsupported_version_before_version_specific_shape(self) -> None:
+        version_one = synthetic_catalog()
+        version_one["schema_version"] = 1
+        version_one.pop("tables")
+        version_one.pop("relationships")
+
+        future = synthetic_catalog()
+        future["schema_version"] = 3
+        future["future_extension"] = {}
+
+        for version, data in ((1, version_one), (3, future)):
+            with self.subTest(version=version):
+                with self.assertRaisesRegex(
+                    CatalogValidationError,
+                    rf"unsupported catalog schema_version {version}; "
+                    "expected integer 2",
+                ):
+                    self.load(data)
+
     def test_rejects_nonstandard_json_numbers(self) -> None:
         data = synthetic_catalog()
         data["bindings"][0]["parameters"] = {"slot": float("nan")}
