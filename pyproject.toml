@@ -1,7 +1,7 @@
 [project]
 name = "embedv2-agent-context"
 version = "0.1.0"
-description = "Count-free structured feature context for EMBED clinical data"
+description = "Count-free clinical-semantic context for EMBED data"
 requires-python = ">=3.12,<3.14"
 dependencies = []
 

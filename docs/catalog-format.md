@@ -2,309 +2,434 @@
 
 ## Design
 
-The catalog separates semantic knowledge from physical representation:
+Schema version 5 separates a portable clinical-semantic model from the
+profile-specific structures that implement it:
 
 ```text
-concept ──< binding >── profile / table / column / grain
-   │
-   └──── optional vocabulary ── code → meaning
+portable clinical semantics
+│
+├── clinical object ──< concept / feature
+│        │
+│        ├── semantic relationship ── clinical object
+│        ├── temporal semantic
+│        └── aggregation
+│
+├── reusable guardrail
+├── coverage statement
+└── context claim ── source
 
-profile / table ──< key candidate
-       │
-       └──── relationship ── profile / table
-
-context ──< claim >── source
-   │
-   ├──── concept
-   ├──── profile / table
-   └──── relationship
-
-analysis pattern ──< alternative / decision / prohibited shortcut
-       │
-       ├──── concept / grain / context
-       └──── profile / table / relationship
+profile binding
+│
+├── object ── table / columns / representation
+├── concept ── table / column / physical type / binding grain
+├── table ── key candidate
+└── semantic relationship ── physical relationship / join tuple
 ```
 
-This is intentionally a small registry rather than a generic knowledge graph.
-It gives agents stable feature identities and useful filters without requiring
-an ontology engine, database, generated documentation, or probabilistic search.
+The portable layer describes clinical meaning, adjacency, time, aggregation,
+uncertainty, and evidence without assuming a table layout. The binding layer
+describes how one release or storage format represents those semantics. A
+clinical object need not have its own table, and one row may co-locate parts of
+several objects.
 
-## Top-level objects
+The catalog is a closed, count-free registry rather than a general ontology or
+an execution engine. It does not contain SQL, dataframe expressions, executable
+cohort predicates, preferred analysis policies, or empirical distributions.
+See [`architecture-v5.md`](architecture-v5.md) for the design decision and
+[`migration-v4-to-v5.md`](migration-v4-to-v5.md) for the breaking migration.
+
+## Top-level contract
 
 `schema_version`
-: Integer format version. Readers reject unsupported versions.
+: Integer format version. Version 5 readers reject every other version before
+  interpreting version-specific fields.
 
 `profiles`
-: Stable identifiers for physical dataset variants. Concepts are shared across
-  profiles; bindings select a profile.
+: Stable identifiers for physical dataset variants. The keys of
+  `profile_bindings` must equal the declared profile set.
 
-`grains`, `feature_kinds`, `domains`, `context_kinds`, `context_scopes`,
-`source_kinds`, `source_locator_kinds`, `claim_statuses`, and
-`analysis_pattern_statuses`
-: Controlled facets used by validation and filtering. Domains are
-  multi-valued, so one concept can be both demographic and a social determinant
-  of health, or both imaging and pathology-related. The context facets keep
-  clinical background, non-versioned EMBED documentation, and claims about one
-  physical profile distinguishable.
+`binding_grains`
+: Controlled physical row grains used only by feature and table bindings:
+  patient, exam, breast side, imaging finding, pathology finding, report, risk
+  assessment, and wide row. A clinical object's `grain` is instead a
+  descriptive clinical statement and is not constrained to a physical row
+  enum.
 
-`concepts`
-: Object keyed by stable semantic IDs. Each concept contains a label,
-  definition, feature kind, domains, search terms, caveats, and evidence. A
-  coded concept may reference one vocabulary.
+`feature_kinds`, `domains`, `context_kinds`, `context_scopes`, `source_kinds`,
+`source_locator_kinds`, and `claim_statuses`
+: Controlled facets retained from earlier schemas for feature classification,
+  discovery, context scope, provenance, and review state.
 
-`bindings`
-: Physical occurrences. A binding records profile, table, column, concept,
-  grain, role, physical type, schema nullability, and optional semantic
-  parameters. Phase 1 permits only a positive `slot` parameter for repeated
-  pathology positions; the parameter object is closed so empirical summaries
-  cannot be added under alternate names. Roles distinguish canonical
-  occurrences, references, wide-table projections, and technical fields.
+`semantic_relationship_kinds`
+: Controlled portable relationship classes: `hierarchy`, `association`,
+  `attribution`, `documentation`, and `derivation`.
 
-`vocabularies`
-: Reusable code-to-meaning maps. Each vocabulary declares whether its code list
-  is known to be closed and whether values are atomic, share a slot dictionary,
-  or use an undocumented comma-composed representation.
+`temporal_kinds`
+: Controlled distinctions among `event_time`, `documentation_time`, and
+  `availability_time`.
 
-`tables`
-: Profile-specific table declarations. Each declaration fixes the table grain
-  and records natural or technical key candidates with explicit uniqueness,
-  completeness, evidence, and caveats. A candidate may be non-unique or
-  unresolved; its presence is not a database-constraint claim.
+`aggregation_statuses`
+: Controlled states for an aggregation: `provided`, `analyst_defined`,
+  `unsupported`, or `unresolved`.
 
-`relationships`
-: Profile-scoped, directional linkage claims. Source and target endpoints use
-  ordered physical-column tuples. Relationship kind, source completeness,
-  cardinality in both directions, evidence, caveats, and join hazards remain
-  explicit and separate from semantic feature concepts.
+`coverage_statuses`
+: Controlled statements of `supported`, `unsupported`, `unresolved`, or
+  `not_cataloged` coverage.
 
-`sources`
-: A registry of evidence locators keyed by stable ID. Each source records its
-  kind, context scope, physical profiles when applicable, portable locator,
-  version boundary, and notes. An empty profile list means that the source
-  makes no claim about a physical catalog profile; it does not mean that the
-  source applies to every profile.
+`clinical_objects`, `concepts`, `semantic_relationships`,
+`temporal_semantics`, `aggregations`, `guardrails`, and `coverage`
+: ID-keyed portable semantic collections.
 
-`contexts`
-: Sourced clinical and procedural context keyed by stable ID. A context has one
-  homogeneous scope, controlled kind and domains, navigation-only summary,
-  related catalog entities, individually reviewable claims, and caveats.
-  Clinical workflows additionally contain ordered stages backed by claim IDs.
+`vocabularies`, `sources`, and `contexts`
+: ID-keyed value dictionaries and claim-level provenance collections.
 
-`analysis_patterns`
-: Non-executable analysis guidance keyed by stable ID. A pattern declares its
-  draft or reviewed status, scope, profiles, domains, applicable grains, related
-  catalog entities, common alternatives, required decisions, prohibited
-  shortcuts, and caveats. Alternatives describe when a policy may be
-  appropriate and its limitations; they are not predicates or defaults.
+`profile_bindings`
+: ID-keyed implementation layer. Each profile contains feature bindings, object
+  bindings, table specifications, and physical relationship bindings.
 
 The authoritative field constraints are in
-[`catalog/catalog.schema.json`](../catalog/catalog.schema.json).
+[`catalog/catalog.schema.json`](../catalog/catalog.schema.json). Every object
+shape is closed with `additionalProperties: false`; extensions require an
+explicit schema decision rather than an ad hoc field.
 
-### Schema version 4 migration
+## Portable clinical-semantic entities
 
-Version 4 adds the required `analysis_pattern_statuses` facet and
-`analysis_patterns` object. Version 3 readers must reject a version 4 catalog
-rather than ignore the new policy layer. A version 3 catalog migrating to
-version 4 must add both top-level fields; an empty `analysis_patterns` object is
-valid while guidance is being authored. Existing concepts, bindings,
-vocabularies, tables, relationships, sources, and contexts retain their version
-3 shapes.
+### Clinical objects
 
-## Identity and deduplication
+`clinical_objects` contains one entry per independently meaningful clinical
+entity or observation. Each entry requires:
 
-A concept ID identifies meaning, not a column occurrence. A raw column name can
-therefore appear in several tables and still resolve to one concept.
-`table.column` identifies a physical name. `profile:table.column` identifies
-exactly one profile binding. An unqualified physical name is accepted across
-profiles when every matching binding has the same concept; otherwise lookup
-reports the ambiguity and lists qualified choices. Parameterized repeated slots
-point to one concept and carry their slot in the binding.
+- `label` and `definition`;
+- `grain`, a nonblank description of what one instance represents;
+- controlled `domains` and discovery-oriented `search_terms`;
+- zero or more `claim_refs`; and
+- explicit `caveats`.
 
-Bindings at different grains may share a concept only when the definition
-remains true at every bound grain. Finding-level presence and level-specific
-aggregates use separate concepts because they are not interchangeable.
+The initial model can therefore distinguish a patient, imaging episode, exam,
+breast side, imaging finding, imaging interpretation, procedure, pathology
+observation, pathology diagnosis, report, and risk assessment without claiming
+that each object occupies a separate table.
 
-## Query behavior
+### Concepts and missing states
 
-Exact lookup resolves a concept ID, physical name, or profile-qualified
-physical name. Code lookup accepts any of those forms or a vocabulary ID and
-matches code strings exactly, including case.
+`concepts` retains the stable feature identity, label, definition, feature
+kind, domains, search terms, caveats, evidence labels, and optional vocabulary
+reference from version 4. Version 5 adds:
 
-Table lookup accepts an explicit profile and table name and returns the table
-declaration plus its incoming and outgoing relationships. Relationship lookup
-accepts a stable relationship ID. Relationship search is independently
-filterable by profile, either endpoint table, directional source or target
-table, and relationship kind; results are sorted deterministically by ID.
-These APIs do not alter existing feature lookup or search result shapes.
+- required `objects`, identifying the clinical objects that own the feature;
+- optional `claim_refs`;
+- optional structured `missing_states`;
+- optional `temporal_semantics` references; and
+- optional `aggregations` references.
 
-Context lookup accepts a stable context ID and returns the complete context
-plus a deduplicated map of every cited source. Context search is independently
-filterable by kind, scope, profile, domain, related concept, related table,
-related relationship, claim status, and source. Text search covers context
-navigation fields, claim text and caveats, and source titles, but not raw source
-locators. A profile filter matches only contexts that explicitly declare that
-profile; profile-independent context is not silently treated as universal.
-Search results contain only the claims that matched claim-level filters or
-text, along with their source details. Workflow stages are trimmed to those
-matching claims so returned references remain internally resolvable. A context
-matched only through navigation fields such as its title, domain, or search
-terms can therefore have an empty `matching_claims` array and no returned
-sources.
+Non-technical concepts must own at least one clinical object. A technical
+concept may use an empty `objects` array because a storage index or processing
+field need not have independent clinical meaning.
 
-Analysis-pattern lookup accepts a stable pattern ID. Pattern search supports
-text plus status, scope, profile, domain, and applicable-grain filters. Text
-search covers the pattern summary, alternatives, required decisions, prohibited
-shortcuts, caveats, and related identifiers. Results return the complete
-guidance object so an agent cannot see an alternative without its limitations
-and required policy questions.
+Each missing-state entry has a local `id`, a source `representation`, its
+clinical `meaning`, claim references, and caveats. Missingness is field-specific:
+an unattached-pathology state is not a diagnosis code, and a null value must not
+be silently converted to a negative clinical state.
 
-Search scans the in-memory catalog linearly. It considers concept IDs, physical
-names, labels, definitions, search terms, facets, caveats, and vocabulary
-meanings. A small prompt-word stoplist plus weighted token overlap makes short
-natural descriptions useful without adding a fuzzy-search or embedding
-dependency. It applies a small plural normalization and indexes
-punctuation-collapsed identifier aliases, so inputs such as `breast masses` and
-`ACCAnon` work without a general fuzzy matcher. Results are sorted
-deterministically and deduplicated by concept; their `bindings` array shows the
-physical occurrences that satisfied the query and filters.
+### Semantic relationships
 
-Filters are available for profile, table, grain, domain, and feature kind. The
-text query may be omitted when at least one filter is present, which supports
-requests such as all pathology concepts or all demographic features at patient
-grain.
+`semantic_relationships` connect clinical-object IDs independently of storage.
+Each relationship records:
 
-## Evidence and caveats
+- `kind`, `source_object`, and `target_object`;
+- directional `cardinality` as targets per source and sources per target;
+- endpoint `optionality` for both source and target;
+- an `attribution` statement and explicit `attribution_limitations`;
+- a `temporal_qualification`;
+- domains, search terms, claim references, and caveats.
 
-Evidence labels describe why a semantic claim is present; they are not
-confidence scores. Definitions should say only what the evidence supports.
-Unknown units, code completeness, derivations, temporal availability, delimiter
-rules, and missing-value semantics belong in caveats.
+Cardinality uses `exactly_one`, `zero_or_one`, `one_or_more`, `zero_or_more`,
+or `unknown`. Optionality uses `required`, `optional`, or `unknown`.
+Cardinality, optionality, and attribution are distinct claims. For example, an
+optional many-to-many pathology-to-finding attribution cannot be simplified to
+a one-to-one join merely because one profile supplies matching columns.
 
-The catalog records no empirical distribution. See the count-free policy in
-[`project-scope.md`](project-scope.md).
+### Temporal semantics
 
-Relationship cardinality is qualitative and directional. It never records
-release row totals, match rates, orphan counts, or duplicate counts. Column
-nullability, source-endpoint completeness, and referential coverage are
-different claims and must not be substituted for one another.
+`temporal_semantics` names what a candidate time means rather than selecting a
+universal anchor. Each entry contains:
 
-## Clinical context and provenance
+- `kind`: event, documentation, or availability time;
+- a clinical `meaning`;
+- related `objects` and `feature_refs`;
+- `relative_to` references to other temporal semantics;
+- domains, search terms, claim references, and caveats.
 
-Context records explain how existing feature and relationship definitions fit
-into clinical or documentation processes. They do not execute joins, construct
-cohorts, exclude rows, derive labels, or replace a versioned data toolkit.
-Substantive assertions belong in `claims`; a context `summary` is only a
-navigation aid.
+Exam study time, procedure time, specimen collection time, pathology report
+time, and data availability answer different questions. A profile can mark a
+clinically meaningful time as unsupported through `coverage`; absence of a
+binding must not cause the catalog to invent a date. The catalog does not
+designate any candidate as a universal diagnosis date.
 
-Every claim has a stable local ID, a review status, one or more source IDs, and
-its own caveats. A claim can therefore be addressed as
-`context-id.claim-id` without treating the whole context as uniformly
-authoritative. Status has these meanings:
+### Aggregations
 
-- `verified` — directly supported at the declared scope by applicable,
-  authoritative evidence;
-- `reconciled` — competing or differently scoped evidence has been reviewed
-  and the qualified statement records the result;
-- `unverified` — useful source material has not passed the applicable review;
-- `unresolved` — the available evidence does not establish the requested
-  meaning or policy; and
-- `contradicted` — retained provenance for a claim that conflicts with other
-  evidence and must not be presented as current guidance.
+`aggregations` describes movement between clinical objects and features. Each
+entry identifies:
 
-Contexts are scope-homogeneous. `general_clinical` explains clinical background,
-`embed_general` describes non-profile-specific EMBED material, and
-`profile_specific` identifies one or more physical profiles. General and
-non-versioned EMBED contexts cannot reference physical tables or
-relationships. A profile-specific verified claim must cite an applicable
-maintainer-confirmed, release-schema, or release-legend source; public or
-internal background alone cannot promote a claim to verified V2 behavior.
+- a controlled `status`;
+- `source_object`, `target_object`, and `source_concept`;
+- a nullable `result_concept`;
+- the `method` and relevant `ordering`; and
+- domains, search terms, claim references, and caveats.
 
-Source locators are typed as stable HTTPS URLs, repository-relative paths, or
-logical artifact names. Absolute workstation paths and parent traversal are
-rejected. Release schema and legend sources must identify their physical
-profiles. Contradicted claims require at least two sources so the conflict is
-traceable.
+`provided` documents a supplied rollup. `analyst_defined` means the transition
+requires an analysis-specific policy. `unsupported` records that the catalog or
+selected representation does not supply the transition. `unresolved` preserves
+insufficient evidence. A null `result_concept` is explicit: it means there is
+no registered result feature for that transition, not that a default should be
+calculated.
 
-Every context must connect to at least one existing concept, table, or
-relationship. Profile-specific references must resolve within the declared
-profile, including concept bindings. Ordered `workflow_steps` are required for
-clinical workflows and must place every claim; non-workflow contexts must keep
-that array empty. This supports branching caveats without turning free-form
-Markdown order into an implicit API.
+### Reusable guardrails
 
-## Relationship validation
+`guardrails` contains interpretation constraints that apply across research
+questions. A guardrail has a title, statement, rationale, scope, profile list,
+domains, search terms, claim references, caveats, and links to relevant
+objects, concepts, semantic relationships, temporal semantics, aggregations,
+and coverage entries.
 
-Every table declaration and relationship endpoint must resolve to bindings in
-the same profile. Ordered endpoint tuples must have equal arity and compatible
-physical types. Different key IDs for the same ordered column tuple must not
-make conflicting kind, uniqueness, or completeness claims. When a relationship
-source matches a documented key, `required` source completeness cannot
-contradict an incomplete key and `optional` source completeness cannot
-contradict a complete key.
+Guardrails can state, for example, that absent pathology is not a negative
+diagnosis, imaging assessment is not pathology truth, downstream data may leak
+future information, many-to-many attribution requires reconciliation, or grain
+changes require an explicit aggregation policy. They do not define cases,
+controls, windows, exclusions, or preferred pipelines.
 
-Key and relationship IDs and profile references use the stable lowercase
-identifier grammar and cannot contain trailing line terminators. Phase 2
-caveat and join-hazard entries must contain at least one non-whitespace
-character.
+General-clinical and EMBED-general guardrails have an empty `profiles` list.
+Profile-specific guardrails declare at least one profile.
 
-A relationship claiming at least one target per source must declare the source
-endpoint `required`. A relationship claiming at most one target must point to a
-candidate key documented as unique; the reciprocal at-most-one-source claim
-requires a unique source key. Only hierarchy edges must be acyclic; reference
-and projection edges may legitimately form cycles.
+### Coverage
 
-The default source-profile verifier remains footer-only. It verifies the
-physical table and column surface through bindings but does not scan clinical
-data to prove uniqueness, coverage, or cardinality.
+`coverage` makes supported, unsupported, unresolved, and uncataloged areas
+discoverable. Each entry identifies a `subject_kind`, a stable `subject`,
+status, scope, profiles, summary, domains, search terms, claim references, and
+caveats.
+
+The subject kind is one of `clinical_object`, `concept`,
+`semantic_relationship`, `temporal_semantic`, `aggregation`, `guardrail`, or
+`topic`. References resolve to the corresponding collection except `topic`,
+which is a stable navigation identifier. Profile scope follows the same rule as
+guardrails: only profile-specific coverage declares profiles.
+
+`unsupported` is an affirmative representation statement, while
+`not_cataloged` says the portable catalog has no registered semantic coverage.
+Neither state means that the clinical event did not occur.
+
+## Evidence and provenance
+
+Substantive portable assertions link to context claims with
+`context-id#claim-id`. The fragment form distinguishes a single reviewed claim
+from an entire context and must resolve exactly.
+
+Contexts retain the version-4 claim model:
+
+- each claim has a stable local ID, review status, one or more source IDs, and
+  caveats;
+- a context is homogeneous in scope;
+- general-clinical and EMBED-general contexts cannot point at profile tables or
+  physical relationships;
+- profile-specific verified claims require evidence applicable to that
+  profile; and
+- contradicted claims retain enough provenance to expose the conflict.
+
+Review statuses remain:
+
+- `verified` — directly supported at the declared scope;
+- `reconciled` — reviewed evidence has been combined into a qualified claim;
+- `unverified` — useful material has not passed applicable review;
+- `unresolved` — available evidence does not establish the meaning; and
+- `contradicted` — retained evidence conflicts with current interpretation.
+
+Clinical-workflow contexts may preserve ordered source claims, but workflow
+steps are provenance, not the conceptual object graph. Semantic relationships
+carry the portable adjacency and limitations.
+
+Source locators remain typed as stable HTTPS URLs, repository-relative paths,
+or logical artifact names. Absolute paths and parent traversal are invalid.
+Release-schema and release-legend sources identify the profiles they support.
+
+## Profile binding layer
+
+`profile_bindings` is keyed by profile, so nested records omit the redundant
+`profile` field. The containing key supplies profile identity. Core validation
+requires the binding keys to match `profiles`.
+
+### Feature bindings
+
+`feature_bindings` preserves the version-4 physical feature metadata except for
+the moved profile:
+
+- table and column;
+- semantic concept ID;
+- controlled binding grain and binding role;
+- physical type and schema nullability; and
+- optional closed parameters and notes.
+
+The only defined parameter remains a positive pathology slot. Binding notes may
+record representation qualifications, but no empirical counts or frequencies.
+The profile-qualified physical identity is derived as
+`profile:table.column`.
+
+### Object bindings
+
+`object_bindings` explains how a clinical object is represented in a profile.
+Each record identifies the object, table, relevant columns, representation,
+claim references, and caveats. The controlled representations are:
+
+- `canonical` — the profile's primary representation of the object;
+- `partial` — only part of the object is represented;
+- `co_located` — the row contains this object alongside other objects;
+- `projection` — a convenience or denormalized representation; and
+- `reference` — the row refers to, rather than fully represents, the object.
+
+`columns` may be empty when the table-level row representation is the relevant
+claim. An object binding does not imply that the object has a unique row or
+that every object instance is captured.
+
+### Tables and physical relationship bindings
+
+`tables` retains profile-specific table grain, natural and technical key
+candidates, uniqueness, completeness, evidence, and caveats. A key candidate
+is descriptive metadata, not a database constraint.
+
+`relationship_bindings` retains the version-4 physical relationship shape
+except for the moved profile. It includes:
+
+- stable physical relationship ID and kind;
+- ordered source and target table-column endpoints;
+- source completeness and bidirectional physical cardinality;
+- evidence, caveats, and join hazards;
+- zero or more linked `semantic_relationships`; and
+- claim references.
+
+Physical relationship kinds remain `hierarchy`, `reference`, and `projection`.
+They are not interchangeable with the portable semantic relationship kinds.
+A binding can support several semantic relationships or none, and a semantic
+relationship may require several physical bindings.
+
+Endpoint tuples must resolve to feature bindings in the same profile, have
+equal arity and compatible physical types, and respect documented key
+uniqueness and completeness. Hierarchy cycles are invalid; reference and
+projection cycles can be legitimate. These checks do not prove clinical
+capture, attribution completeness, or temporal co-availability.
+
+The footer-only source-profile verifier checks the table, column, type, and
+schema-nullability surface derived from feature bindings. It does not scan
+clinical values or establish keys, referential coverage, cardinality,
+attribution, or outcome capture.
+
+## Identity and cross-reference rules
+
+Top-level semantic collections are keyed by stable lowercase identifiers.
+Clinical-object, concept, relationship, temporal, aggregation, guardrail,
+coverage, vocabulary, source, and context IDs occupy distinct namespaces but
+must not be silently reinterpreted across kinds.
+
+A concept ID identifies one meaning, not one physical occurrence. Equivalent
+columns across normalized tables, denormalized views, databases, or releases
+bind to the same concept. A new concept is required when clinical meaning
+changes. Finding-level features and side-, exam-, or patient-level aggregates
+are distinct unless the definition remains true at every represented object.
+
+Core validation supplements JSON Schema by resolving:
+
+- concept ownership and optional vocabulary, temporal, and aggregation links;
+- semantic relationship endpoints;
+- aggregation object and concept references;
+- guardrail links;
+- coverage subjects;
+- every claim reference and source;
+- every profile, table, column, key, and physical relationship reference; and
+- the exact equality of declared profiles and `profile_bindings` keys.
+
+## Discovery behavior
+
+`discover` is the clinical-first query surface. It searches:
+
+- clinical objects and concepts;
+- semantic relationships;
+- temporal semantics and aggregations;
+- guardrails and coverage;
+- relevant context claims.
+
+It does not require a table name or stable identifier. Results expose the
+entity kind and ID, score, matched fields, matched terms, and unmatched query
+terms. Exact getters provide the complete entity after discovery. Profile
+binding lookup is a secondary navigation step.
+
+Discovery diagnostics distinguish:
+
+- filters that excluded otherwise matching entities;
+- an unknown controlled filter;
+- a vocabulary mismatch;
+- explicitly unsupported coverage in a selected profile; and
+- no indexed catalog coverage.
+
+An empty result is therefore not presented as evidence that a clinical state,
+event, or relationship is absent from the dataset. Deterministic token
+matching remains transparent and dependency-free; results are sorted
+deterministically.
+
+## Adding semantic content
+
+When extending the portable model:
+
+1. Identify the clinical object and its instance grain before naming columns.
+2. Reuse an existing object, concept, vocabulary, temporal semantic, or
+   aggregation when meaning is unchanged.
+3. Add semantic relationships with explicit direction, cardinality,
+   optionality, attribution limits, and temporal qualification.
+4. Attach claim references at the narrowest supported scope.
+5. Register missing and unknown states without converting absence to a clinical
+   negative.
+6. Record supplied, analyst-defined, unsupported, and unresolved aggregation
+   transitions explicitly.
+7. Add reusable guardrails only when they constrain interpretation across
+   questions.
+8. Add coverage entries for important unsupported, unresolved, or uncataloged
+   topics so discovery can explain gaps.
+9. Add no physical names until the portable assertion is independently clear.
 
 ## Adding a profile
 
-To support another EMBED variant:
+To bind another EMBED representation:
 
-1. Add a stable profile ID.
-2. Reuse existing concepts and vocabularies wherever meanings are unchanged.
-3. Add bindings for the profile's physical columns.
-4. Add a new concept only for a genuinely new or changed meaning.
-5. Add one `tables` declaration for every bound physical table. Record its
-   grain and each assessed natural or technical key candidate, including
-   explicit uniqueness, completeness, evidence, and caveats when a tuple is
-   non-unique or unresolved.
-6. Add `relationships` for the profile's intended joins. Record ordered source
-   and target columns, source completeness, cardinality in both directions,
-   evidence, caveats, and join hazards such as dangling references,
-   row multiplication, nullable components, or temporal leakage.
-7. Validate all cross-references and compare the profile bindings with the
-   source schema. Substantiate key and linkage claims separately because the
-   footer-only source verifier cannot prove them.
-8. Add or update profile-specific contexts only when their claims have
-   applicable sources. Do not copy general or older-release behavior into the
-   new profile, and preserve unresolved workflow policy as unresolved.
-9. Add focused synthetic tests plus checked-in profile integration assertions
-   for required table declarations, key caveats, and the expected relationship
-   inventory, then update profile documentation.
+1. Add the stable profile ID and one matching `profile_bindings` entry.
+2. Reuse the portable semantic collections without copying them.
+3. Add feature bindings for physical columns.
+4. Add object bindings, including partial, co-located, projected, and reference
+   representations.
+5. Declare every bound table, its binding grain, and assessed key candidates.
+6. Add physical relationship bindings and link them to semantic relationships
+   only where the representation supports that claim.
+7. Preserve dangling references, row multiplication, nullable components,
+   attribution gaps, and temporal leakage as caveats or join hazards.
+8. Add profile-scoped claims and coverage only with applicable evidence.
+9. Validate the footer surface and separately substantiate semantic capture,
+   keys, joins, attribution, and availability.
 
-Profile-specific statistics must remain outside the feature catalog. If a
-future use case needs empirical profiling, it should be a separate,
-explicitly-scoped artifact with its own lifecycle.
-
-The footer-only `scripts/validate_source_profile.py` verifier derives the
-selected profile's expected table and column manifest from bindings. It does
-not contain a hard-coded release occurrence total.
+Profile-specific statistics remain outside the portable catalog.
 
 ## Schema evolution
 
-Compatible content additions keep the current schema version. A change that
-alters required fields, field meaning, identifier resolution, or query
-semantics requires a version decision and migration note. Consumers must fail
-clearly on an unsupported schema version rather than silently interpreting it
-as the current format. Readers inspect `schema_version` before applying
-version-specific required-field and extension-field rules, so both legacy and
-future documents receive an explicit unsupported-version error.
+Compatible content additions can retain version 5. Changes to required fields,
+field meaning, identifier resolution, controlled facets, or query semantics
+require a version decision and migration note. Readers must reject unsupported
+versions rather than ignore fields.
 
-Schema version 2 added required `tables` and `relationships` collections.
-Schema version 3 adds the controlled context facets plus required `sources` and
-`contexts` collections. It also introduces claim-level review state, typed
-source locators, profile-aware evidence validation, and ordered workflow
-stages. Version-2 consumers must upgrade before loading a version-3 catalog.
-Existing feature, code, table, and relationship result shapes remain
-unchanged; clinical context uses a separate model and query surface.
+Version 5 is intentionally incompatible with version 4:
+
+- `grains` becomes `binding_grains`;
+- task-specific analysis patterns are removed;
+- physical bindings, tables, and relationships move beneath
+  `profile_bindings`; and
+- portable objects, semantic relationships, time, aggregation, guardrail, and
+  coverage collections become required.
+
+There is no automatic conversion because physical metadata cannot establish
+clinical object identity, attribution, time meaning, aggregation, or coverage.
+See [`migration-v4-to-v5.md`](migration-v4-to-v5.md) for the complete
+disposition and interface changes.

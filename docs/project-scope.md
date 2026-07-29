@@ -2,22 +2,27 @@
 
 ## Purpose
 
-This project maintains a concise feature-context backbone for agents working
-with EMBED clinical data. It should answer questions such as:
+This project maintains a concise clinical-semantic context backbone for agents
+working with EMBED data. An unfamiliar agent should be able to begin with a
+clinical question and determine:
 
-- What does a feature capture?
-- At which patient, exam, side, finding, report, risk, or wide-table grain does
-  it occur?
-- Which physical columns represent the same semantic feature?
-- Which features concern pathology, demographics, social determinants of
-  health, imaging, risk, or another controlled domain?
-- What does a released code mean, and what interpretation caveats apply?
-- How do relevant clinical or procedural processes relate to those features,
-  and which workflow or availability questions remain unresolved?
+- which clinical objects and observations are represented;
+- what one instance of each object means;
+- how objects relate, including cardinality, optionality, and attribution
+  limitations;
+- which features describe each object and what their codes and missing states
+  mean;
+- which event, documentation, and availability times are candidates for a
+  timeline;
+- how supplied or unsupported aggregation behaves across finding, side, exam,
+  and patient levels;
+- what evidence supports each assertion, at what profile scope, and which
+  questions remain unresolved; and
+- how a selected release binds those semantics to physical tables, columns,
+  types, keys, and joins.
 
-The backbone is intended to support both open and non-open EMBED profiles.
-Dataset measurements are not feature definitions and do not belong in the
-portable catalog.
+The tool supplies trustworthy context for agents to design their own cohorts,
+pipelines, and analyses. It does not prescribe those designs.
 
 ## Canonical deliverable
 
@@ -25,132 +30,234 @@ portable catalog.
 
 - valid against the version-matched `catalog/catalog.schema.json`;
 - directly usable without a database, index service, or generated Markdown;
-- normalized so one semantic concept can have many physical bindings;
-- explicit about evidence and unresolved interpretation;
-- queryable by stable identifiers, physical names, text, grain, table, feature
-  kind, domain, clinical-context facets, and cited source; and
-- safe to extend with another profile without copying shared concepts.
+- clinically normalized independently of physical storage;
+- explicit about evidence, coverage, missing states, uncertainty, attribution,
+  time meaning, and aggregation;
+- discoverable from clinical language without table names or stable IDs;
+- safe to bind to normalized tables, denormalized views, databases, or future
+  releases without copying semantic definitions; and
+- count-free and non-executable.
 
-Markdown documents explain the implementation but are not parsed as feature
-data. If a human-readable feature reference is ever generated, it must be a
-derived view of the JSON catalog rather than a second source of truth.
+Markdown documents explain the format and decisions but are not parsed as
+catalog data. Human-readable references must be derived from the structured
+catalog rather than maintained as competing sources of truth.
+
+## Clinical-semantic model
+
+Portable semantics are primary. The initial breast-imaging model represents:
+
+```text
+patient
+└── breast-imaging episode
+    └── imaging exam
+        ├── breast side
+        └── imaging finding
+            └── imaging interpretation / recommendation
+                └── linked procedure
+                    └── pathology observation
+                        └── pathology diagnosis
+```
+
+Radiology report and risk-assessment objects provide additional documentation
+and clinical context. This diagram is navigation, not a deterministic workflow:
+relationships can be optional, branching, many-to-many, incompletely
+attributed, or unsupported in a profile.
+
+Clinical objects define meaning and instance grain. Concepts define reusable
+features owned by those objects. Semantic relationships define clinical
+adjacency and attribution independently of joins. Temporal semantics,
+aggregations, guardrails, and coverage capture the qualifications an agent
+needs before selecting an analysis policy.
+
+Physical tables are not the conceptual model. `profile_bindings` is a secondary
+implementation layer containing:
+
+- feature-to-column bindings;
+- object-to-table representations;
+- table grains and key candidates; and
+- physical relationship bindings and join hazards.
+
+A clinical object does not need its own table. One row can represent parts of
+several objects, and the same semantic model can bind to a different layout.
+
+## Breast-cancer outcome focus
+
+The initial outcome representation must distinguish:
+
+- invasive breast cancer;
+- in-situ breast cancer;
+- high-risk lesion;
+- borderline lesion;
+- benign finding;
+- non-breast cancer; and
+- unattached pathology.
+
+The first six are represented diagnosis groups. `unattached_pathology` is a
+missing or attachment state, not another diagnosis code. It does not establish
+disease absence, benign pathology, adequate follow-up, or a negative outcome.
+
+Pathology relationships must explain how observations and diagnoses can relate
+to a patient, exam, breast side, imaging finding, and procedure. Finding-level
+attribution can be optional or many-to-many. No foreign-key or deterministic
+backfill guarantee may be inferred from a matching physical tuple.
+
+Supplied side- and exam-level pathology severity uses the minimum value because
+the represented scale is inverse. Finding-to-side, exam-to-patient, and
+patient-level outcome reductions require an explicit policy unless the catalog
+registers a supported aggregation. The catalog does not choose such a policy.
+
+Outcome coverage must state what is known and unknown about capture and
+follow-up. Absence of a recorded outcome is not proof that the outcome did not
+occur.
+
+## Temporal semantics
+
+Candidate dates are documented by what they represent, not collapsed into a
+single diagnosis date. Relevant distinctions include:
+
+- imaging-exam event time;
+- procedure event time;
+- specimen-collection event time;
+- pathology documentation or report time; and
+- the time at which information becomes available to an analysis.
+
+Open-v2 can explicitly mark a clinically meaningful candidate such as specimen
+collection time as unsupported when no supported feature represents it. The
+catalog must not invent a proxy or silently substitute procedure or report
+time.
+
+No candidate is a universal diagnosis date. Agents and users remain responsible
+for choosing task-specific anchors, follow-up windows, outcomes, exclusions,
+censoring, and temporal feature boundaries. Downstream procedure, pathology, or
+report information can create temporal leakage when applied to an earlier
+target.
+
+## Reusable reasoning guardrails
+
+Guardrails state interpretation constraints that recur across analyses. Initial
+coverage should include:
+
+- null or absent pathology is not a negative diagnosis;
+- imaging assessment is not pathology truth;
+- downstream clinical information may cause temporal leakage;
+- finding-to-pathology attribution may be optional or many-to-many;
+- movement among finding, side, exam, and patient grain needs an explicit
+  aggregation policy;
+- different clinical timestamps answer different questions; and
+- physical co-location does not prove contemporaneous availability.
+
+Guardrails may link to relevant objects, concepts, relationships, time,
+aggregation, coverage, and evidence. They must not grow into named research
+workflows or encode cases, controls, exclusions, follow-up windows, or
+preferred estimands.
+
+## Discovery requirements
+
+`discover` is the clinical-first entry point. It searches the portable semantic
+collections and supporting context claims without requiring a caller to know a
+table name or stable identifier.
+
+Every match must explain why it matched through:
+
+- entity kind and stable ID;
+- matched fields and terms;
+- unmatched query terms; and
+- deterministic score.
+
+No-result diagnostics must distinguish:
+
+- filters excluding otherwise matching entries;
+- unknown controlled filter values;
+- vocabulary mismatch;
+- explicit unsupported profile coverage; and
+- no indexed catalog coverage.
+
+An empty result must never be presented as evidence that a clinical object,
+state, relationship, or event is absent from EMBED. Exact semantic getters
+support follow-up navigation; profile-binding lookup is secondary.
 
 ## Portability and count-free policy
 
-Do not record empirical dataset summaries in the catalog or agent-facing
-feature documentation. Prohibited examples include:
+Do not record empirical dataset summaries in the portable catalog or
+agent-facing feature documentation. Prohibited examples include:
 
 - table or row totals;
 - null, non-null, blank, duplicate, or distinct-value counts;
 - value frequencies or proportions;
 - quantiles, observed extrema, and prevalence estimates; and
-- release-specific cardinality claims presented as feature semantics.
+- release-specific match or cardinality measurements presented as clinical
+  semantics.
 
 The policy does not prohibit semantic numbers. Documented code values, units,
-time horizons, physical types, path-slot parameters, and genuinely defined
-sentinel meanings belong when they explain a feature. A physical binding may
-record schema nullability because that is part of its representation; it must
-not record how often null occurs.
+time horizons, physical types, positive slot parameters, qualitative
+cardinality, and genuinely defined sentinel meanings belong when they explain
+representation. Schema nullability is physical metadata; how often null occurs
+is not.
 
-Unresolved missing-value or sentinel behavior may be stated as a caveat without
-an empirical frequency. Prefer “null semantics are not documented” over a
-release measurement.
+Unresolved missing-value or sentinel behavior may be stated without a
+frequency. Prefer “null semantics are not documented” over a release
+measurement.
 
-## Normalization rules
+## Normalization and authoring rules
 
-Create one concept for one stable meaning. Bind all equivalent physical
-occurrences to it, including projections into convenience or wide tables.
-Examples include anonymized patient/accession identifiers, breast side, dates,
-and repeated pathology code slots.
+### Objects and concepts
 
-Create separate concepts when the meaning actually changes. A finding-presence
-flag and a side- or exam-level aggregate are not interchangeable even when
-their names share a stem. Put physical differences such as profile, table,
-column, grain, role, type, nullability, or slot number in bindings rather than
-copying definitions.
+Create one clinical object for one stable entity or observation grain. Create
+one concept for one stable feature meaning and attach it to every owning
+object. Reuse the concept across profiles and physical projections when meaning
+is unchanged.
 
-Reusable code dictionaries belong under `vocabularies`. Vocabulary
-completeness and parsing behavior must stay explicit: a released list is not
-automatically exhaustive, and comma-composed strings must not be split when
-delimiter semantics are undocumented.
+Create separate concepts when meaning changes. A finding-level presence flag,
+side-level rollup, and exam-level rollup are not interchangeable merely because
+their column names share a stem.
 
-## Minimal tooling boundary
+Technical concepts may have no clinical-object owner. They must remain
+explicitly technical and must not be promoted to clinical identity, ordering,
+or linkage across releases.
 
-The catalog loader, validator, exact lookup, and deterministic text/filter
-search use only the Python standard library. The search implementation is
-intentionally transparent and small; embeddings, a vector database, a search
-service, SQLite FTS, and fuzzy-matching dependencies remain outside the
-catalog core.
+### Missing states and vocabularies
 
-The stdio MCP adapter is optional and adds one direct runtime integration
-dependency: the official MCP SDK. It must call the same core API as the CLI,
-emit protocol messages only on stdout, and expose read-only tools.
+Record field-specific missing states with their source representation, meaning,
+evidence, and caveats. Do not apply catalog-wide null, delimiter, ordering,
+repetition, or sentinel rules without evidence.
 
-## Phased implementation
+Reusable code dictionaries belong under `vocabularies`. Vocabulary completeness
+and parsing behavior stay explicit. A released list is not automatically
+exhaustive, and a composed string must not be split when delimiter semantics
+are undocumented.
 
-### 1. Feature meanings
+### Relationships
 
-Implemented in the structured catalog. Concepts describe feature meaning,
-controlled facets, code vocabularies, evidence, and caveats. Bindings describe
-where each concept occurs in a profile.
+Every semantic relationship records:
 
-### 2. Table linkages
+- source and target clinical objects;
+- relationship kind;
+- directional cardinality;
+- endpoint optionality;
+- attribution meaning and limitations;
+- temporal qualification;
+- claim references and caveats.
 
-Implemented as a structured, profile-scoped layer for table grains, key
-candidates, optional relationships, hierarchy edges, cardinality expectations,
-and join hazards. Relationship claims are
-structured separately from feature concepts and must not smuggle
-release-specific counts into the feature catalog.
+These are clinical-semantic claims, not join claims. A profile's physical
+relationship binding separately records tables, column tuples, source
+completeness, physical cardinality, evidence, and join hazards.
 
-The `open-v2` profile records all eight physical table grains and conservative
-linkages among patient, exam, side, imaging-finding, pathology-finding, report,
-risk, and wide-row surfaces. Non-unique clinical tuples, optional or unresolved
-references, nullable side components, technical-index projections, temporal
-availability, and the wide table's unresolved construction remain explicit
-hazards rather than being promoted to foreign-key guarantees.
+### Time, aggregation, and coverage
 
-### 3. Clinical and procedural context
+Temporal records distinguish event, documentation, and availability meaning.
+Aggregation records distinguish provided, analyst-defined, unsupported, and
+unresolved transitions. Coverage records make supported, unsupported,
+unresolved, and uncataloged topics discoverable at the correct scope.
 
-Implemented as sourced, individually reviewable context claims. The initial
-context layer covers general screening and diagnostic workflow; the documented
-classic EMBED finding, procedure, and pathology-recording lifecycle; and
-open-v2 assessment, recommendation, linked-exam, multimodal-finding, pathology,
-report, risk, and temporal-availability interpretation.
+Unsupported and unresolved are useful results. Do not replace them with a
+preferred proxy, derivation, or analysis default.
 
-General clinical background, non-profile-specific EMBED documentation, and
-open-v2 representation are separate scopes. Workflow stages are ordered and
-backed by stable claim IDs. Each claim retains its review status and sources;
-maintainer-confirmed representation semantics are distinguished from remaining
-unknown MagView code mappings, unverified report-addendum linkage, and
-unvalidated risk-field variants, percentage formatting, sentinel meanings, and
-model versions. Task-specific follow-up, cohort, label, and modality-inclusion
-choices are analysis policy rather than dataset claims. They may be represented
-as non-executable analysis-pattern alternatives and required decisions, but
-must not be promoted to verified dataset behavior or silently selected as
-defaults.
+### Guardrails
 
-This layer is descriptive and read-only. It does not perform joins, define
-cohorts, derive labels, exclude records, prescribe care, or replace a versioned
-data toolkit.
-
-### 4. Non-executable analysis patterns
-
-Implemented as a separate advisory layer. An analysis pattern connects a
-research intent to relevant concepts, grains, tables, relationships, and
-sourced contexts. Each pattern must provide:
-
-- common policy alternatives when the scientific question admits materially
-  different cohort definitions;
-- the decisions an analyst must make before implementation;
-- shortcuts that are prohibited because they contradict catalog semantics or
-  would create an invalid inference; and
-- a maturity status distinguishing draft guidance from reviewed guidance.
-
-Patterns must not contain SQL, dataframe expressions, executable predicates,
-automatic defaults, empirical cohort measurements, or claims that a cohort is
-valid. The initial draft pattern covers pathology-defined breast cancer versus
-non-cancer cohorts and keeps null pathology, control composition, grain,
-follow-up, aggregation, and temporal leakage as explicit decisions.
+Add a guardrail only when it constrains interpretation across research
+questions. Link it to the semantic entities and claims that justify it. Do not
+encode task-specific recipes, cohort alternatives, SQL, predicates, or
+scientific-validity judgments.
 
 ## Evidence and source priority
 
@@ -162,60 +269,110 @@ When sources disagree, use the following order:
 4. Public EMBED documentation and other external sources.
 
 Public EMBED V1 material is not authoritative for V2 without verification.
-External material can supply general clinical context, but it cannot fill a
-dataset-specific gap as though the result were verified. Keep inference and
-unresolved meaning visible. Apply review state at claim level: catalog
-membership does not by itself make a statement authoritative, and a source
-conflict must remain traceable rather than being silently overwritten.
+External material can supply general clinical context but cannot fill a
+profile-specific gap as verified release behavior.
+
+Apply review state at claim level. Catalog membership does not itself make a
+statement authoritative. Portable entities reference claims with
+`context-id#claim-id`, preserving the exact assertion and scope. Conflicts and
+unknowns remain traceable rather than being silently overwritten.
+
+General clinical, EMBED-general, and profile-specific scopes remain distinct.
+A profile-specific verified claim must cite applicable maintainer-confirmed,
+release-schema, or release-legend evidence.
 
 ## Local source boundary
 
 The ignored `reference_files/` directory contains local release artifacts used
-to construct and verify the `open-v2` profile. Source-profile validation may
-read Parquet footer schemas and the release legend. It must not copy clinical
-rows, identifiers, anonymized dates, report text, or empirical summaries into
-the catalog.
+to construct and verify profile bindings. Source-profile validation may read
+Parquet footer schemas and the release legend. It must not copy clinical rows,
+identifiers, anonymized dates, report text, or empirical summaries into the
+catalog.
 
-The incomplete alpha context system and the Cortex knowledge-base notes are
-design and hazard-discovery inputs, not runtime dependencies or unreviewed
-clinical authorities. Alpha recipes and prose must not be copied into the
-catalog as executable V2 policy. Cortex governance informs the separation of
-definitions from ETL, version scope, claim-level provenance, and preservation
-of unresolved questions. Canonical claims still require portable sources at
-the applicable scope.
+The incomplete alpha context system and Cortex knowledge-base notes are design
+and hazard-discovery inputs, not runtime dependencies or unreviewed clinical
+authorities. Recipes from those systems must not become executable V2 policy.
+Canonical assertions still require portable sources at the applicable scope.
+
+## Minimal tooling boundary
+
+The catalog loader, strict validator, exact getters, binding queries, and
+deterministic discovery use only the Python standard library. Embeddings,
+vector databases, search services, SQLite FTS, and fuzzy-matching dependencies
+remain outside the core.
+
+The optional stdio MCP adapter calls the same core API as the CLI, writes
+protocol messages only to stdout, and exposes read-only tools.
+
+## Non-goals
+
+The project does not:
+
+- encode SQL, dataframe operations, executable joins, or pipelines;
+- select preferred cohort definitions, labels, anchors, windows, exclusions,
+  censoring, or aggregation policies;
+- claim that a cohort or analysis is scientifically valid;
+- treat physical tables or denormalized rows as the clinical model;
+- anticipate every research workflow;
+- provide clinical advice;
+- expose clinical rows, identifiers, or report text; or
+- add empirical counts or distributions to the portable catalog.
+
+## Profile binding requirements
+
+A profile is complete when:
+
+- its key exactly matches one declared profile;
+- each feature binding references a portable concept and a declared table;
+- each nonempty object binding references a portable object, declared table,
+  and bound columns;
+- every bound table has one table specification at the correct binding grain;
+- key candidates state kind, uniqueness, completeness, evidence, and caveats;
+- physical relationship endpoints resolve to compatible bound columns;
+- relationship bindings retain source completeness, bidirectional
+  cardinality, evidence, caveats, join hazards, claim references, and relevant
+  semantic links; and
+- unsupported capture or representation is recorded through coverage rather
+  than inferred from missing columns.
+
+Footer validation verifies physical table, column, type, and schema-nullability
+surfaces only. It does not establish uniqueness, referential coverage,
+cardinality, clinical attribution, outcome capture, or availability.
 
 ## Documentation synchronization
 
-Any functional catalog, CLI, or MCP change must update the relevant usage,
-format, architecture, and migration documentation in the same logical commit.
-Examples and cross-references must be checked for stale identifiers, commands,
-filters, and file paths.
+Any functional catalog, CLI, MCP, or schema change must update relevant usage,
+format, architecture, configuration, and migration documentation in the same
+logical commit. Examples and cross-references must be checked for stale
+identifiers, commands, filters, fields, and file paths.
+
+Schema version 5 is intentionally breaking. The migration contract is in
+[`migration-v4-to-v5.md`](migration-v4-to-v5.md); the architectural decision is
+in [`architecture-v5.md`](architecture-v5.md).
 
 ## Completion criteria
 
-A catalog-context change is complete when it:
+A clinical-semantic change is complete when it:
 
-- passes strict catalog validation;
-- uses the correct evidence level;
-- identifies relevant profile bindings and declares every bound physical table
-  at the correct grain;
-- records assessed natural and technical key candidates with explicit
-  uniqueness, completeness, evidence, and caveats;
-- records intended relationships with ordered endpoints, source completeness,
-  directional cardinality, evidence, caveats, and join hazards;
-- reuses an existing concept or vocabulary whenever the meaning is shared;
-- keeps inference, missing-value ambiguity, and version caveats explicit;
-- gives each clinical or procedural claim a stable ID, review status,
-  applicable scope, and traceable source;
-- keeps general clinical context separate from EMBED-general and
-  profile-specific behavior;
-- preserves unresolved workflow and temporal policy as unresolved rather than
-  encoding an executable default;
-- gives each analysis pattern a maturity status, explicit alternatives,
-  required decisions, prohibited shortcuts, and resolvable links to its
-  supporting catalog context without embedding executable cohort logic;
-- adds no empirical dataset summary;
-- has focused synthetic tests for changed behavior and checked-in profile
-  integration assertions for required tables, key caveats, expected
-  relationships, context inventory, source closure, and policy boundaries; and
+- passes strict schema and core cross-reference validation;
+- defines clinical meaning and instance grain independently of storage;
+- records adjacent-object relationships with cardinality, optionality,
+  attribution limits, and temporal qualification;
+- attaches concepts to correct objects and preserves code and missing-state
+  meaning;
+- distinguishes event, documentation, and availability time without selecting
+  a universal diagnosis date;
+- records provided, analyst-defined, unsupported, and unresolved aggregation
+  transitions explicitly;
+- uses reusable guardrails instead of task-specific workflows;
+- records supported, unsupported, unresolved, and uncataloged coverage at the
+  correct scope;
+- preserves claim-level provenance and unresolved questions;
+- keeps profile tables, columns, types, keys, and joins in the secondary
+  binding layer;
+- adds no executable policy or empirical dataset summary;
+- supports clinical-first discovery with match explanations and diagnostic
+  no-result states;
+- includes focused synthetic tests and checked-in integration assertions for
+  changed behavior; and
 - includes synchronized documentation and a focused Git commit.
