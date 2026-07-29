@@ -2071,27 +2071,6 @@ class Catalog:
             "matches": [item.to_dict() for item in matches[:limit]],
         }
 
-    def get_context(self, identifier: str) -> dict[str, Any]:
-        normalized = _lookup_identifier(identifier, "identifier")
-        context = self.contexts.get(normalized)
-        if context is None:
-            raise CatalogNotFoundError(f"context {normalized!r} was not found")
-        source_ids = sorted(
-            {
-                source
-                for claim in context.claims
-                for source in claim.sources
-            }
-        )
-        return {
-            "kind": "context",
-            "identifier": normalized,
-            "context": context.to_dict(),
-            "sources": {
-                source: self.sources[source].to_dict() for source in source_ids
-            },
-        }
-
     def discover(
         self,
         query: str,

@@ -32,6 +32,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "get_table",
             "get_relationship",
             "search_relationships",
+            "get_context",
         ):
             with self.subTest(legacy_api=legacy_name):
                 self.assertFalse(hasattr(self.catalog, legacy_name))
