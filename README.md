@@ -3,7 +3,9 @@
 This repository provides a small, machine-queryable feature catalog for the
 Emory Breast Imaging Dataset (EMBED). It describes what clinical-data features
 capture, how physical columns bind to those concepts at different grains, and
-which released code meanings apply.
+which released code meanings apply. It also provides sourced clinical and
+procedural context needed to interpret those structures without turning
+unresolved workflow policy into executable defaults.
 
 The canonical product is structured JSON rather than Markdown tables. It
 deliberately excludes release-specific row counts, null counts, value
@@ -15,7 +17,7 @@ turning one release's measurements into apparent contracts.
 
 - [`catalog/catalog.json`](catalog/catalog.json) — the canonical feature
   concepts, physical bindings, code vocabularies, table keys, and linkage
-  claims.
+  claims, plus the context-source registry and reviewed workflow claims.
 - [`catalog/catalog.schema.json`](catalog/catalog.schema.json) — the versioned
   JSON Schema for the catalog.
 - `embed_context/` — the dependency-free query core and command-line interface,
@@ -38,9 +40,15 @@ bindings. Finding-level flags remain distinct from side- and exam-level
 aggregates because those levels carry different meanings. Repeated physical
 projections, including the wide table, do not duplicate semantic definitions.
 
-The version-2 catalog also has a separate profile-scoped structure for table
+Phase 2 added a separate profile-scoped structure for table
 grains, candidate keys, relationships, cardinality expectations, and join
-hazards. Broader clinical workflow context remains a later phase.
+hazards.
+
+Phase 3 adds a sourced clinical and procedural context layer. It distinguishes
+general clinical background, public EMBED behavior, and open-v2 representation;
+keeps review status and provenance on individual claims; orders clinical
+workflow stages; and preserves open temporal, matching, and outcome-policy
+questions as unresolved. The canonical catalog is now schema version 3.
 
 ## Command-line queries
 
@@ -57,6 +65,9 @@ uv run --locked --no-dev python -m embed_context code imaging.assessment N
 uv run --locked --no-dev python -m embed_context table open-v2 exam_level_anon
 uv run --locked --no-dev python -m embed_context relationship open-v2.pathology_findings_anon.imaging_finding
 uv run --locked --no-dev python -m embed_context relationships --table imaging_findings_anon
+uv run --locked --no-dev python -m embed_context context open-v2.temporal-availability-context
+uv run --locked --no-dev python -m embed_context contexts "temporal leakage"
+uv run --locked --no-dev python -m embed_context contexts --profile open-v2 --domain pathology --status unresolved
 ```
 
 Use `--format json` before the subcommand for a stable machine-readable
@@ -81,9 +92,17 @@ source-table, target-table, and relationship-kind filters. Cardinality,
 evidence, caveats, and join hazards are included in the structured results;
 they describe safe interpretation rather than executing a join.
 
+Context lookup returns one complete context and its cited source records.
+`contexts` supports deterministic text search plus kind, scope, profile, domain,
+related-concept, related-table, related-relationship, claim-status, and source
+filters. Claim-level text or provenance filters return only the matching claims
+and their sources. Context output remains descriptive: it does not perform a
+join, construct a cohort, derive an outcome, or prescribe care.
+
 Run `python -m embed_context --help` or a subcommand's `--help` for the complete
 filter surface. `--format json validate` also returns the controlled grains,
-domains, and feature kinds for programmatic discovery.
+domains, feature kinds, context facets, source kinds, and claim statuses for
+programmatic discovery.
 
 ## Stdio MCP server
 

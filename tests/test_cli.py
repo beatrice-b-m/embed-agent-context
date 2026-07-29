@@ -380,6 +380,229 @@ class CatalogCLITests(unittest.TestCase):
         self.assertEqual(envelope["command"], "relationship")
         self.assertEqual(envelope["error"]["type"], "not_found")
 
+    def test_context_json_returns_exact_core_result(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "context",
+            "open-v2.density-interpretation",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        envelope = json.loads(stdout)
+        self.assertEqual(envelope["command"], "context")
+        self.assertEqual(envelope["data"]["kind"], "context")
+        self.assertEqual(
+            envelope["data"]["context"]["claims"][0]["id"],
+            "coded-feature",
+        )
+        self.assertEqual(
+            list(envelope["data"]["sources"]),
+            ["open-v2.release-schema"],
+        )
+
+    def test_context_text_includes_claim_status_and_source(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "context",
+            "open-v2.density-interpretation",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn(
+            "open-v2.density-interpretation — "
+            "Density interpretation boundary",
+            stdout,
+        )
+        self.assertIn(
+            "profile_specific · interpretation_guardrail · open-v2",
+            stdout,
+        )
+        self.assertIn(
+            "[verified] coded-feature — The synthetic density field",
+            stdout,
+        )
+        self.assertIn(
+            "open-v2.release-schema — Synthetic open-v2 release schema",
+            stdout,
+        )
+
+    def test_contexts_help_lists_controlled_and_reference_filters(self) -> None:
+        stdout = io.StringIO()
+        with self.assertRaises(SystemExit) as raised, redirect_stdout(stdout):
+            main(["contexts", "--help"])
+
+        self.assertEqual(raised.exception.code, 0)
+        help_text = stdout.getvalue()
+        self.assertIn("clinical_workflow", help_text)
+        self.assertIn("profile_specific", help_text)
+        self.assertIn("contradicted", help_text)
+        self.assertIn("--concept", help_text)
+        self.assertIn("--relationship", help_text)
+        self.assertIn("--source", help_text)
+
+    def test_contexts_json_passes_all_filters_and_limit(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "contexts",
+            "density",
+            "--kind",
+            "interpretation_guardrail",
+            "--scope",
+            "profile_specific",
+            "--profile",
+            "open-v2",
+            "--domain",
+            "mammography",
+            "--concept",
+            "exam.tissue_density",
+            "--table",
+            "exam_level_anon",
+            "--status",
+            "verified",
+            "--source",
+            "open-v2.release-schema",
+            "--limit",
+            "1",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        data = json.loads(stdout)["data"]
+        self.assertEqual(
+            data["filters"],
+            {
+                "kind": "interpretation_guardrail",
+                "scope": "profile_specific",
+                "profile": "open-v2",
+                "domain": "mammography",
+                "concept": "exam.tissue_density",
+                "table": "exam_level_anon",
+                "relationship": None,
+                "status": "verified",
+                "source": "open-v2.release-schema",
+            },
+        )
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(
+            data["matches"][0]["identifier"],
+            "open-v2.density-interpretation",
+        )
+        self.assertEqual(
+            [claim["id"] for claim in data["matches"][0]["matching_claims"]],
+            ["coded-feature"],
+        )
+
+    def test_contexts_json_passes_relationship_filter(self) -> None:
+        data = synthetic_catalog()
+        data["relationships"].append(
+            {
+                "id": "wide.tissue-density-projection",
+                "profile": "open-v2",
+                "kind": "projection",
+                "source": {
+                    "table": "combined_anon",
+                    "columns": ["tissueden"],
+                    "completeness": "unknown",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["tissueden"],
+                },
+                "cardinality": {
+                    "targets_per_source": "unknown",
+                    "sources_per_target": "unknown",
+                },
+                "evidence": ["release_schema"],
+                "caveats": [],
+                "join_hazards": [],
+            }
+        )
+        data["contexts"][
+            "open-v2.density-interpretation"
+        ]["related_relationships"] = ["wide.tissue-density-projection"]
+        relationship_catalog = write_catalog(
+            Path(self.temporary.name) / "relationship-context.json",
+            data,
+        )
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            status = main(
+                [
+                    "--catalog",
+                    str(relationship_catalog),
+                    "--format",
+                    "json",
+                    "contexts",
+                    "--relationship",
+                    "wide.tissue-density-projection",
+                ]
+            )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        result = json.loads(stdout.getvalue())["data"]
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(
+            result["filters"]["relationship"],
+            "wide.tissue-density-projection",
+        )
+
+    def test_contexts_text_handles_matches_and_empty_results(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "contexts",
+            "--status",
+            "verified",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn(
+            "open-v2.density-interpretation — "
+            "Density interpretation boundary",
+            stdout,
+        )
+        self.assertIn(
+            "[verified] coded-feature — The synthetic density field",
+            stdout,
+        )
+
+        status, stdout, stderr = self.run_cli(
+            "contexts",
+            "pathology",
+        )
+        self.assertEqual(status, 0)
+        self.assertEqual(stdout, "No contexts.\n")
+        self.assertEqual(stderr, "")
+
+    def test_context_errors_use_existing_error_envelopes(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "--format",
+            "json",
+            "context",
+            "missing.context",
+        )
+
+        self.assertEqual(status, 2)
+        self.assertEqual(stderr, "")
+        envelope = json.loads(stdout)
+        self.assertEqual(envelope["command"], "context")
+        self.assertEqual(envelope["error"]["type"], "not_found")
+
+    def test_contexts_require_query_or_filter(self) -> None:
+        status, stdout, stderr = self.run_cli("contexts")
+
+        self.assertEqual(status, 2)
+        self.assertEqual(stdout, "")
+        self.assertIn(
+            "provide a query or at least one context search filter",
+            stderr,
+        )
+
     def test_json_error_is_machine_readable(self) -> None:
         status, stdout, stderr = self.run_cli(
             "--format", "json", "get", "missing.feature"

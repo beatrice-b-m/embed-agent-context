@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from .catalog import (
+    CLAIM_STATUSES,
+    CONTEXT_KINDS,
+    CONTEXT_SCOPES,
     DOMAINS,
     FEATURE_KINDS,
     GRAINS,
@@ -89,6 +92,28 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(RELATIONSHIP_KINDS),
     )
     relationships_parser.add_argument("--limit", type=int, default=50)
+
+    context_parser = subparsers.add_parser(
+        "context",
+        help="get one exact clinical context",
+    )
+    context_parser.add_argument("identifier")
+
+    contexts_parser = subparsers.add_parser(
+        "contexts",
+        help="search and filter clinical contexts",
+    )
+    contexts_parser.add_argument("query", nargs="?", default="")
+    contexts_parser.add_argument("--kind", choices=CONTEXT_KINDS)
+    contexts_parser.add_argument("--scope", choices=CONTEXT_SCOPES)
+    contexts_parser.add_argument("--profile")
+    contexts_parser.add_argument("--domain", choices=DOMAINS)
+    contexts_parser.add_argument("--concept")
+    contexts_parser.add_argument("--table")
+    contexts_parser.add_argument("--relationship")
+    contexts_parser.add_argument("--status", choices=CLAIM_STATUSES)
+    contexts_parser.add_argument("--source")
+    contexts_parser.add_argument("--limit", type=int, default=50)
     return parser
 
 
@@ -126,6 +151,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_table=args.source_table,
                 target_table=args.target_table,
                 kind=args.kind,
+                limit=args.limit,
+            )
+        elif args.command == "context":
+            data = catalog.get_context(args.identifier)
+        elif args.command == "contexts":
+            data = catalog.search_contexts(
+                args.query,
+                kind=args.kind,
+                scope=args.scope,
+                profile=args.profile,
+                domain=args.domain,
+                concept=args.concept,
+                table=args.table,
+                relationship=args.relationship,
+                status=args.status,
+                source=args.source,
                 limit=args.limit,
             )
         else:  # pragma: no cover - argparse constrains this branch.
@@ -275,6 +316,53 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
                 f"Showing {len(matches)} of {data['total']} relationships."
             )
         return "\n".join(lines)
+    if command == "context":
+        context = data["context"]
+        lines = [
+            f"{data['identifier']} — {context['title']}",
+            context["summary"],
+            _format_context_metadata(context),
+        ]
+        lines.extend(_format_context_claims(context["claims"]))
+        workflow_steps = context["workflow_steps"]
+        if workflow_steps:
+            lines.append("workflow:")
+            lines.extend(
+                f"  {step['id']} — {step['label']} "
+                f"({', '.join(step['claims'])})"
+                for step in workflow_steps
+            )
+        sources = data["sources"]
+        if sources:
+            lines.append("sources:")
+            lines.extend(
+                f"  {identifier} — {source['title']}"
+                for identifier, source in sources.items()
+            )
+        return "\n".join(lines)
+    if command == "contexts":
+        matches = data["matches"]
+        if not matches:
+            return "No contexts."
+        lines: list[str] = []
+        for match in matches:
+            lines.append(
+                f"{match['score']:>4}  {match['identifier']} — "
+                f"{match['title']}"
+            )
+            lines.append(f"      {_format_context_metadata(match)}")
+            lines.extend(
+                f"      {line}"
+                for line in _format_context_claims(
+                    match["matching_claims"],
+                    heading=False,
+                )
+            )
+        if data["total"] > len(matches):
+            lines.append(
+                f"Showing {len(matches)} of {data['total']} contexts."
+            )
+        return "\n".join(lines)
     raise ValueError(f"unsupported command {command!r}")
 
 
@@ -295,6 +383,27 @@ def _format_relationship(relationship: dict[str, Any]) -> str:
     if hazards:
         line += "\n  hazards: " + "; ".join(hazards)
     return line
+
+
+def _format_context_metadata(context: dict[str, Any]) -> str:
+    metadata = f"{context['scope']} · {context['kind']}"
+    profiles = context["profiles"]
+    if profiles:
+        metadata += f" · {', '.join(profiles)}"
+    return metadata
+
+
+def _format_context_claims(
+    claims: list[dict[str, Any]],
+    *,
+    heading: bool = True,
+) -> list[str]:
+    lines = ["claims:"] if heading else []
+    lines.extend(
+        f"  [{claim['status']}] {claim['id']} — {claim['statement']}"
+        for claim in claims
+    )
+    return lines
 
 
 if __name__ == "__main__":
