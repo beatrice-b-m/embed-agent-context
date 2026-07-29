@@ -392,6 +392,19 @@ event, or relationship is absent from the dataset. Deterministic token
 matching remains transparent and dependency-free; results are sorted
 deterministically.
 
+Exact semantic getters return `kind`, `identifier`, the kind-specific entity,
+and two computed sections:
+
+- `related` contains stable IDs for adjacent objects, features,
+  relationships, time semantics, aggregations, guardrails, and coverage as
+  applicable, plus relevant object or relationship bindings;
+- `provenance` resolves direct claim references into claim statements and
+  review status, context titles and scope/profiles, and complete source
+  records.
+
+These sections are derived from the validated graph on every lookup. They are
+not additional author-maintained adjacency or evidence copies.
+
 ## Adding semantic content
 
 When extending the portable model:

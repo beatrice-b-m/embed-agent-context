@@ -27,6 +27,13 @@ relationship identifiers.
 The version 4 `open-v2.pathology-cancer-vs-noncancer` pattern is not migrated as
 a cohort recipe.
 
+| Disposition | Version 4 material | Version 5 destination |
+|---|---|---|
+| Retain | Reviewed severity code meanings, inverse ordering, verified side/exam minimum rollups, and sourced representation facts | Concepts, vocabulary, aggregations, contexts, and claim provenance |
+| Generalize | Null-is-negative, assessment-is-pathology, downstream leakage, one-to-one attribution, implicit grain change, attached-pathology selection, and non-breast-cancer-as-healthy shortcuts | Reusable guardrails independent of a named research workflow |
+| Move into clinical semantics | Outcome states, unattached pathology, procedure/pathology attribution, candidate dates, aggregation alternatives, and capture limitations | Clinical objects, semantic relationships, temporal semantics, structured missing states, aggregations, and coverage |
+| Remove | The three case/control alternatives, the named cancer-versus-noncancer workflow, draft-pattern maturity, generic partition advice, and any implication of a preferred case, control, anchor, window, or exclusion policy | No replacement; agents must construct and defend these analysis choices |
+
 - Cancer, benign, high-risk, borderline, non-breast-cancer, and unattached
   states move to outcome and missing-state semantics.
 - Unit-of-analysis and multiple-record questions become grain and aggregation

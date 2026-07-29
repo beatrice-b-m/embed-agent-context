@@ -60,7 +60,9 @@ The initial outcome model distinguishes invasive breast cancer, in-situ breast
 cancer, high-risk lesion, borderline lesion, benign finding, and non-breast
 cancer. `unattached_pathology` is an attachment state, not a seventh diagnosis
 code: it does not establish absence of disease, a benign diagnosis, complete
-follow-up, or a negative outcome.
+follow-up, or a negative outcome. The non-breast-cancer state is likewise not
+benign, healthy, or absence of malignancy. Restricting to attached pathology
+also conditions on a represented tissue-sampling procedure.
 
 Supplied side- and exam-level pathology severity use the minimum numeric value
 because the represented scale is inverse. The catalog does not invent a
