@@ -1,745 +1,493 @@
-"""Integration contracts for the checked-in structured catalog."""
+"""Acceptance contracts for the checked-in schema-v5 semantic catalog."""
 
 from __future__ import annotations
 
 import json
-import re
 import unittest
 from pathlib import Path
 
 from embed_context import load_catalog
-from embed_context.catalog import (
-    ANALYSIS_PATTERN_STATUSES,
-    BINDING_PARAMETER_KEYS,
-    CARDINALITY_VALUES,
-    CLAIM_STATUSES,
-    CONTEXT_KINDS,
-    CONTEXT_SCOPES,
-    DOMAINS,
-    ENDPOINT_COMPLETENESS,
-    EVIDENCE_VALUES,
-    FEATURE_KINDS,
-    GRAINS,
-    KEY_COMPLETENESS,
-    KEY_KINDS,
-    KEY_UNIQUENESS,
-    RELATIONSHIP_KINDS,
-    ROLES,
-    SOURCE_KINDS,
-    SOURCE_LOCATOR_KINDS,
-    VOCABULARY_COMPLETENESS,
-    VOCABULARY_PARSING,
-    _BINDING_KEYS,
-    _BINDING_REQUIRED_KEYS,
-    _ANALYSIS_ALTERNATIVE_KEYS,
-    _ANALYSIS_DECISION_KEYS,
-    _ANALYSIS_PATTERN_KEYS,
-    _CONCEPT_KEYS,
-    _CONCEPT_REQUIRED_KEYS,
-    _CLINICAL_CONTEXT_KEYS,
-    _CONTEXT_CLAIM_KEYS,
-    _CONTEXT_SOURCE_KEYS,
-    _CONTEXT_TABLE_REFERENCE_KEYS,
-    _PROHIBITED_SHORTCUT_KEYS,
-    _VOCABULARY_KEYS,
-    _VOCABULARY_REQUIRED_KEYS,
-    _WORKFLOW_STEP_KEYS,
-)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+CATALOG_PATH = REPO_ROOT / "catalog" / "catalog.json"
 
 
-class CheckedInCatalogTests(unittest.TestCase):
+class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.catalog = load_catalog()
+        cls.raw = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        cls.catalog = load_catalog(CATALOG_PATH)
 
-    def test_every_concept_and_binding_resolves_exactly(self) -> None:
-        for concept_id in self.catalog.concepts:
-            with self.subTest(concept=concept_id):
-                result = self.catalog.get_feature(concept_id)
-                self.assertEqual(result["concept"]["id"], concept_id)
+    def test_v5_models_the_clinical_graph_without_analysis_patterns(self) -> None:
+        self.assertEqual(self.catalog.schema_version, 5)
+        self.assertNotIn("analysis_pattern_statuses", self.raw)
+        self.assertNotIn("analysis_patterns", self.raw)
+        self.assertFalse(hasattr(self.catalog, "analysis_patterns"))
+        self.assertFalse(hasattr(self.catalog, "get_analysis_pattern"))
 
-        for binding in self.catalog.bindings:
-            with self.subTest(binding=binding.qualified_identifier):
-                result = self.catalog.get_feature(binding.qualified_identifier)
-                self.assertEqual(result["binding"]["concept"], binding.concept)
-
-    def test_every_table_and_relationship_resolves_exactly(self) -> None:
-        for table in self.catalog.tables:
-            with self.subTest(table=table.identifier):
-                result = self.catalog.get_table(table.profile, table.table)
-                self.assertEqual(result["identifier"], table.identifier)
-
-        for relationship in self.catalog.relationships:
-            with self.subTest(relationship=relationship.id):
-                result = self.catalog.get_relationship(relationship.id)
-                self.assertEqual(result["identifier"], relationship.id)
-
-    def test_phase_three_context_inventory_resolves_with_sources(self) -> None:
-        expected_contexts = {
-            "clinical.screening-diagnostic-pathway",
-            "embed.finding-procedure-recording",
-            "open-v2.assessment-recommendation-context",
-            "open-v2.demographic-administrative-context",
-            "open-v2.linked-exam-context",
-            "open-v2.multimodal-finding-context",
-            "open-v2.pathology-procedure-context",
-            "open-v2.report-context",
-            "open-v2.risk-context",
-            "open-v2.temporal-availability-context",
+        expected_objects = {
+            "patient",
+            "breast_imaging_episode",
+            "imaging_exam",
+            "breast_side",
+            "imaging_finding",
+            "imaging_interpretation",
+            "procedure",
+            "pathology_observation",
+            "pathology_diagnosis",
         }
-        self.assertEqual(set(self.catalog.contexts), expected_contexts)
+        self.assertLessEqual(expected_objects, set(self.catalog.clinical_objects))
 
-        cited_sources = set()
-        for context_id, context in self.catalog.contexts.items():
-            with self.subTest(context=context_id):
-                result = self.catalog.get_context(context_id)
-                self.assertEqual(result["identifier"], context_id)
-                claim_sources = {
-                    source_id
-                    for claim in context.claims
-                    for source_id in claim.sources
-                }
-                self.assertEqual(set(result["sources"]), claim_sources)
-                cited_sources.update(claim_sources)
+        expected_edges = {
+            "clinical.patient-imaging-episode": (
+                "patient",
+                "breast_imaging_episode",
+            ),
+            "clinical.episode-exam": (
+                "breast_imaging_episode",
+                "imaging_exam",
+            ),
+            "clinical.exam-side": ("imaging_exam", "breast_side"),
+            "clinical.exam-finding": ("imaging_exam", "imaging_finding"),
+            "clinical.finding-interpretation": (
+                "imaging_finding",
+                "imaging_interpretation",
+            ),
+            "clinical.interpretation-procedure": (
+                "imaging_interpretation",
+                "procedure",
+            ),
+            "clinical.procedure-pathology-observation": (
+                "procedure",
+                "pathology_observation",
+            ),
+            "clinical.pathology-observation-diagnosis": (
+                "pathology_observation",
+                "pathology_diagnosis",
+            ),
+        }
+        for identifier, endpoints in expected_edges.items():
+            with self.subTest(relationship=identifier):
+                relationship = self.catalog.get_semantic_relationship(
+                    identifier
+                )["semantic_relationship"]
+                self.assertEqual(
+                    (
+                        relationship["source_object"],
+                        relationship["target_object"],
+                    ),
+                    endpoints,
+                )
 
-        self.assertEqual(cited_sources, set(self.catalog.sources))
+    def test_exact_getters_resolve_navigation_and_claim_provenance(self) -> None:
+        result = self.catalog.get_clinical_object("pathology_diagnosis")
 
-    def test_initial_analysis_pattern_exposes_policy_boundaries(self) -> None:
-        self.assertEqual(
-            set(self.catalog.analysis_patterns),
-            {"open-v2.pathology-cancer-vs-noncancer"},
-        )
-        result = self.catalog.get_analysis_pattern(
-            "open-v2.pathology-cancer-vs-noncancer"
-        )
-        pattern = result["pattern"]
-        self.assertEqual(pattern["status"], "draft")
-        self.assertEqual(len(pattern["alternatives"]), 3)
+        self.assertIn("pathology.severity", result["related"]["features"])
         self.assertIn(
-            "null-is-negative",
+            "clinical.pathology-observation-diagnosis",
+            result["related"]["semantic_relationships"],
+        )
+        self.assertIn(
+            "time.pathology-report-documentation",
+            result["related"]["temporal_semantics"],
+        )
+        self.assertIn(
+            "aggregation.pathology-severity-to-patient",
+            result["related"]["aggregations"],
+        )
+        self.assertEqual(
+            result["provenance"]["claims"][0]["id"],
+            "open-v2.pathology-procedure-context#severity-meaning",
+        )
+        self.assertEqual(
+            result["provenance"]["claims"][0]["status"], "verified"
+        )
+        self.assertIn(
+            "open-v2.maintainer-clarification-2026-07-29",
+            result["provenance"]["sources"],
+        )
+        self.assertEqual(
+            result["provenance"]["contexts"][0]["profiles"], ["open-v2"]
+        )
+
+    def test_pathology_states_and_nulls_remain_clinically_distinct(self) -> None:
+        result = self.catalog.get_feature(
+            "pathology.severity", include_codes=True
+        )
+        self.assertEqual(
+            result["vocabulary"]["codes"],
             {
-                item["id"] for item in pattern["prohibited_shortcuts"]
+                "0": "Invasive breast cancer",
+                "1": "In-situ breast cancer",
+                "2": "High-risk lesion",
+                "3": "Borderline lesion",
+                "4": "Benign finding",
+                "5": "Non-breast cancer",
             },
         )
-        self.assertIn(
-            "control-definition",
-            {item["id"] for item in pattern["required_decisions"]},
-        )
-        search = self.catalog.search_analysis_patterns(
-            "cancer versus no cancer",
-            profile="open-v2",
-            domain="pathology",
-        )
-        self.assertEqual(search["total"], 1)
-
-    def test_phase_three_context_keeps_scope_and_maintainer_boundaries(self) -> None:
+        self.assertNotIn("6", result["vocabulary"]["codes"])
         self.assertEqual(
-            {context.scope for context in self.catalog.contexts.values()},
-            {"general_clinical", "embed_general", "profile_specific"},
+            result["feature"]["missing_states"][0]["id"],
+            "unattached_pathology",
         )
-        statuses = {
-            claim.status
-            for context in self.catalog.contexts.values()
-            for claim in context.claims
-        }
-        self.assertTrue({"verified", "reconciled", "unresolved"} <= statuses)
-
-        for context in self.catalog.contexts.values():
-            if context.scope == "profile_specific":
-                continue
-            with self.subTest(context=context.id):
-                self.assertFalse(context.related_tables)
-                self.assertFalse(context.related_relationships)
-
-        temporal = self.catalog.get_context(
-            "open-v2.temporal-availability-context"
-        )["context"]
-        claims = {claim["id"]: claim for claim in temporal["claims"]}
-        anonymization = claims["anonymization-properties"]
-        self.assertEqual(anonymization["status"], "verified")
-        self.assertIn("consistent random date shift", anonymization["statement"])
-        self.assertNotIn("policy-boundaries", claims)
-        self.assertNotIn("downstream-availability", claims)
-
-        linked = self.catalog.get_context(
-            "open-v2.linked-exam-context"
-        )["context"]
-        linked_claims = {
-            claim["id"]: claim for claim in linked["claims"]
-        }
-        self.assertEqual(linked_claims["link-meaning"]["status"], "verified")
+        missing_text = json.dumps(
+            result["feature"]["missing_states"][0]
+        ).casefold()
+        self.assertIn("not a diagnosis category or negative outcome", missing_text)
         self.assertIn(
-            "same-episode exam",
-            linked_claims["link-meaning"]["statement"],
+            "time.downstream-availability",
+            result["related"]["temporal_semantics"],
         )
 
-        multimodal = self.catalog.get_context(
-            "open-v2.multimodal-finding-context"
-        )["context"]
-        multimodal_claims = {
-            claim["id"]: claim for claim in multimodal["claims"]
-        }
-        self.assertEqual(
-            multimodal_claims["descriptor-null-semantics"]["status"],
-            "verified",
-        )
-        self.assertNotIn("modality-followup-policy", multimodal_claims)
-
-        pathology = self.catalog.get_context(
-            "open-v2.pathology-procedure-context"
-        )["context"]
-        pathology_claims = {
-            claim["id"]: claim for claim in pathology["claims"]
-        }
-        self.assertEqual(
-            pathology_claims["severity-meaning"]["status"],
-            "verified",
-        )
-        self.assertEqual(
-            pathology_claims["severity-aggregation"]["status"],
-            "verified",
-        )
-        self.assertEqual(
-            pathology_claims["pathology-code-mappings"]["status"],
-            "unresolved",
-        )
-        self.assertIn(
-            "no single authoritative owner",
-            pathology_claims["pathology-code-mappings"]["statement"],
-        )
-
-        report = self.catalog.get_context("open-v2.report-context")["context"]
-        report_claims = {claim["id"]: claim for claim in report["claims"]}
-        self.assertEqual(
-            report_claims["sequence-meaning"]["status"],
-            "reconciled",
-        )
-        self.assertIn(
-            "minimum represented sequence",
-            report_claims["sequence-meaning"]["statement"],
-        )
-        self.assertEqual(report_claims["addendum-link"]["status"], "unresolved")
-        self.assertIn(
-            "real-world exceptions",
-            report_claims["addendum-link"]["statement"],
-        )
-
-        risk = self.catalog.get_context("open-v2.risk-context")["context"]
-        risk_claims = {claim["id"]: claim for claim in risk["claims"]}
-        self.assertEqual(risk_claims["risk-availability"]["status"], "verified")
-        self.assertEqual(risk_claims["risk-semantics"]["status"], "unresolved")
-        self.assertIn(
-            "tentatively believed to use percentage points",
-            risk_claims["risk-semantics"]["statement"],
-        )
-
-        demographics = self.catalog.get_context(
-            "open-v2.demographic-administrative-context"
-        )["context"]
-        demographic_claims = {
-            claim["id"]: claim for claim in demographics["claims"]
-        }
-        self.assertEqual(
-            {
-                claim_id: claim["status"]
-                for claim_id, claim in demographic_claims.items()
-            },
-            {
-                "age-years-and-quality": "verified",
-                "age-at-exam-deidentification": "verified",
-                "ashkenazi-heritage": "verified",
-                "legal-sex": "verified",
-                "release-version-meaning": "verified",
-            },
-        )
-
-    def test_maintainer_review_semantics_are_registered(self) -> None:
-        multimodal = self.catalog.get_context(
-            "open-v2.multimodal-finding-context"
-        )["context"]
-        claims = {claim["id"]: claim for claim in multimodal["claims"]}
-        self.assertEqual(
-            claims["mammography-aggregate-semantics"]["status"],
-            "verified",
-        )
-        self.assertIn(
-            "finding number -9",
-            claims["synthetic-contralateral-finding"]["statement"],
-        )
-        self.assertIn(
-            "null side attached to a clinical finding",
-            claims["finding-side-null"]["statement"],
-        )
-        self.assertIn(
-            "do not share one guaranteed delimiter",
-            claims["field-specific-parsing"]["statement"],
-        )
-
-        assessment = self.catalog.get_context(
-            "open-v2.assessment-recommendation-context"
-        )["context"]
-        assessment_claims = {
-            claim["id"]: claim for claim in assessment["claims"]
-        }
-        self.assertIn(
-            "no single authoritative owner",
-            assessment_claims["recommendation-code-mappings"]["statement"],
-        )
-
-        finding_number = self.catalog.get_feature(
-            "imaging.finding_number"
-        )["concept"]
-        self.assertIn("Ordinal finding number", finding_number["definition"])
-        self.assertTrue(
-            any(
-                "synthetic contralateral negative" in caveat
-                for caveat in finding_number["caveats"]
-            )
-        )
-
-        age = self.catalog.get_feature("demographics.age_at_exam")["concept"]
-        self.assertIn("Age in years", age["definition"])
-        self.assertTrue(
-            any("top-coded to 89" in caveat for caveat in age["caveats"])
-        )
-
-        gender = self.catalog.get_feature(
-            "demographics.gender_description"
-        )["concept"]
-        self.assertIn("legal sex", gender["definition"])
-
-        release = self.catalog.get_feature("exam.release_version")["concept"]
-        self.assertIn("first EMBED release", release["definition"])
-
-        for concept_id in (
+        for aggregate_feature in (
             "breast_side.pathology_severity_aggregate",
             "exam.pathology_severity_aggregate",
         ):
-            with self.subTest(concept=concept_id):
-                concept = self.catalog.get_feature(concept_id)["concept"]
-                self.assertIn("Minimum", concept["definition"])
-                self.assertNotIn("unresolved", concept["evidence"])
+            with self.subTest(feature=aggregate_feature):
+                feature = self.catalog.get_feature(aggregate_feature)["feature"]
+                self.assertEqual(
+                    feature["missing_states"][0]["id"],
+                    "unattached_pathology",
+                )
 
-    def test_phase_three_requirement_level_context_queries(self) -> None:
-        temporal = self.catalog.search_contexts("temporal leakage")
+        non_breast = self.catalog.get_guardrail(
+            "guardrail.non-breast-cancer-not-no-malignancy"
+        )["guardrail"]
+        self.assertIn("not be interpreted as benign", non_breast["statement"])
+
+    def test_attribution_is_optional_many_to_many_and_not_a_join_recipe(
+        self,
+    ) -> None:
+        result = self.catalog.get_semantic_relationship(
+            "clinical.finding-pathology-observation"
+        )
+        relationship = result["semantic_relationship"]
+
+        self.assertEqual(
+            relationship["cardinality"],
+            {
+                "targets_per_source": "zero_or_more",
+                "sources_per_target": "zero_or_more",
+            },
+        )
+        self.assertEqual(
+            relationship["optionality"],
+            {"source": "optional", "target": "optional"},
+        )
         self.assertIn(
-            "open-v2.temporal-availability-context",
-            {
-                match["identifier"]
-                for match in temporal["matches"]
-            },
+            "many-to-many",
+            " ".join(relationship["attribution_limitations"]),
+        )
+        self.assertIn(
+            "time.downstream-availability",
+            relationship["temporal_semantics"],
+        )
+        self.assertIn(
+            "coverage.open-v2.finding-pathology-attribution",
+            result["related"]["coverage"],
         )
 
-        pathology_text = self.catalog.search_contexts("pathology")
-        pathology_context = next(
-            match
-            for match in pathology_text["matches"]
-            if match["identifier"] == "open-v2.pathology-procedure-context"
+        binding = result["related"]["relationship_bindings"][0]
+        self.assertEqual(binding["source"]["completeness"], "optional")
+        self.assertEqual(
+            binding["source"]["columns"], ["acc_anon", "side", "numfind"]
         )
-        self.assertNotIn(
-            "finding-versus-biopsy-side",
-            {
-                claim["id"]
-                for claim in pathology_context["matching_claims"]
-            },
+        self.assertEqual(
+            binding["target"]["columns"], ["acc_anon", "side", "numfind"]
         )
+        self.assertIn("multiply rows", " ".join(binding["join_hazards"]))
 
-        pathology = self.catalog.search_contexts(
-            "",
-            profile="open-v2",
-            domain="pathology",
-            status="unresolved",
-        )
-        self.assertGreater(pathology["total"], 0)
-        self.assertTrue(
-            all(
-                match["profiles"] == ["open-v2"]
-                for match in pathology["matches"]
-            )
-        )
-        self.assertTrue(
-            all(
-                claim["status"] == "unresolved"
-                for match in pathology["matches"]
-                for claim in match["matching_claims"]
-            )
-        )
-
-    def test_open_v2_relationship_inventory_is_complete(self) -> None:
+    def test_timestamps_preserve_event_documentation_and_availability_meaning(
+        self,
+    ) -> None:
         expected = {
-            "open-v2.combined_anon.exam_projection",
-            "open-v2.combined_anon.imaging_index_projection",
-            "open-v2.combined_anon.linked_exam",
-            "open-v2.combined_anon.pathology_index_projection",
-            "open-v2.combined_anon.patient_projection",
-            "open-v2.combined_anon.side_projection",
-            "open-v2.exam_level_anon.patient",
-            "open-v2.imaging_findings_anon.exam",
-            "open-v2.imaging_findings_anon.linked_exam",
-            "open-v2.imaging_findings_anon.side",
-            "open-v2.pathology_findings_anon.exam",
-            "open-v2.pathology_findings_anon.imaging_finding",
-            "open-v2.pathology_findings_anon.side",
-            "open-v2.reports_anon.exam",
-            "open-v2.reports_anon.patient",
-            "open-v2.risk_anon.exam",
-            "open-v2.risk_anon.patient",
-            "open-v2.side_level_anon.exam",
+            "time.exam-event": ("event_time", ["exam.study_date"]),
+            "time.procedure-event": (
+                "event_time",
+                ["pathology.procedure_date"],
+            ),
+            "time.specimen-collection": ("event_time", []),
+            "time.pathology-report-documentation": (
+                "documentation_time",
+                ["pathology.report_date"],
+            ),
+            "time.downstream-availability": ("availability_time", []),
         }
-        actual = {
-            relationship.id
-            for relationship in self.catalog.relationships
-            if relationship.profile == "open-v2"
-        }
-        self.assertEqual(actual, expected)
-
-    def test_unreliable_natural_keys_and_wide_hazards_remain_explicit(self) -> None:
-        by_table = {table.table: table for table in self.catalog.tables}
-        for table_name in (
-            "imaging_findings_anon",
-            "pathology_findings_anon",
-            "reports_anon",
-        ):
-            with self.subTest(table=table_name):
-                natural_keys = [
-                    key
-                    for key in by_table[table_name].keys
-                    if key.kind == "natural"
+        for identifier, (kind, feature_refs) in expected.items():
+            with self.subTest(temporal_semantic=identifier):
+                temporal = self.catalog.get_temporal_semantic(identifier)[
+                    "temporal_semantic"
                 ]
-                self.assertTrue(natural_keys)
+                self.assertEqual(temporal["kind"], kind)
+                self.assertEqual(temporal["feature_refs"], feature_refs)
+
+        report_time = self.catalog.get_temporal_semantic(
+            "time.pathology-report-documentation"
+        )["temporal_semantic"]
+        self.assertIn(
+            "not designated as a universal diagnosis date",
+            " ".join(report_time["caveats"]),
+        )
+        timestamp_guardrail = self.catalog.get_guardrail(
+            "guardrail.timestamps-answer-different-questions"
+        )["guardrail"]
+        self.assertIn("rather than treated as interchangeable", timestamp_guardrail["statement"])
+
+        for feature_id, absent_event in (
+            ("pathology.procedure_date", "procedure did not occur"),
+            ("pathology.report_date", "pathology report or diagnosis did not exist"),
+        ):
+            with self.subTest(feature=feature_id):
+                state = self.catalog.get_feature(feature_id)["feature"][
+                    "missing_states"
+                ][0]
+                self.assertEqual(state["representation"], "null")
+                self.assertIn(absent_event, state["meaning"])
+
+        for coverage_id in (
+            "coverage.open-v2.specimen-time",
+            "coverage.open-v2.downstream-availability-time",
+        ):
+            with self.subTest(coverage=coverage_id):
+                coverage = self.catalog.get_coverage(coverage_id)["coverage"]
+                self.assertEqual(coverage["status"], "unsupported")
+                self.assertEqual(coverage["profiles"], ["open-v2"])
+
+    def test_aggregation_and_profile_support_are_explicit(self) -> None:
+        for suffix, target, result_feature in (
+            ("side", "breast_side", "breast_side.pathology_severity_aggregate"),
+            ("exam", "imaging_exam", "exam.pathology_severity_aggregate"),
+        ):
+            with self.subTest(level=suffix):
+                identifier = f"aggregation.pathology-severity-to-{suffix}"
+                result = self.catalog.get_aggregation(identifier)
+                aggregation = result["aggregation"]
+                self.assertEqual(aggregation["status"], "provided")
+                self.assertEqual(aggregation["target_object"], target)
+                self.assertEqual(aggregation["result_concept"], result_feature)
+                self.assertIn("minimum", aggregation["method"].casefold())
+                self.assertIn(
+                    f"coverage.open-v2.pathology-severity-to-{suffix}",
+                    result["related"]["coverage"],
+                )
+                coverage = self.catalog.get_coverage(
+                    f"coverage.open-v2.pathology-severity-to-{suffix}"
+                )["coverage"]
+                self.assertEqual(coverage["status"], "supported")
+                self.assertEqual(coverage["profiles"], ["open-v2"])
+
+        finding = self.catalog.get_aggregation(
+            "aggregation.pathology-severity-to-finding"
+        )["aggregation"]
+        self.assertEqual(finding["status"], "unresolved")
+        self.assertIsNone(finding["result_concept"])
+        self.assertIn(
+            "clinical.finding-pathology-observation",
+            finding["semantic_relationships"],
+        )
+
+        patient = self.catalog.get_aggregation(
+            "aggregation.pathology-severity-to-patient"
+        )["aggregation"]
+        self.assertEqual(patient["status"], "analyst_defined")
+        self.assertIsNone(patient["result_concept"])
+        patient_coverage = self.catalog.get_coverage(
+            "coverage.open-v2.patient-pathology-aggregate"
+        )["coverage"]
+        self.assertEqual(patient_coverage["status"], "unsupported")
+
+    def test_reusable_guardrails_replace_task_specific_recipes(self) -> None:
+        expected = {
+            "guardrail.null-pathology-not-negative",
+            "guardrail.assessment-not-pathology",
+            "guardrail.downstream-temporal-leakage",
+            "guardrail.explicit-attribution-policy",
+            "guardrail.explicit-grain-aggregation",
+            "guardrail.timestamps-answer-different-questions",
+            "guardrail.inverse-severity-ordering",
+            "guardrail.attached-pathology-selection",
+            "guardrail.non-breast-cancer-not-no-malignancy",
+            "guardrail.colocation-not-coavailability",
+            "guardrail.incomplete-outcome-capture",
+        }
+        self.assertLessEqual(expected, set(self.catalog.guardrails))
+
+        workflow_fields = {
+            "alternatives",
+            "required_decisions",
+            "prohibited_shortcuts",
+        }
+        for identifier, guardrail in self.raw["guardrails"].items():
+            with self.subTest(guardrail=identifier):
+                self.assertTrue(workflow_fields.isdisjoint(guardrail))
+
+    def test_clinical_discovery_finds_outcomes_attribution_and_profile_gaps(
+        self,
+    ) -> None:
+        outcome = self.catalog.discover(
+            "How is breast cancer represented and when is it known?",
+            limit=100,
+        )
+        outcome_ids = {item["identifier"] for item in outcome["matches"]}
+        self.assertIn("pathology_diagnosis", outcome_ids)
+        self.assertIn("pathology.severity", outcome_ids)
+        severity_match = next(
+            item
+            for item in outcome["matches"]
+            if item["identifier"] == "pathology.severity"
+        )
+        self.assertTrue(severity_match["match_reasons"])
+        self.assertIn(
+            "time.downstream-availability",
+            severity_match["entity"]["temporal_semantics"],
+        )
+
+        attribution = self.catalog.discover(
+            "pathology linked to imaging finding", limit=100
+        )
+        relationship_match = next(
+            item
+            for item in attribution["matches"]
+            if item["identifier"]
+            == "clinical.finding-pathology-observation"
+        )
+        self.assertEqual(relationship_match["kind"], "semantic_relationship")
+        self.assertTrue(relationship_match["match_reasons"])
+
+        specimen = self.catalog.discover(
+            "specimen date",
+            profile="open-v2",
+            kinds=["temporal_semantic", "coverage"],
+        )
+        specimen_ids = {item["identifier"] for item in specimen["matches"]}
+        self.assertIn("time.specimen-collection", specimen_ids)
+        self.assertIn("coverage.open-v2.specimen-time", specimen_ids)
+        self.assertIn(
+            "unsupported_in_profile",
+            {item["category"] for item in specimen["diagnostics"]},
+        )
+
+    def test_discovery_diagnostics_distinguish_failure_modes(self) -> None:
+        filtered = self.catalog.discover(
+            "missing specimen timestamp", kinds=["aggregation"]
+        )
+        self.assertIn(
+            "filters_excluded_matches",
+            {item["category"] for item in filtered["diagnostics"]},
+        )
+
+        vocabulary = self.catalog.discover(
+            "pathology severity frobnicate", limit=5
+        )
+        self.assertIn(
+            "vocabulary_mismatch",
+            {item["category"] for item in vocabulary["diagnostics"]},
+        )
+        self.assertIn("frobnicate", vocabulary["unmatched_terms"])
+
+        absent = self.catalog.discover("xylophonic reticulocyte")
+        self.assertEqual(absent["matches"], [])
+        self.assertIn(
+            "no_catalog_coverage",
+            {item["category"] for item in absent["diagnostics"]},
+        )
+
+        unknown = self.catalog.discover(
+            "pathology", profile="missing-profile", kinds=["imaginary"]
+        )
+        self.assertEqual(unknown["matches"], [])
+        self.assertEqual(unknown["diagnostics"][0]["category"], "unknown_filter")
+
+    def test_physical_bindings_are_secondary_and_projections_are_explicit(
+        self,
+    ) -> None:
+        self.assertTrue(
+            {"bindings", "tables", "relationships"}.isdisjoint(self.raw)
+        )
+        profile = self.raw["profile_bindings"]["open-v2"]
+        self.assertEqual(
+            set(profile),
+            {
+                "feature_bindings",
+                "object_bindings",
+                "tables",
+                "relationship_bindings",
+            },
+        )
+
+        combined = self.catalog.get_profile_table("open-v2", "combined_anon")
+        self.assertEqual(combined["kind"], "profile_table")
+        self.assertEqual(combined["identifier"], "open-v2:combined_anon")
+        projected_objects = {
+            item["object"]
+            for item in combined["object_bindings"]
+            if item["representation"] == "projection"
+        }
+        self.assertLessEqual(
+            {
+                "patient",
+                "imaging_exam",
+                "imaging_finding",
+                "imaging_interpretation",
+                "procedure",
+                "pathology_observation",
+                "pathology_diagnosis",
+            },
+            projected_objects,
+        )
+
+    def test_physical_aliases_are_profile_scoped_discovery_metadata(self) -> None:
+        physical_names = {
+            value.casefold()
+            for profile in self.raw["profile_bindings"].values()
+            for binding in profile["feature_bindings"]
+            for value in (binding["table"], binding["column"])
+        }
+        for identifier, concept in self.raw["concepts"].items():
+            with self.subTest(concept=identifier):
                 self.assertTrue(
-                    all(
-                        key.uniqueness != "unique"
-                        for key in natural_keys
+                    physical_names.isdisjoint(
+                        term.casefold() for term in concept["search_terms"]
                     )
                 )
 
-        wide_relationships = self.catalog.search_relationships(
-            table="combined_anon"
-        )["matches"]
-        self.assertTrue(wide_relationships)
-        self.assertTrue(
-            all(item["join_hazards"] for item in wide_relationships)
+        portable = self.catalog.discover(
+            "procdate_anon", kinds=["feature"]
         )
+        self.assertEqual(portable["matches"], [])
 
-        for relationship_id in (
-            "open-v2.combined_anon.linked_exam",
-            "open-v2.imaging_findings_anon.linked_exam",
-        ):
-            with self.subTest(relationship=relationship_id):
-                linked = self.catalog.get_relationship(relationship_id)[
-                    "relationship"
-                ]
-                self.assertEqual(
-                    linked["source"]["completeness"], "optional"
-                )
-                self.assertEqual(
-                    linked["cardinality"]["targets_per_source"], "zero_or_one"
-                )
-                self.assertTrue(linked["join_hazards"])
-
-
-    def test_domain_only_search_returns_each_matching_concept_once(self) -> None:
-        for domain in (
-            "pathology",
-            "demographics",
-            "social_determinants_of_health",
-        ):
-            with self.subTest(domain=domain):
-                expected = {
-                    concept_id
-                    for concept_id, concept in self.catalog.concepts.items()
-                    if domain in concept.domains
-                }
-                result = self.catalog.search_features("", domain=domain)
-                identifiers = [
-                    match["identifier"] for match in result["matches"]
-                ]
-                self.assertEqual(set(identifiers), expected)
-                self.assertEqual(len(identifiers), len(set(identifiers)))
-
-    def test_shared_accession_and_pathology_slots_are_normalized(self) -> None:
-        accession = self.catalog.get_feature("exam.accession_identifier")
-        self.assertTrue(accession["bindings"])
+        bound = self.catalog.discover(
+            "procdate_anon", profile="open-v2", kinds=["feature"]
+        )
+        self.assertEqual(bound["matches"][0]["identifier"], "pathology.procedure_date")
+        self.assertIn(
+            "binding.column",
+            {
+                reason["field"]
+                for reason in bound["matches"][0]["match_reasons"]
+            },
+        )
         self.assertEqual(
-            {binding["column"] for binding in accession["bindings"]},
-            {"acc_anon"},
+            bound["matches"][0]["implementation_bindings"]["profile"],
+            "open-v2",
         )
 
-        pathology_slots = [
-            binding
-            for binding in self.catalog.bindings
-            if binding.column.startswith("path")
-            and binding.column.removeprefix("path").isdigit()
-        ]
-        self.assertTrue(pathology_slots)
-        self.assertEqual(
-            {binding.concept for binding in pathology_slots},
-            {"pathology.diagnosis_code_slot"},
-        )
-        for binding in pathology_slots:
-            self.assertEqual(
-                dict(binding.parameters)["slot"],
-                int(binding.column.removeprefix("path")),
-            )
-
-    def test_code_lookup_returns_plain_structured_meaning(self) -> None:
-        result = self.catalog.lookup_code("imaging.assessment", "N")
-        self.assertEqual(result["meaning"], "Negative")
-        self.assertEqual(result["concept"], "imaging.assessment")
-
-        severity = self.catalog.lookup_code("pathology.severity", "0")
-        self.assertEqual(severity["meaning"], "Invasive breast cancer")
-        self.assertEqual(severity["concept"], "pathology.severity")
-
-        for vocabulary in self.catalog.vocabularies.values():
-            for _, meaning in vocabulary.codes:
-                self.assertNotIn("**", meaning)
-                self.assertNotIn("`", meaning)
-
-    def test_requirement_level_text_queries(self) -> None:
-        accession = self.catalog.search_features("ACCAnon")
-        self.assertEqual(accession["total"], 1)
-        self.assertEqual(
-            accession["matches"][0]["identifier"],
-            "exam.accession_identifier",
-        )
-
-        demographic = self.catalog.search_features("demographic features")
-        self.assertGreater(demographic["total"], 0)
-        self.assertTrue(
-            all(
-                "demographics" in match["domains"]
-                for match in demographic["matches"]
-            )
-        )
-
-        masses = self.catalog.search_features("breast masses")
-        mass_identifiers = {
-            match["identifier"] for match in masses["matches"]
+    def test_repository_source_locators_exist_and_are_not_self_citing(
+        self,
+    ) -> None:
+        repository_sources = {
+            identifier: source
+            for identifier, source in self.raw["sources"].items()
+            if source["locator_kind"] == "repository_path"
         }
-        self.assertTrue(mass_identifiers)
-        self.assertNotIn("breast.side", mass_identifiers)
-        self.assertTrue(
-            any("mass" in identifier for identifier in mass_identifiers)
-        )
-
-    def test_pathology_severity_aggregates_share_codes_and_derivation(self) -> None:
-        for concept_id in (
-            "breast_side.pathology_severity_aggregate",
-            "exam.pathology_severity_aggregate",
-        ):
-            with self.subTest(concept=concept_id):
-                concept = self.catalog.concepts[concept_id]
-                caveats = concept.caveats
-                self.assertEqual(concept.vocabulary, "pathology.severity")
-                self.assertIn("Minimum", concept.definition)
-                self.assertTrue(
-                    any(
-                        "minimum value is the most severe" in item
-                        for item in caveats
-                    )
-                )
-                self.assertTrue(
-                    all(
-                        "finding-level presence flag" not in item
-                        for item in caveats
-                    )
-                )
-
-    def test_schema_facets_match_the_dependency_free_core(self) -> None:
-        schema = json.loads(
-            (REPO_ROOT / "catalog/catalog.schema.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        properties = schema["properties"]
-        self.assertEqual(properties["grains"]["const"], list(GRAINS))
-        self.assertEqual(
-            properties["feature_kinds"]["const"], list(FEATURE_KINDS)
-        )
-        self.assertEqual(properties["domains"]["const"], list(DOMAINS))
-        self.assertEqual(
-            properties["context_kinds"]["const"], list(CONTEXT_KINDS)
-        )
-        self.assertEqual(
-            properties["context_scopes"]["const"], list(CONTEXT_SCOPES)
-        )
-        self.assertEqual(
-            properties["source_kinds"]["const"], list(SOURCE_KINDS)
-        )
-        self.assertEqual(
-            properties["source_locator_kinds"]["const"],
-            list(SOURCE_LOCATOR_KINDS),
-        )
-        self.assertEqual(
-            properties["claim_statuses"]["const"], list(CLAIM_STATUSES)
-        )
-        self.assertEqual(
-            properties["analysis_pattern_statuses"]["const"],
-            list(ANALYSIS_PATTERN_STATUSES),
-        )
-        definitions = schema["$defs"]
-        self.assertEqual(
-            set(definitions["evidence"]["enum"]), EVIDENCE_VALUES
-        )
-        self.assertEqual(
-            set(definitions["binding"]["properties"]["role"]["enum"]),
-            ROLES,
-        )
-        self.assertEqual(
-            set(
-                definitions["binding"]["properties"]["parameters"][
-                    "properties"
-                ]
-            ),
-            BINDING_PARAMETER_KEYS,
-        )
-        self.assertEqual(
-            set(
-                definitions["vocabulary"]["properties"]["completeness"][
-                    "enum"
-                ]
-            ),
-            VOCABULARY_COMPLETENESS,
-        )
-        self.assertEqual(
-            set(
-                definitions["vocabulary"]["properties"]["parsing"]["enum"]
-            ),
-            VOCABULARY_PARSING,
-        )
-        self.assertEqual(
-            set(definitions["key"]["properties"]["kind"]["enum"]),
-            KEY_KINDS,
-        )
-        self.assertEqual(
-            set(definitions["key"]["properties"]["uniqueness"]["enum"]),
-            KEY_UNIQUENESS,
-        )
-        self.assertEqual(
-            set(definitions["key"]["properties"]["completeness"]["enum"]),
-            KEY_COMPLETENESS,
-        )
-        self.assertEqual(
-            set(definitions["relationship"]["properties"]["kind"]["enum"]),
-            RELATIONSHIP_KINDS,
-        )
-        self.assertEqual(
-            set(
-                definitions["source_endpoint"]["properties"][
-                    "completeness"
-                ]["enum"]
-            ),
-            ENDPOINT_COMPLETENESS,
-        )
-        self.assertEqual(
-            set(definitions["cardinality_value"]["enum"]),
-            CARDINALITY_VALUES,
-        )
-        self.assertEqual(
-            set(definitions["context_source"]["properties"]),
-            _CONTEXT_SOURCE_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["clinical_context"]["properties"]),
-            _CLINICAL_CONTEXT_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["context_claim"]["properties"]),
-            _CONTEXT_CLAIM_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["context_table_reference"]["properties"]),
-            _CONTEXT_TABLE_REFERENCE_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["workflow_step"]["properties"]),
-            _WORKFLOW_STEP_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["analysis_pattern"]["properties"]),
-            _ANALYSIS_PATTERN_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["analysis_alternative"]["properties"]),
-            _ANALYSIS_ALTERNATIVE_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["analysis_decision"]["properties"]),
-            _ANALYSIS_DECISION_KEYS,
-        )
-        self.assertEqual(
-            set(definitions["prohibited_shortcut"]["properties"]),
-            _PROHIBITED_SHORTCUT_KEYS,
-        )
-        for definition in (
-            "context_source",
-            "clinical_context",
-            "context_claim",
-            "context_table_reference",
-            "workflow_step",
-            "analysis_pattern",
-            "analysis_alternative",
-            "analysis_decision",
-            "prohibited_shortcut",
-        ):
-            with self.subTest(definition=definition):
-                self.assertEqual(
-                    set(definitions[definition]["required"]),
-                    set(definitions[definition]["properties"]),
-                )
-        for definition, allowed, required in (
-            ("concept", _CONCEPT_KEYS, _CONCEPT_REQUIRED_KEYS),
-            ("binding", _BINDING_KEYS, _BINDING_REQUIRED_KEYS),
-            (
-                "vocabulary",
-                _VOCABULARY_KEYS,
-                _VOCABULARY_REQUIRED_KEYS,
-            ),
-        ):
-            with self.subTest(definition=definition):
-                self.assertEqual(
-                    set(definitions[definition]["properties"]), allowed
-                )
-                self.assertEqual(
-                    set(definitions[definition]["required"]), required
-                )
-
-    def test_phase_two_schema_strings_match_core_validation(self) -> None:
-        schema = json.loads(
-            (REPO_ROOT / "catalog/catalog.schema.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        definitions = schema["$defs"]
-        identifier_schemas = (
-            definitions["key"]["properties"]["id"],
-            definitions["table"]["properties"]["profile"],
-            definitions["relationship"]["properties"]["id"],
-            definitions["relationship"]["properties"]["profile"],
-        )
-        for identifier_schema in identifier_schemas:
-            pattern = identifier_schema["pattern"]
-            with self.subTest(pattern=pattern):
-                self.assertIsNotNone(re.search(pattern, "open-v2.valid_id"))
-                for invalid in ("open-v2.valid_id\n", "Open-v2", " "):
-                    self.assertIsNone(re.search(pattern, invalid))
-
-        nonblank_schemas = (
-            definitions["key"]["properties"]["caveats"]["items"],
-            definitions["table"]["properties"]["caveats"]["items"],
-            definitions["relationship"]["properties"]["caveats"]["items"],
-            definitions["relationship"]["properties"]["join_hazards"]["items"],
-        )
-        for string_schema in nonblank_schemas:
-            pattern = string_schema["pattern"]
-            with self.subTest(pattern=pattern):
-                self.assertIsNotNone(re.search(pattern, "Documented caveat."))
-                self.assertIsNone(re.search(pattern, " \t\n"))
+        self.assertTrue(repository_sources)
+        for identifier, source in repository_sources.items():
+            with self.subTest(source=identifier):
+                locator = Path(source["locator"])
+                self.assertFalse(locator.is_absolute())
+                self.assertNotEqual(locator, Path("catalog/catalog.json"))
+                self.assertTrue((REPO_ROOT / locator).is_file())
 
 
 if __name__ == "__main__":
