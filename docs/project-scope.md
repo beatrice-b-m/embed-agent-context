@@ -12,6 +12,8 @@ with EMBED clinical data. It should answer questions such as:
 - Which features concern pathology, demographics, social determinants of
   health, imaging, risk, or another controlled domain?
 - What does a released code mean, and what interpretation caveats apply?
+- How do relevant clinical or procedural processes relate to those features,
+  and which workflow or availability questions remain unresolved?
 
 The backbone is intended to support both open and non-open EMBED profiles.
 Dataset measurements are not feature definitions and do not belong in the
@@ -26,7 +28,7 @@ portable catalog.
 - normalized so one semantic concept can have many physical bindings;
 - explicit about evidence and unresolved interpretation;
 - queryable by stable identifiers, physical names, text, grain, table, feature
-  kind, and domain; and
+  kind, domain, clinical-context facets, and cited source; and
 - safe to extend with another profile without copying shared concepts.
 
 Markdown documents explain the implementation but are not parsed as feature
@@ -77,7 +79,8 @@ delimiter semantics are undocumented.
 The catalog loader, validator, exact lookup, and deterministic text/filter
 search use only the Python standard library. The search implementation is
 intentionally transparent and small; embeddings, a vector database, a search
-service, SQLite FTS, and fuzzy-matching dependencies are outside Phase 1.
+service, SQLite FTS, and fuzzy-matching dependencies remain outside the
+catalog core.
 
 The stdio MCP adapter is optional and adds one direct runtime integration
 dependency: the official MCP SDK. It must call the same core API as the CLI,
@@ -108,9 +111,22 @@ hazards rather than being promoted to foreign-key guarantees.
 
 ### 3. Clinical and procedural context
 
-Future work may explain imaging, reporting, assessment, risk, procedure, and
-pathology workflows where necessary for correct use. General clinical
-background must remain distinguishable from EMBED-specific behavior.
+Implemented as sourced, individually reviewable context claims. The initial
+context layer covers general screening and diagnostic workflow; the documented
+classic EMBED finding, procedure, and pathology-recording lifecycle; and
+open-v2 assessment, recommendation, linked-exam, multimodal-finding, pathology,
+report, risk, and temporal-availability interpretation.
+
+General clinical background, non-profile-specific EMBED documentation, and
+open-v2 representation are separate scopes. Workflow stages are ordered and
+backed by stable claim IDs. Each claim retains its review status and sources;
+unresolved follow-up, interval-cancer, screening-matching, modality-inclusion,
+temporal-availability, and pathology-interpretation policies remain unresolved
+rather than becoming defaults.
+
+This layer is descriptive and read-only. It does not perform joins, define
+cohorts, derive labels, exclude records, prescribe care, or replace a versioned
+data toolkit.
 
 ## Evidence and source priority
 
@@ -124,7 +140,9 @@ When sources disagree, use the following order:
 Public EMBED V1 material is not authoritative for V2 without verification.
 External material can supply general clinical context, but it cannot fill a
 dataset-specific gap as though the result were verified. Keep inference and
-unresolved meaning visible.
+unresolved meaning visible. Apply review state at claim level: catalog
+membership does not by itself make a statement authoritative, and a source
+conflict must remain traceable rather than being silently overwritten.
 
 ## Local source boundary
 
@@ -133,6 +151,14 @@ to construct and verify the `open-v2` profile. Source-profile validation may
 read Parquet footer schemas and the release legend. It must not copy clinical
 rows, identifiers, anonymized dates, report text, or empirical summaries into
 the catalog.
+
+The incomplete alpha context system and the Cortex knowledge-base notes are
+design and hazard-discovery inputs, not runtime dependencies or unreviewed
+clinical authorities. Alpha recipes and prose must not be copied into the
+catalog as executable V2 policy. Cortex governance informs the separation of
+definitions from ETL, version scope, claim-level provenance, and preservation
+of unresolved questions. Canonical claims still require portable sources at
+the applicable scope.
 
 ## Documentation synchronization
 
@@ -155,8 +181,14 @@ A catalog-context change is complete when it:
   directional cardinality, evidence, caveats, and join hazards;
 - reuses an existing concept or vocabulary whenever the meaning is shared;
 - keeps inference, missing-value ambiguity, and version caveats explicit;
+- gives each clinical or procedural claim a stable ID, review status,
+  applicable scope, and traceable source;
+- keeps general clinical context separate from EMBED-general and
+  profile-specific behavior;
+- preserves unresolved workflow and temporal policy as unresolved rather than
+  encoding an executable default;
 - adds no empirical dataset summary;
 - has focused synthetic tests for changed behavior and checked-in profile
-  integration assertions for required tables, key caveats, and expected
-  relationships; and
+  integration assertions for required tables, key caveats, expected
+  relationships, context inventory, source closure, and policy boundaries; and
 - includes synchronized documentation and a focused Git commit.

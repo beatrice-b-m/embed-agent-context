@@ -7559,6 +7559,1045 @@
       ]
     }
   ],
-  "sources": {},
-  "contexts": {}
+  "sources": {
+    "hitilab.embed.label-assignment.clinical-pathway": {
+      "title": "HITI Lab EMBED label-assignment clinical pathway",
+      "kind": "public_documentation",
+      "scope": "general_clinical",
+      "locator_kind": "url",
+      "locator": "https://docs.hitilab.com/datasets/embed/label-assignment#clinical-pathway",
+      "version_scope": "General breast-imaging pathway described in the public EMBED documentation; no open-v2 physical representation is asserted.",
+      "profiles": [],
+      "notes": [
+        "Use for general clinical background only.",
+        "The page's empirical proportions are outside this catalog's count-free scope."
+      ]
+    },
+    "hitilab.embed.overview.clinical-primer": {
+      "title": "HITI Lab EMBED mammography primer",
+      "kind": "public_documentation",
+      "scope": "general_clinical",
+      "locator_kind": "url",
+      "locator": "https://docs.hitilab.com/datasets/embed/overview#primer-on-mammography",
+      "version_scope": "General screening and diagnostic mammography background; no open-v2 physical representation is asserted.",
+      "profiles": [],
+      "notes": [
+        "Use for clinical pathway orientation, not clinical advice or cohort logic.",
+        "The page's empirical proportions are outside this catalog's count-free scope."
+      ]
+    },
+    "hitilab.embed.overview.pathology-attribution": {
+      "title": "HITI Lab EMBED pathology-recording note",
+      "kind": "public_documentation",
+      "scope": "embed_general",
+      "locator_kind": "url",
+      "locator": "https://docs.hitilab.com/datasets/embed/overview#special-note-pathology-results-in-clinical-data",
+      "version_scope": "Public EMBED documentation for the classic clinical-data representation; not verified as the open-v2 physical schema.",
+      "profiles": [],
+      "notes": [
+        "Use for documented EMBED recording provenance only.",
+        "Do not import the described row layout or a temporal matching algorithm into open-v2."
+      ]
+    },
+    "hitilab.embed.structure.public-representation": {
+      "title": "HITI Lab EMBED clinical and metadata hierarchy",
+      "kind": "public_documentation",
+      "scope": "embed_general",
+      "locator_kind": "url",
+      "locator": "https://docs.hitilab.com/datasets/embed/structure#clinicalmetadata-hierarchies",
+      "version_scope": "Public EMBED documentation for the classic clinical and image-metadata tables; not verified as the open-v2 physical schema.",
+      "profiles": [],
+      "notes": [
+        "Use for the documented finding and procedure distinction.",
+        "The two-table layout must not be treated as an open-v2 contract."
+      ]
+    },
+    "open-v2.catalog-linkage-review": {
+      "title": "Open-v2 catalog linkage review",
+      "kind": "supporting_internal",
+      "scope": "profile_specific",
+      "locator_kind": "repository_path",
+      "locator": "catalog/catalog.json",
+      "version_scope": "Schema-version-3 open-v2 table, key, relationship, and caveat declarations derived during Phase 2.",
+      "profiles": [
+        "open-v2"
+      ],
+      "notes": [
+        "This source records reviewed catalog conclusions, including unresolved relationship behavior.",
+        "It is not a substitute for maintainer confirmation of clinical workflow semantics."
+      ]
+    },
+    "open-v2.release-legend": {
+      "title": "EMBED V2 open-data clinical legend",
+      "kind": "release_legend",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "EMBEDv2-open-data-clinical-legend.csv",
+      "version_scope": "Legend distributed for the open-v2 clinical-table release.",
+      "profiles": [
+        "open-v2"
+      ],
+      "notes": [
+        "The legend supports released header and code meanings but is not assumed exhaustive.",
+        "Legend content does not establish temporal availability, row identity, or null semantics."
+      ]
+    },
+    "open-v2.release-schema": {
+      "title": "EMBED V2 open-data Parquet footer schemas",
+      "kind": "release_schema",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "open-v2 clinical table Parquet footer schemas",
+      "version_scope": "Physical columns, types, and schema nullability for the open-v2 clinical-table release.",
+      "profiles": [
+        "open-v2"
+      ],
+      "notes": [
+        "Footer schemas establish representation but not clinical values or empirical distributions.",
+        "The registered footer verification does not inspect clinical rows."
+      ]
+    }
+  },
+  "contexts": {
+    "clinical.screening-diagnostic-pathway": {
+      "title": "Screening and diagnostic breast-imaging pathway",
+      "kind": "clinical_workflow",
+      "scope": "general_clinical",
+      "profiles": [],
+      "summary": "Screening and diagnostic imaging serve different clinical roles, with tissue sampling and pathology entering later when indicated.",
+      "domains": [
+        "imaging",
+        "mammography",
+        "pathology",
+        "procedure",
+        "workflow"
+      ],
+      "search_terms": [
+        "screening pathway",
+        "diagnostic pathway",
+        "screening recall",
+        "symptomatic diagnostic",
+        "biopsy pathway"
+      ],
+      "related_concepts": [
+        "exam.mammography_type",
+        "imaging.assessment",
+        "pathology.biopsy_type",
+        "pathology.surgery_type"
+      ],
+      "related_tables": [],
+      "related_relationships": [],
+      "claims": [
+        {
+          "id": "screening-role",
+          "statement": "Screening mammography evaluates asymptomatic patients for findings that may require additional diagnostic evaluation.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.label-assignment.clinical-pathway",
+            "hitilab.embed.overview.clinical-primer"
+          ],
+          "caveats": [
+            "This clinical role does not identify an EMBED exam row or define a cohort."
+          ]
+        },
+        {
+          "id": "direct-diagnostic-entry",
+          "statement": "A symptomatic presentation may enter diagnostic imaging without a preceding screening examination.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.label-assignment.clinical-pathway",
+            "hitilab.embed.overview.clinical-primer"
+          ],
+          "caveats": [
+            "Absence of a linked screening record does not by itself prove that symptoms were present."
+          ]
+        },
+        {
+          "id": "assessment-guides-next-step",
+          "statement": "Diagnostic assessment may resolve a finding, support surveillance, or lead to a recommendation for tissue sampling.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.label-assignment.clinical-pathway",
+            "hitilab.embed.overview.clinical-primer"
+          ],
+          "caveats": [
+            "An assessment category is not interchangeable with pathology truth."
+          ]
+        },
+        {
+          "id": "pathology-follows-sampling",
+          "statement": "Pathology is produced after tissue sampling or surgery and may inform subsequent treatment or imaging.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.label-assignment.clinical-pathway",
+            "hitilab.embed.overview.clinical-primer"
+          ],
+          "caveats": [
+            "The statement supplies no universal timing window or treatment rule."
+          ]
+        }
+      ],
+      "workflow_steps": [
+        {
+          "id": "screening",
+          "label": "Screening imaging",
+          "claims": [
+            "screening-role"
+          ]
+        },
+        {
+          "id": "diagnostic-evaluation",
+          "label": "Diagnostic evaluation",
+          "claims": [
+            "direct-diagnostic-entry",
+            "assessment-guides-next-step"
+          ]
+        },
+        {
+          "id": "tissue-sampling",
+          "label": "Tissue sampling",
+          "claims": [
+            "pathology-follows-sampling"
+          ]
+        },
+        {
+          "id": "subsequent-care",
+          "label": "Subsequent care",
+          "claims": [
+            "pathology-follows-sampling"
+          ]
+        }
+      ],
+      "caveats": [
+        "This context is general clinical background and is not evidence that open-v2 rows form a complete or deterministic event sequence.",
+        "No follow-up interval, interval-cancer policy, outcome definition, or modality-inclusion rule is established."
+      ]
+    },
+    "embed.finding-procedure-recording": {
+      "title": "Public EMBED finding and procedure recording",
+      "kind": "data_representation",
+      "scope": "embed_general",
+      "profiles": [],
+      "summary": "Public EMBED documentation distinguishes radiologist-recorded findings from later procedure and pathology information in the classic clinical table.",
+      "domains": [
+        "imaging",
+        "pathology",
+        "procedure",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "finding procedure distinction",
+        "retroactive pathology",
+        "procedure duplication",
+        "manual pathology attribution",
+        "classic Magview"
+      ],
+      "related_concepts": [
+        "imaging.finding_number",
+        "pathology.procedure_date",
+        "pathology.report_date",
+        "pathology.biopsy_type"
+      ],
+      "related_tables": [],
+      "related_relationships": [],
+      "claims": [
+        {
+          "id": "finding-versus-procedure",
+          "statement": "The public classic-table documentation describes findings as radiologist-recorded observations and procedures as later events linked to a finding.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.structure.public-representation"
+          ],
+          "caveats": [
+            "This statement does not assert that open-v2 stores both entities in one row."
+          ]
+        },
+        {
+          "id": "multiple-procedures",
+          "statement": "In the documented classic representation, more than one linked procedure can repeat a finding while procedure details differ.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.structure.public-representation"
+          ],
+          "caveats": [
+            "Finding-row deduplication must not be transferred to open-v2 without profile-specific evidence."
+          ]
+        },
+        {
+          "id": "retroactive-attribution",
+          "statement": "Public EMBED documentation describes pathology as manually entered after a procedure and attributed back to the originating finding.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.overview.pathology-attribution"
+          ],
+          "caveats": [
+            "Manual attribution can be incomplete and is not a foreign-key guarantee."
+          ]
+        },
+        {
+          "id": "screening-attribution-gap",
+          "statement": "The public documentation warns that pathology may be recorded on a diagnostic study without corresponding attribution to an earlier screening study.",
+          "status": "reconciled",
+          "sources": [
+            "hitilab.embed.overview.pathology-attribution"
+          ],
+          "caveats": [
+            "No frequency, temporal window, or deterministic repair rule is established."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "This is EMBED-specific public background, but its classic two-table row layout is not authoritative for open-v2.",
+        "The context records provenance and hazards, not a pathology backfill algorithm."
+      ]
+    },
+    "open-v2.assessment-recommendation-context": {
+      "title": "Open-v2 assessment and recommendation context",
+      "kind": "interpretation_guardrail",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Assessment and recommendation are distinct finding-level fields whose clinical and temporal roles must not be collapsed.",
+      "domains": [
+        "imaging",
+        "mammography",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "BI-RADS assessment",
+        "asses",
+        "recommendation",
+        "assessment versus recommendation",
+        "temporal leakage"
+      ],
+      "related_concepts": [
+        "imaging.assessment",
+        "imaging.recommendation",
+        "exam.mammography_type"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "imaging_findings_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "combined_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.imaging_findings_anon.exam",
+        "open-v2.combined_anon.imaging_index_projection"
+      ],
+      "claims": [
+        {
+          "id": "separate-fields",
+          "statement": "Open-v2 represents imaging assessment and imaging recommendation as separate columns at imaging-finding grain.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend"
+          ],
+          "caveats": [
+            "Physical co-location does not make the fields semantically interchangeable."
+          ]
+        },
+        {
+          "id": "assessment-codes",
+          "statement": "The released assessment codes identify distinct BI-RADS states and must not be reduced to one simple ordinal scale.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-legend"
+          ],
+          "caveats": [
+            "Code membership alone does not establish workflow validity for a particular exam type."
+          ]
+        },
+        {
+          "id": "recommendation-composition",
+          "statement": "Recommendation strings may be composed, but delimiter, ordering, repetition, and exhaustiveness are unresolved.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-legend",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Preserve the source string rather than splitting it with an assumed grammar."
+          ]
+        },
+        {
+          "id": "wide-projection-boundary",
+          "statement": "The assessment and recommendation columns in combined_anon are convenience projections, not proof of value equality or contemporaneous availability.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Use the canonical imaging-finding binding when feature provenance matters."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "Do not derive an outcome label from assessment or recommendation without a declared task and temporal anchor.",
+        "Public pathway guidance does not establish that open-v2 rows form a complete screening-to-diagnostic sequence."
+      ]
+    },
+    "open-v2.linked-exam-context": {
+      "title": "Open-v2 linked-exam references",
+      "kind": "known_issue",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Linked accession fields describe optional references whose clinical meaning and referential coverage remain limited.",
+      "domains": [
+        "exam",
+        "identity",
+        "imaging",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "linked accession",
+        "linkedaccession_anon",
+        "linked study",
+        "dangling exam reference",
+        "comparison exam"
+      ],
+      "related_concepts": [
+        "exam.accession_identifier",
+        "imaging.linked_accession_identifier",
+        "imaging.linked_study_flag"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "imaging_findings_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "combined_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "exam_level_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.imaging_findings_anon.linked_exam",
+        "open-v2.combined_anon.linked_exam"
+      ],
+      "claims": [
+        {
+          "id": "optional-reference",
+          "statement": "A linked accession is an optional reference and is not guaranteed to resolve to an open-v2 exam row.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Treat accession identifiers as opaque and release-scoped."
+          ]
+        },
+        {
+          "id": "many-source-rows",
+          "statement": "Multiple imaging-finding or wide rows may reference the same linked exam, so joined exam attributes can repeat at the source grain.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "This is a row-multiplication hazard, not an empirical frequency claim."
+          ]
+        },
+        {
+          "id": "flag-equivalence",
+          "statement": "Row-wise equivalence between linked-study flag state and linked-accession presence is unresolved.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Do not use one field as a missing-value repair for the other."
+          ]
+        },
+        {
+          "id": "link-meaning",
+          "statement": "The clinical and temporal meaning of a linked accession is not established by the reference alone.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Do not assume that the reference identifies a prior, follow-up, or same-episode exam."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "Linked references describe relationship metadata and are not executable joins.",
+        "No screening-matching or follow-up-window policy is supplied."
+      ]
+    },
+    "open-v2.multimodal-finding-context": {
+      "title": "Open-v2 multimodal finding context",
+      "kind": "data_representation",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "The imaging-finding surface contains mammography, ultrasound, and MRI descriptor families without proving modality presence from descriptor nulls.",
+      "domains": [
+        "imaging",
+        "mammography",
+        "mri",
+        "ultrasound"
+      ],
+      "search_terms": [
+        "multimodal findings",
+        "mammography descriptors",
+        "ultrasound descriptors",
+        "MRI descriptors",
+        "not applicable null"
+      ],
+      "related_concepts": [
+        "exam.modality",
+        "mammography.mass_present",
+        "ultrasound.finding",
+        "mri.other_finding"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "exam_level_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "imaging_findings_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.imaging_findings_anon.exam"
+      ],
+      "claims": [
+        {
+          "id": "descriptor-families",
+          "statement": "Open-v2 imaging_findings_anon exposes distinct mammography, ultrasound, and MRI descriptor columns.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend"
+          ],
+          "caveats": [
+            "A shared table surface does not make modality-specific descriptors interchangeable."
+          ]
+        },
+        {
+          "id": "exam-modality",
+          "statement": "Exam modality is represented separately at exam grain and should remain distinct from individual descriptor fields.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend"
+          ],
+          "caveats": [
+            "Cross-field modality consistency has not been registered as a validated invariant."
+          ]
+        },
+        {
+          "id": "descriptor-null-semantics",
+          "statement": "A null modality-specific descriptor does not establish that the modality was absent or that the finding was negative.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Not-applicable, undocumented, and missing observations are not distinguished by the schema alone."
+          ]
+        },
+        {
+          "id": "modality-followup-policy",
+          "statement": "Whether ultrasound or MRI contributes to a task-specific follow-up outcome is unresolved and must not be inferred from column availability.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Executable modality-inclusion policy belongs outside the context catalog."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "Do not collapse modality-specific observations into one finding truth without a reviewed task policy.",
+        "The catalog describes representation and interpretation hazards, not imaging acquisition completeness."
+      ]
+    },
+    "open-v2.pathology-procedure-context": {
+      "title": "Open-v2 pathology and procedure context",
+      "kind": "data_representation",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Pathology findings carry procedure, report, surgery, diagnosis-slot, and severity fields with non-unique links back to imaging.",
+      "domains": [
+        "breast_side",
+        "imaging",
+        "pathology",
+        "procedure",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "pathology procedure lifecycle",
+        "biopsy result",
+        "pathology slots",
+        "pathology imaging linkage",
+        "path_severity"
+      ],
+      "related_concepts": [
+        "pathology.biopsy_type",
+        "pathology.diagnosis_code_slot",
+        "pathology.procedure_date",
+        "pathology.report_date",
+        "pathology.severity",
+        "pathology.surgery_type"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "pathology_findings_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "imaging_findings_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "side_level_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.pathology_findings_anon.exam",
+        "open-v2.pathology_findings_anon.imaging_finding",
+        "open-v2.pathology_findings_anon.side"
+      ],
+      "claims": [
+        {
+          "id": "separate-pathology-surface",
+          "statement": "Open-v2 stores pathology findings in a separate pathology-finding-grain table with procedure, report, surgery, and diagnosis fields.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend"
+          ],
+          "caveats": [
+            "The table grain does not establish a unique clinical row identity."
+          ]
+        },
+        {
+          "id": "imaging-link-tuple",
+          "statement": "The registered pathology-to-imaging association uses accession, finding side, and finding number, but is optional and can match multiple rows in either direction.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Joining can multiply rows and incomplete tuples require an explicit policy."
+          ]
+        },
+        {
+          "id": "finding-versus-biopsy-side",
+          "statement": "The side component of the registered imaging relationship is finding side, not biopsy side.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend"
+          ],
+          "caveats": [
+            "Do not substitute bside when following the declared table relationship."
+          ]
+        },
+        {
+          "id": "diagnosis-slot-order",
+          "statement": "Pathology diagnosis slots share a released code dictionary, but slot ordering, repetition, and secondary-finding semantics are unresolved.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "A slot number records physical position only."
+          ]
+        },
+        {
+          "id": "severity-meaning",
+          "statement": "Open-v2 pathology-severity code meanings, ordinality, derivation, and temporal availability remain unresolved.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Do not apply public or alpha severity thresholds as an open-v2 contract."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "Procedure and pathology information may postdate imaging and must not be treated as contemporaneous by default.",
+        "This context supplies no pathology aggregation, tie-breaking, or back-attribution algorithm."
+      ]
+    },
+    "open-v2.report-context": {
+      "title": "Open-v2 report lifecycle context",
+      "kind": "interpretation_guardrail",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Reports are separate records whose sequence, multiplicity, addendum relationship, and temporal interpretation remain only partly documented.",
+      "domains": [
+        "imaging",
+        "report",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "report lifecycle",
+        "report sequence",
+        "rseq",
+        "addendum",
+        "report multiplicity"
+      ],
+      "related_concepts": [
+        "imaging.addendum_flag",
+        "report.sequence",
+        "report.text"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "reports_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "exam_level_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "imaging_findings_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.reports_anon.exam",
+        "open-v2.reports_anon.patient"
+      ],
+      "claims": [
+        {
+          "id": "separate-report-surface",
+          "statement": "Open-v2 stores anonymized report text and a report-sequence-like field at report grain.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema"
+          ],
+          "caveats": [
+            "Report content was not read while authoring the catalog."
+          ]
+        },
+        {
+          "id": "natural-key-limit",
+          "statement": "No tested natural tuple uniquely identifies every report row in the registered open-v2 review.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "The technical export index is not a documented durable report identifier."
+          ]
+        },
+        {
+          "id": "sequence-meaning",
+          "statement": "Report-sequence chronology, zero semantics, and uniqueness within an accession are unresolved.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Do not select a final report by numeric sequence without a reviewed rule."
+          ]
+        },
+        {
+          "id": "addendum-link",
+          "statement": "The relationship between imaging addendum flags and individual report records is unresolved.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Do not infer that one flag identifies a particular report revision."
+          ]
+        },
+        {
+          "id": "finding-join-multiplication",
+          "statement": "Joining report rows to finding-grain tables by accession can multiply both report and finding rows.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Aggregate or select reports only under an explicit report policy."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "Original observations, revisions, addenda, and a final reported state must not be collapsed without evidence.",
+        "Treat report text as potentially sensitive and do not expose raw values through this context service."
+      ]
+    },
+    "open-v2.risk-context": {
+      "title": "Open-v2 risk-assessment context",
+      "kind": "interpretation_guardrail",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Risk outputs occupy a separate assessment grain, but their units, horizons, derivations, coverage, and timing require confirmation.",
+      "domains": [
+        "risk",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "risk assessment",
+        "IBIS risk",
+        "NCI risk",
+        "risk horizon",
+        "risk temporal availability"
+      ],
+      "related_concepts": [
+        "risk.ibis_lifetime",
+        "risk.ibis_ten_year",
+        "risk.nci_five_year",
+        "risk.nci_lifetime"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "risk_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "exam_level_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "patients_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.risk_anon.exam",
+        "open-v2.risk_anon.patient"
+      ],
+      "claims": [
+        {
+          "id": "separate-risk-surface",
+          "statement": "Open-v2 stores named IBIS and NCI numeric outputs at risk-assessment grain with patient, accession, and study-date references.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema"
+          ],
+          "caveats": [
+            "A released name is not a complete clinical definition."
+          ]
+        },
+        {
+          "id": "risk-semantics",
+          "statement": "The outcome, horizon, unit, derivation, and sentinel behavior of the registered risk outputs are unresolved unless explicitly stated in an individual concept caveat.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Do not infer a probability scale or comparable range from numeric physical type."
+          ]
+        },
+        {
+          "id": "exam-coverage",
+          "statement": "The risk-to-exam relationship is optional and does not establish that every exam has a risk record.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "No empirical coverage measurement belongs in this catalog."
+          ]
+        },
+        {
+          "id": "risk-availability",
+          "statement": "A risk row linked to an accession does not establish that the risk output was available when imaging was acquired or interpreted.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "A task-specific temporal anchor and maintainer confirmation are required."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "Risk output and BI-RADS assessment are different constructs and must not be substituted for one another.",
+        "No field is approved for modeling or release merely because it appears in risk_anon."
+      ]
+    },
+    "open-v2.temporal-availability-context": {
+      "title": "Open-v2 temporal availability guardrail",
+      "kind": "known_issue",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Dates and linked downstream records describe when events were recorded, but do not by themselves prove when information was available for a task.",
+      "domains": [
+        "imaging",
+        "pathology",
+        "procedure",
+        "report",
+        "risk",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "temporal availability",
+        "temporal leakage",
+        "task anchor",
+        "post-exam information",
+        "anonymized dates"
+      ],
+      "related_concepts": [
+        "exam.study_date",
+        "pathology.procedure_date",
+        "pathology.report_date",
+        "report.text",
+        "risk.ibis_ten_year"
+      ],
+      "related_tables": [
+        {
+          "profile": "open-v2",
+          "table": "exam_level_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "pathology_findings_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "reports_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "risk_anon"
+        },
+        {
+          "profile": "open-v2",
+          "table": "combined_anon"
+        }
+      ],
+      "related_relationships": [
+        "open-v2.pathology_findings_anon.exam",
+        "open-v2.reports_anon.exam",
+        "open-v2.risk_anon.exam",
+        "open-v2.combined_anon.pathology_index_projection"
+      ],
+      "claims": [
+        {
+          "id": "date-representation",
+          "statement": "Open-v2 exposes exam, procedure, and pathology-report date fields in separate clinical surfaces.",
+          "status": "verified",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend"
+          ],
+          "caveats": [
+            "Physical date representation does not prove preserved calendar or interval properties."
+          ]
+        },
+        {
+          "id": "anonymization-properties",
+          "statement": "Preserved ordering and interval properties for open-v2 anonymized dates are unresolved in the applicable release evidence.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Do not transfer date-shift guarantees from a different EMBED representation without verification."
+          ]
+        },
+        {
+          "id": "downstream-availability",
+          "statement": "Pathology, surgery, report revision, recommendation, and risk fields can encode information unavailable at an earlier imaging-time anchor.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.release-legend",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "Each task must define and validate its own availability boundary."
+          ]
+        },
+        {
+          "id": "wide-table-colocation",
+          "statement": "Co-location of fields in combined_anon does not establish that they were observed at the same clinical time.",
+          "status": "reconciled",
+          "sources": [
+            "open-v2.release-schema",
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "The wide table's construction remains unresolved."
+          ]
+        },
+        {
+          "id": "policy-boundaries",
+          "statement": "Canonical follow-up windows, negative confirmation, interval-cancer handling, screening matching, and ultrasound inclusion remain unresolved policies.",
+          "status": "unresolved",
+          "sources": [
+            "open-v2.catalog-linkage-review"
+          ],
+          "caveats": [
+            "The context catalog intentionally supplies no default values for these policies."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "This context identifies leakage and interpretation hazards; it does not implement temporal validation.",
+        "Executable cohort and label policies belong in versioned toolkit configuration after review."
+      ]
+    }
+  }
 }

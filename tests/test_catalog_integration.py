@@ -72,6 +72,100 @@ class CheckedInCatalogTests(unittest.TestCase):
                 result = self.catalog.get_relationship(relationship.id)
                 self.assertEqual(result["identifier"], relationship.id)
 
+    def test_phase_three_context_inventory_resolves_with_sources(self) -> None:
+        expected_contexts = {
+            "clinical.screening-diagnostic-pathway",
+            "embed.finding-procedure-recording",
+            "open-v2.assessment-recommendation-context",
+            "open-v2.linked-exam-context",
+            "open-v2.multimodal-finding-context",
+            "open-v2.pathology-procedure-context",
+            "open-v2.report-context",
+            "open-v2.risk-context",
+            "open-v2.temporal-availability-context",
+        }
+        self.assertEqual(set(self.catalog.contexts), expected_contexts)
+
+        cited_sources = set()
+        for context_id, context in self.catalog.contexts.items():
+            with self.subTest(context=context_id):
+                result = self.catalog.get_context(context_id)
+                self.assertEqual(result["identifier"], context_id)
+                claim_sources = {
+                    source_id
+                    for claim in context.claims
+                    for source_id in claim.sources
+                }
+                self.assertEqual(set(result["sources"]), claim_sources)
+                cited_sources.update(claim_sources)
+
+        self.assertEqual(cited_sources, set(self.catalog.sources))
+
+    def test_phase_three_context_keeps_scope_and_policy_boundaries(self) -> None:
+        self.assertEqual(
+            {context.scope for context in self.catalog.contexts.values()},
+            {"general_clinical", "embed_general", "profile_specific"},
+        )
+        statuses = {
+            claim.status
+            for context in self.catalog.contexts.values()
+            for claim in context.claims
+        }
+        self.assertTrue({"verified", "reconciled", "unresolved"} <= statuses)
+
+        for context in self.catalog.contexts.values():
+            if context.scope == "profile_specific":
+                continue
+            with self.subTest(context=context.id):
+                self.assertFalse(context.related_tables)
+                self.assertFalse(context.related_relationships)
+
+        temporal = self.catalog.get_context(
+            "open-v2.temporal-availability-context"
+        )["context"]
+        claims = {claim["id"]: claim for claim in temporal["claims"]}
+        policy = claims["policy-boundaries"]
+        self.assertEqual(policy["status"], "unresolved")
+        for term in (
+            "follow-up windows",
+            "interval-cancer",
+            "screening matching",
+            "ultrasound inclusion",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, policy["statement"])
+
+    def test_phase_three_requirement_level_context_queries(self) -> None:
+        temporal = self.catalog.search_contexts("temporal leakage")
+        self.assertIn(
+            "open-v2.temporal-availability-context",
+            {
+                match["identifier"]
+                for match in temporal["matches"]
+            },
+        )
+
+        pathology = self.catalog.search_contexts(
+            "",
+            profile="open-v2",
+            domain="pathology",
+            status="unresolved",
+        )
+        self.assertGreater(pathology["total"], 0)
+        self.assertTrue(
+            all(
+                match["profiles"] == ["open-v2"]
+                for match in pathology["matches"]
+            )
+        )
+        self.assertTrue(
+            all(
+                claim["status"] == "unresolved"
+                for match in pathology["matches"]
+                for claim in match["matching_claims"]
+            )
+        )
+
     def test_open_v2_relationship_inventory_is_complete(self) -> None:
         expected = {
             "open-v2.combined_anon.exam_projection",
