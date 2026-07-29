@@ -139,6 +139,37 @@ class CatalogLoaderTests(unittest.TestCase):
                 ):
                     self.load(data)
 
+    def test_cardinality_requires_unique_key_on_the_one_side(self) -> None:
+        data = synthetic_catalog()
+        data["relationships"] = [
+            {
+                "id": "synthetic.nonunique_source",
+                "profile": "open-v2",
+                "kind": "projection",
+                "source": {
+                    "table": "combined_anon",
+                    "columns": ["tissueden"],
+                    "completeness": "unknown",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["tissueden"],
+                },
+                "cardinality": {
+                    "targets_per_source": "unknown",
+                    "sources_per_target": "zero_or_one",
+                },
+                "evidence": ["inference"],
+                "caveats": [],
+                "join_hazards": [],
+            }
+        ]
+
+        with self.assertRaisesRegex(
+            CatalogValidationError, "source columns.*unique key"
+        ):
+            self.load(data)
+
     def test_rejects_duplicate_json_object_keys(self) -> None:
         serialized = json.dumps(synthetic_catalog())
         serialized = serialized.replace(

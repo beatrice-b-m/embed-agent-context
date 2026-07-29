@@ -1637,6 +1637,17 @@ def _validate_relationship(
                 f"relationship {relationship.id!r} claims at most one target "
                 "but its target columns are not a documented unique key"
             )
+    if relationship.sources_per_target in {"exactly_one", "zero_or_one"}:
+        source = table_specs[source_key]
+        if not any(
+            key.columns == relationship.source.columns
+            and key.uniqueness == "unique"
+            for key in source.keys
+        ):
+            raise CatalogValidationError(
+                f"relationship {relationship.id!r} claims at most one source "
+                "but its source columns are not a documented unique key"
+            )
 
 
 def _validate_hierarchy_acyclic(

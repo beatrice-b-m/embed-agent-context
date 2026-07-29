@@ -127,8 +127,9 @@ different claims and must not be substituted for one another.
 Every table declaration and relationship endpoint must resolve to bindings in
 the same profile. Ordered endpoint tuples must have equal arity and compatible
 physical types. A relationship claiming at most one target must point to a
-candidate key documented as unique. Only hierarchy edges must be acyclic;
-reference and projection edges may legitimately form cycles.
+candidate key documented as unique; the reciprocal at-most-one-source claim
+requires a unique source key. Only hierarchy edges must be acyclic; reference
+and projection edges may legitimately form cycles.
 
 The default source-profile verifier remains footer-only. It verifies the
 physical table and column surface through bindings but does not scan clinical
