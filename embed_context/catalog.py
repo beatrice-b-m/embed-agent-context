@@ -17,7 +17,7 @@ from typing import Any
 
 
 SCHEMA_REFERENCE = "./catalog.schema.json"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 GRAINS = (
     "patient",
     "exam",
@@ -57,6 +57,36 @@ DOMAINS = (
     "temporal",
     "workflow",
     "technical",
+)
+CONTEXT_KINDS = (
+    "clinical_workflow",
+    "data_representation",
+    "interpretation_guardrail",
+    "known_issue",
+)
+CONTEXT_SCOPES = (
+    "general_clinical",
+    "embed_general",
+    "profile_specific",
+)
+SOURCE_KINDS = (
+    "maintainer_confirmed",
+    "release_schema",
+    "release_legend",
+    "supporting_internal",
+    "public_documentation",
+)
+SOURCE_LOCATOR_KINDS = (
+    "url",
+    "repository_path",
+    "logical_artifact",
+)
+CLAIM_STATUSES = (
+    "verified",
+    "reconciled",
+    "unverified",
+    "unresolved",
+    "contradicted",
 )
 EVIDENCE_VALUES = frozenset(
     {
@@ -115,11 +145,18 @@ _TOP_LEVEL_KEYS = frozenset(
         "grains",
         "feature_kinds",
         "domains",
+        "context_kinds",
+        "context_scopes",
+        "source_kinds",
+        "source_locator_kinds",
+        "claim_statuses",
         "concepts",
         "bindings",
         "vocabularies",
         "tables",
         "relationships",
+        "sources",
+        "contexts",
     }
 )
 _CATALOG_ENVELOPE_KEYS = frozenset({"$schema", "schema_version"})
@@ -186,6 +223,41 @@ _TARGET_ENDPOINT_KEYS = frozenset({"table", "columns"})
 _CARDINALITY_KEYS = frozenset(
     {"targets_per_source", "sources_per_target"}
 )
+_CONTEXT_SOURCE_KEYS = frozenset(
+    {
+        "title",
+        "kind",
+        "scope",
+        "locator_kind",
+        "locator",
+        "version_scope",
+        "profiles",
+        "notes",
+    }
+)
+_CLINICAL_CONTEXT_KEYS = frozenset(
+    {
+        "title",
+        "kind",
+        "scope",
+        "profiles",
+        "summary",
+        "domains",
+        "search_terms",
+        "related_concepts",
+        "related_tables",
+        "related_relationships",
+        "claims",
+        "workflow_steps",
+        "caveats",
+    }
+)
+_CONTEXT_TABLE_REFERENCE_KEYS = frozenset({"profile", "table"})
+_CONTEXT_CLAIM_KEYS = frozenset(
+    {"id", "statement", "status", "sources", "caveats"}
+)
+_WORKFLOW_STEP_KEYS = frozenset({"id", "label", "claims"})
+
 
 class CatalogError(Exception):
     """Base class for catalog failures safe to present to a caller."""
@@ -406,6 +478,130 @@ class Relationship:
 
 
 @dataclass(frozen=True, slots=True)
+class ContextSource:
+    """One traceable source with an explicit version and profile boundary."""
+
+    id: str
+    title: str
+    kind: str
+    scope: str
+    locator_kind: str
+    locator: str
+    version_scope: str
+    profiles: tuple[str, ...]
+    notes: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "kind": self.kind,
+            "scope": self.scope,
+            "locator_kind": self.locator_kind,
+            "locator": self.locator,
+            "version_scope": self.version_scope,
+            "profiles": list(self.profiles),
+            "notes": list(self.notes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ContextTableReference:
+    """One profile-qualified physical table related to a context record."""
+
+    profile: str
+    table: str
+
+    @property
+    def identifier(self) -> str:
+        return f"{self.profile}:{self.table}"
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "profile": self.profile,
+            "table": self.table,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ContextClaim:
+    """One reviewable clinical or procedural statement and its provenance."""
+
+    id: str
+    statement: str
+    status: str
+    sources: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "statement": self.statement,
+            "status": self.status,
+            "sources": list(self.sources),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowStep:
+    """One ordered workflow stage backed by one or more context claims."""
+
+    id: str
+    label: str
+    claims: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "claims": list(self.claims),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicalContext:
+    """A sourced context record kept distinct from feature definitions."""
+
+    id: str
+    title: str
+    kind: str
+    scope: str
+    profiles: tuple[str, ...]
+    summary: str
+    domains: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    related_concepts: tuple[str, ...]
+    related_tables: tuple[ContextTableReference, ...]
+    related_relationships: tuple[str, ...]
+    claims: tuple[ContextClaim, ...]
+    workflow_steps: tuple[WorkflowStep, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "kind": self.kind,
+            "scope": self.scope,
+            "profiles": list(self.profiles),
+            "summary": self.summary,
+            "domains": list(self.domains),
+            "search_terms": list(self.search_terms),
+            "related_concepts": list(self.related_concepts),
+            "related_tables": [
+                table.to_dict() for table in self.related_tables
+            ],
+            "related_relationships": list(self.related_relationships),
+            "claims": [claim.to_dict() for claim in self.claims],
+            "workflow_steps": [
+                step.to_dict() for step in self.workflow_steps
+            ],
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class _BindingSearchDocument:
     binding: Binding
     identifier_text: str
@@ -435,6 +631,8 @@ class Catalog:
         "_vocabularies",
         "_tables",
         "_relationships",
+        "_sources",
+        "_contexts",
         "_tables_by_qualified",
         "_relationships_by_id",
         "_by_physical",
@@ -454,6 +652,8 @@ class Catalog:
         vocabularies: Mapping[str, Vocabulary],
         tables: tuple[TableSpec, ...],
         relationships: tuple[Relationship, ...],
+        sources: Mapping[str, ContextSource],
+        contexts: Mapping[str, ClinicalContext],
     ) -> None:
         object.__setattr__(self, "_schema_version", schema_version)
         object.__setattr__(self, "_profiles", profiles)
@@ -468,6 +668,12 @@ class Catalog:
         )
         object.__setattr__(self, "_tables", tables)
         object.__setattr__(self, "_relationships", relationships)
+        object.__setattr__(
+            self, "_sources", MappingProxyType(dict(sorted(sources.items())))
+        )
+        object.__setattr__(
+            self, "_contexts", MappingProxyType(dict(sorted(contexts.items())))
+        )
         object.__setattr__(
             self,
             "_tables_by_qualified",
@@ -538,6 +744,26 @@ class Catalog:
         return DOMAINS
 
     @property
+    def context_kinds(self) -> tuple[str, ...]:
+        return CONTEXT_KINDS
+
+    @property
+    def context_scopes(self) -> tuple[str, ...]:
+        return CONTEXT_SCOPES
+
+    @property
+    def source_kinds(self) -> tuple[str, ...]:
+        return SOURCE_KINDS
+
+    @property
+    def source_locator_kinds(self) -> tuple[str, ...]:
+        return SOURCE_LOCATOR_KINDS
+
+    @property
+    def claim_statuses(self) -> tuple[str, ...]:
+        return CLAIM_STATUSES
+
+    @property
     def concepts(self) -> Mapping[str, Concept]:
         return self._concepts
 
@@ -556,6 +782,14 @@ class Catalog:
     @property
     def relationships(self) -> tuple[Relationship, ...]:
         return self._relationships
+
+    @property
+    def sources(self) -> Mapping[str, ContextSource]:
+        return self._sources
+
+    @property
+    def contexts(self) -> Mapping[str, ClinicalContext]:
+        return self._contexts
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> Catalog:
@@ -587,6 +821,23 @@ class Catalog:
             data["feature_kinds"], FEATURE_KINDS, "$.feature_kinds"
         )
         _require_constant_array(data["domains"], DOMAINS, "$.domains")
+        _require_constant_array(
+            data["context_kinds"], CONTEXT_KINDS, "$.context_kinds"
+        )
+        _require_constant_array(
+            data["context_scopes"], CONTEXT_SCOPES, "$.context_scopes"
+        )
+        _require_constant_array(
+            data["source_kinds"], SOURCE_KINDS, "$.source_kinds"
+        )
+        _require_constant_array(
+            data["source_locator_kinds"],
+            SOURCE_LOCATOR_KINDS,
+            "$.source_locator_kinds",
+        )
+        _require_constant_array(
+            data["claim_statuses"], CLAIM_STATUSES, "$.claim_statuses"
+        )
 
         raw_concepts = _expect_mapping(data["concepts"], "$.concepts")
         if not raw_concepts:
@@ -629,6 +880,20 @@ class Catalog:
             _parse_relationship(raw, index, frozenset(profiles))
             for index, raw in enumerate(raw_relationships)
         ]
+        raw_sources = _expect_mapping(data["sources"], "$.sources")
+        sources: dict[str, ContextSource] = {}
+        for source_id, raw_source in raw_sources.items():
+            _require_identifier(source_id, f"$.sources key {source_id!r}")
+            sources[source_id] = _parse_context_source(
+                source_id, raw_source, frozenset(profiles)
+            )
+        raw_contexts = _expect_mapping(data["contexts"], "$.contexts")
+        contexts: dict[str, ClinicalContext] = {}
+        for context_id, raw_context in raw_contexts.items():
+            _require_identifier(context_id, f"$.contexts key {context_id!r}")
+            contexts[context_id] = _parse_clinical_context(
+                context_id, raw_context, frozenset(profiles)
+            )
 
         for concept in concepts.values():
             if (
@@ -772,6 +1037,30 @@ class Catalog:
                 relationship, bindings_by_table, table_specs
             )
         _validate_hierarchy_acyclic(relationships)
+        context_collisions = sorted(
+            set(contexts)
+            & (
+                set(concepts)
+                | set(vocabularies)
+                | relationship_ids
+                | set(sources)
+            )
+        )
+        if context_collisions:
+            raise CatalogValidationError(
+                "context IDs collide with another catalog namespace: "
+                + ", ".join(context_collisions)
+            )
+        _validate_context_references(
+            contexts=contexts,
+            sources=sources,
+            concepts=concepts,
+            bindings=bindings,
+            table_specs=table_specs,
+            relationships={
+                relationship.id: relationship for relationship in relationships
+            },
+        )
 
         ordered_bindings = tuple(
             sorted(
@@ -796,6 +1085,8 @@ class Catalog:
             relationships=tuple(
                 sorted(relationships, key=lambda item: item.id)
             ),
+            sources=sources,
+            contexts=contexts,
         )
 
     def summary(self) -> dict[str, Any]:
@@ -805,11 +1096,18 @@ class Catalog:
             "grains": list(self.grains),
             "feature_kinds": list(self.feature_kinds),
             "domains": list(self.domains),
+            "context_kinds": list(self.context_kinds),
+            "context_scopes": list(self.context_scopes),
+            "source_kinds": list(self.source_kinds),
+            "source_locator_kinds": list(self.source_locator_kinds),
+            "claim_statuses": list(self.claim_statuses),
             "concepts": len(self.concepts),
             "bindings": len(self.bindings),
             "vocabularies": len(self.vocabularies),
             "tables": len(self.tables),
             "relationships": len(self.relationships),
+            "sources": len(self.sources),
+            "contexts": len(self.contexts),
         }
 
     def get_table(self, profile: str, table: str) -> dict[str, Any]:
@@ -1566,6 +1864,282 @@ def _parse_relationship(
     )
 
 
+def _parse_context_source(
+    source_id: str,
+    value: object,
+    profiles: frozenset[str],
+) -> ContextSource:
+    path = f"$.sources.{source_id}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _CONTEXT_SOURCE_KEYS, _CONTEXT_SOURCE_KEYS, path
+    )
+    kind = _controlled_string(data["kind"], f"{path}.kind", SOURCE_KINDS)
+    scope = _controlled_string(
+        data["scope"], f"{path}.scope", CONTEXT_SCOPES
+    )
+    source_profiles = _string_array(
+        data["profiles"], f"{path}.profiles", identifier=True
+    )
+    unknown_profiles = sorted(set(source_profiles) - profiles)
+    if unknown_profiles:
+        raise CatalogValidationError(
+            f"{path}.profiles references unknown profiles: "
+            + ", ".join(unknown_profiles)
+        )
+    if (scope == "profile_specific") != bool(source_profiles):
+        requirement = (
+            "at least one profile"
+            if scope == "profile_specific"
+            else "an empty profile list"
+        )
+        raise CatalogValidationError(
+            f"{path}.profiles must contain {requirement} for scope {scope!r}"
+        )
+    if kind in {"release_schema", "release_legend"} and not source_profiles:
+        raise CatalogValidationError(
+            f"{path}.profiles must identify the release profile for "
+            f"source kind {kind!r}"
+        )
+    locator_kind = _controlled_string(
+        data["locator_kind"],
+        f"{path}.locator_kind",
+        SOURCE_LOCATOR_KINDS,
+    )
+    locator = _nonempty_string(data["locator"], f"{path}.locator")
+    if locator_kind == "url" and not locator.startswith("https://"):
+        raise CatalogValidationError(
+            f"{path}.locator must be an https URL for locator kind 'url'"
+        )
+    if locator_kind == "repository_path":
+        locator_path = Path(locator)
+        if locator_path.is_absolute() or ".." in locator_path.parts:
+            raise CatalogValidationError(
+                f"{path}.locator must be a repository-relative path "
+                "without parent traversal"
+            )
+    return ContextSource(
+        id=source_id,
+        title=_nonempty_string(data["title"], f"{path}.title"),
+        kind=kind,
+        scope=scope,
+        locator_kind=locator_kind,
+        locator=locator,
+        version_scope=_nonempty_string(
+            data["version_scope"], f"{path}.version_scope"
+        ),
+        profiles=source_profiles,
+        notes=_string_array(data["notes"], f"{path}.notes"),
+    )
+
+
+def _parse_clinical_context(
+    context_id: str,
+    value: object,
+    profiles: frozenset[str],
+) -> ClinicalContext:
+    path = f"$.contexts.{context_id}"
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _CLINICAL_CONTEXT_KEYS, _CLINICAL_CONTEXT_KEYS, path
+    )
+    kind = _controlled_string(
+        data["kind"], f"{path}.kind", CONTEXT_KINDS
+    )
+    scope = _controlled_string(
+        data["scope"], f"{path}.scope", CONTEXT_SCOPES
+    )
+    context_profiles = _string_array(
+        data["profiles"], f"{path}.profiles", identifier=True
+    )
+    unknown_profiles = sorted(set(context_profiles) - profiles)
+    if unknown_profiles:
+        raise CatalogValidationError(
+            f"{path}.profiles references unknown profiles: "
+            + ", ".join(unknown_profiles)
+        )
+    if (scope == "profile_specific") != bool(context_profiles):
+        requirement = (
+            "at least one profile"
+            if scope == "profile_specific"
+            else "an empty profile list"
+        )
+        raise CatalogValidationError(
+            f"{path}.profiles must contain {requirement} for scope {scope!r}"
+        )
+
+    domains = _string_array(
+        data["domains"], f"{path}.domains", minimum=1
+    )
+    unknown_domains = sorted(set(domains) - set(DOMAINS))
+    if unknown_domains:
+        raise CatalogValidationError(
+            f"{path}.domains contains unknown values: "
+            + ", ".join(unknown_domains)
+        )
+    related_concepts = _string_array(
+        data["related_concepts"],
+        f"{path}.related_concepts",
+        identifier=True,
+    )
+    related_relationships = _string_array(
+        data["related_relationships"],
+        f"{path}.related_relationships",
+        identifier=True,
+    )
+    raw_related_tables = _expect_list(
+        data["related_tables"], f"{path}.related_tables"
+    )
+    related_tables: list[ContextTableReference] = []
+    seen_tables: set[str] = set()
+    for index, raw_table in enumerate(raw_related_tables):
+        table_path = f"{path}.related_tables[{index}]"
+        table_data = _expect_mapping(raw_table, table_path)
+        _require_exact_keys(
+            table_data,
+            _CONTEXT_TABLE_REFERENCE_KEYS,
+            _CONTEXT_TABLE_REFERENCE_KEYS,
+            table_path,
+        )
+        reference = ContextTableReference(
+            profile=_controlled_identifier(
+                table_data["profile"], f"{table_path}.profile", profiles
+            ),
+            table=_physical_component(
+                table_data["table"], f"{table_path}.table"
+            ),
+        )
+        if reference.identifier in seen_tables:
+            raise CatalogValidationError(
+                f"{path}.related_tables contains duplicate "
+                f"{reference.identifier!r}"
+            )
+        seen_tables.add(reference.identifier)
+        related_tables.append(reference)
+    if scope != "profile_specific" and (
+        related_tables or related_relationships
+    ):
+        raise CatalogValidationError(
+            f"{path} may reference physical tables and relationships only "
+            "when scope is 'profile_specific'"
+        )
+
+    raw_claims = _expect_list(data["claims"], f"{path}.claims")
+    if not raw_claims:
+        raise CatalogValidationError(f"{path}.claims must not be empty")
+    claims = tuple(
+        _parse_context_claim(raw_claim, f"{path}.claims[{index}]")
+        for index, raw_claim in enumerate(raw_claims)
+    )
+    claim_ids = [claim.id for claim in claims]
+    if len(claim_ids) != len(set(claim_ids)):
+        raise CatalogValidationError(
+            f"{path}.claims contains duplicate claim IDs"
+        )
+    statements = [claim.statement for claim in claims]
+    if len(statements) != len(set(statements)):
+        raise CatalogValidationError(
+            f"{path}.claims contains duplicate statements"
+        )
+
+    raw_steps = _expect_list(
+        data["workflow_steps"], f"{path}.workflow_steps"
+    )
+    workflow_steps = tuple(
+        _parse_workflow_step(raw_step, f"{path}.workflow_steps[{index}]")
+        for index, raw_step in enumerate(raw_steps)
+    )
+    if kind == "clinical_workflow" and len(workflow_steps) < 2:
+        raise CatalogValidationError(
+            f"{path}.workflow_steps must contain at least two ordered "
+            "stages for a clinical workflow"
+        )
+    if kind != "clinical_workflow" and workflow_steps:
+        raise CatalogValidationError(
+            f"{path}.workflow_steps must be empty unless kind is "
+            "'clinical_workflow'"
+        )
+    step_ids = [step.id for step in workflow_steps]
+    if len(step_ids) != len(set(step_ids)):
+        raise CatalogValidationError(
+            f"{path}.workflow_steps contains duplicate step IDs"
+        )
+    unknown_step_claims = sorted(
+        {
+            claim_id
+            for step in workflow_steps
+            for claim_id in step.claims
+            if claim_id not in set(claim_ids)
+        }
+    )
+    if unknown_step_claims:
+        raise CatalogValidationError(
+            f"{path}.workflow_steps references unknown claims: "
+            + ", ".join(unknown_step_claims)
+        )
+
+    return ClinicalContext(
+        id=context_id,
+        title=_nonempty_string(data["title"], f"{path}.title"),
+        kind=kind,
+        scope=scope,
+        profiles=context_profiles,
+        summary=_nonempty_string(data["summary"], f"{path}.summary"),
+        domains=domains,
+        search_terms=_string_array(
+            data["search_terms"], f"{path}.search_terms", minimum=1
+        ),
+        related_concepts=related_concepts,
+        related_tables=tuple(related_tables),
+        related_relationships=related_relationships,
+        claims=claims,
+        workflow_steps=workflow_steps,
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_context_claim(value: object, path: str) -> ContextClaim:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _CONTEXT_CLAIM_KEYS, _CONTEXT_CLAIM_KEYS, path
+    )
+    claim_id = _nonempty_string(data["id"], f"{path}.id")
+    _require_identifier(claim_id, f"{path}.id")
+    return ContextClaim(
+        id=claim_id,
+        statement=_nonempty_string(data["statement"], f"{path}.statement"),
+        status=_controlled_string(
+            data["status"], f"{path}.status", CLAIM_STATUSES
+        ),
+        sources=_string_array(
+            data["sources"],
+            f"{path}.sources",
+            minimum=1,
+            identifier=True,
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+    )
+
+
+def _parse_workflow_step(value: object, path: str) -> WorkflowStep:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _WORKFLOW_STEP_KEYS, _WORKFLOW_STEP_KEYS, path
+    )
+    step_id = _nonempty_string(data["id"], f"{path}.id")
+    _require_identifier(step_id, f"{path}.id")
+    return WorkflowStep(
+        id=step_id,
+        label=_nonempty_string(data["label"], f"{path}.label"),
+        claims=_string_array(
+            data["claims"],
+            f"{path}.claims",
+            minimum=1,
+            identifier=True,
+        ),
+    )
+
+
 def _parse_source_endpoint(
     value: object, path: str
 ) -> RelationshipEndpoint:
@@ -1690,6 +2264,141 @@ def _validate_relationship(
                 f"relationship {relationship.id!r} claims at most one source "
                 "but its source columns are not a documented unique key"
             )
+
+
+def _validate_context_references(
+    *,
+    contexts: Mapping[str, ClinicalContext],
+    sources: Mapping[str, ContextSource],
+    concepts: Mapping[str, Concept],
+    bindings: Sequence[Binding],
+    table_specs: Mapping[tuple[str, str], TableSpec],
+    relationships: Mapping[str, Relationship],
+) -> None:
+    concept_profiles: defaultdict[str, set[str]] = defaultdict(set)
+    for binding in bindings:
+        concept_profiles[binding.concept].add(binding.profile)
+
+    authoritative_profile_source_kinds = {
+        "maintainer_confirmed",
+        "release_schema",
+        "release_legend",
+    }
+    for context in contexts.values():
+        path = f"$.contexts.{context.id}"
+        if not (
+            context.related_concepts
+            or context.related_tables
+            or context.related_relationships
+        ):
+            raise CatalogValidationError(
+                f"{path} must reference at least one concept, table, or "
+                "relationship"
+            )
+        missing_concepts = sorted(
+            set(context.related_concepts) - set(concepts)
+        )
+        if missing_concepts:
+            raise CatalogValidationError(
+                f"{path}.related_concepts references unknown concepts: "
+                + ", ".join(missing_concepts)
+            )
+        if context.scope == "profile_specific":
+            for concept_id in context.related_concepts:
+                if not (
+                    concept_profiles[concept_id] & set(context.profiles)
+                ):
+                    raise CatalogValidationError(
+                        f"{path}.related_concepts references concept "
+                        f"{concept_id!r} with no binding in context profiles"
+                    )
+
+        for table in context.related_tables:
+            table_key = (table.profile, table.table)
+            if table_key not in table_specs:
+                raise CatalogValidationError(
+                    f"{path}.related_tables references unknown table "
+                    f"{table.identifier!r}"
+                )
+            if table.profile not in context.profiles:
+                raise CatalogValidationError(
+                    f"{path}.related_tables references table "
+                    f"{table.identifier!r} outside context profiles"
+                )
+
+        for relationship_id in context.related_relationships:
+            relationship = relationships.get(relationship_id)
+            if relationship is None:
+                raise CatalogValidationError(
+                    f"{path}.related_relationships references unknown "
+                    f"relationship {relationship_id!r}"
+                )
+            if relationship.profile not in context.profiles:
+                raise CatalogValidationError(
+                    f"{path}.related_relationships references relationship "
+                    f"{relationship_id!r} outside context profiles"
+                )
+
+        for claim in context.claims:
+            claim_path = f"{path}.claims.{claim.id}"
+            missing_sources = sorted(set(claim.sources) - set(sources))
+            if missing_sources:
+                raise CatalogValidationError(
+                    f"{claim_path}.sources references unknown sources: "
+                    + ", ".join(missing_sources)
+                )
+            claim_sources = [sources[source_id] for source_id in claim.sources]
+            if context.scope != "profile_specific":
+                incompatible = sorted(
+                    source.id
+                    for source in claim_sources
+                    if source.scope != context.scope
+                )
+                if incompatible:
+                    raise CatalogValidationError(
+                        f"{claim_path}.sources has scope incompatible with "
+                        f"context scope {context.scope!r}: "
+                        + ", ".join(incompatible)
+                    )
+            else:
+                for source in claim_sources:
+                    if source.scope != "profile_specific":
+                        continue
+                    if not set(context.profiles).issubset(source.profiles):
+                        raise CatalogValidationError(
+                            f"{claim_path}.sources references profile source "
+                            f"{source.id!r} outside context profiles"
+                        )
+                if claim.status == "verified" and not any(
+                    source.scope == "profile_specific"
+                    and source.kind in authoritative_profile_source_kinds
+                    and set(context.profiles).issubset(source.profiles)
+                    for source in claim_sources
+                ):
+                    raise CatalogValidationError(
+                        f"{claim_path} is verified but has no applicable "
+                        "maintainer, release-schema, or release-legend source"
+                    )
+            if claim.status == "contradicted" and len(claim.sources) < 2:
+                raise CatalogValidationError(
+                    f"{claim_path} is contradicted and must cite at least "
+                    "two sources"
+                )
+
+        if context.kind == "clinical_workflow":
+            referenced_claims = {
+                claim_id
+                for step in context.workflow_steps
+                for claim_id in step.claims
+            }
+            unplaced_claims = sorted(
+                {claim.id for claim in context.claims} - referenced_claims
+            )
+            if unplaced_claims:
+                raise CatalogValidationError(
+                    f"{path}.workflow_steps does not place claims: "
+                    + ", ".join(unplaced_claims)
+                )
 
 
 def _validate_hierarchy_acyclic(

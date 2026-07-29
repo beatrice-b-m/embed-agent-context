@@ -14,7 +14,16 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from embed_context.catalog import DOMAINS, FEATURE_KINDS, GRAINS
+from embed_context.catalog import (
+    CLAIM_STATUSES,
+    CONTEXT_KINDS,
+    CONTEXT_SCOPES,
+    DOMAINS,
+    FEATURE_KINDS,
+    GRAINS,
+    SOURCE_KINDS,
+    SOURCE_LOCATOR_KINDS,
+)
 from scripts.validate_source_profile import (
     ProfileValidationError,
     main,
@@ -63,11 +72,16 @@ class SourceProfileVerifierTests(unittest.TestCase):
             json.dumps(
                 {
                     "$schema": "./catalog.schema.json",
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "profiles": profiles or ["sample"],
                     "grains": list(GRAINS),
                     "feature_kinds": list(FEATURE_KINDS),
                     "domains": list(DOMAINS),
+                    "context_kinds": list(CONTEXT_KINDS),
+                    "context_scopes": list(CONTEXT_SCOPES),
+                    "source_kinds": list(SOURCE_KINDS),
+                    "source_locator_kinds": list(SOURCE_LOCATOR_KINDS),
+                    "claim_statuses": list(CLAIM_STATUSES),
                     "concepts": {
                         "synthetic.feature": {
                             "label": "Synthetic feature",
@@ -99,6 +113,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
                         )
                     ],
                     "relationships": [],
+                    "sources": {},
+                    "contexts": {},
                 }
             ),
             encoding="utf-8",

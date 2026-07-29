@@ -70,7 +70,7 @@ class CatalogCLITests(unittest.TestCase):
         self.assertEqual(
             envelope["data"],
             {
-                "schema_version": 2,
+                "schema_version": 3,
                 "profiles": ["open-v2"],
                 "grains": [
                     "patient",
@@ -112,11 +112,43 @@ class CatalogCLITests(unittest.TestCase):
                     "workflow",
                     "technical",
                 ],
+                "context_kinds": [
+                    "clinical_workflow",
+                    "data_representation",
+                    "interpretation_guardrail",
+                    "known_issue",
+                ],
+                "context_scopes": [
+                    "general_clinical",
+                    "embed_general",
+                    "profile_specific",
+                ],
+                "source_kinds": [
+                    "maintainer_confirmed",
+                    "release_schema",
+                    "release_legend",
+                    "supporting_internal",
+                    "public_documentation",
+                ],
+                "source_locator_kinds": [
+                    "url",
+                    "repository_path",
+                    "logical_artifact",
+                ],
+                "claim_statuses": [
+                    "verified",
+                    "reconciled",
+                    "unverified",
+                    "unresolved",
+                    "contradicted",
+                ],
                 "concepts": 2,
                 "bindings": 3,
                 "vocabularies": 1,
                 "tables": 2,
                 "relationships": 1,
+                "sources": 1,
+                "contexts": 1,
             },
         )
 

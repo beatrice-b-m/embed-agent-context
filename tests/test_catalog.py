@@ -60,17 +60,27 @@ class CatalogLoaderTests(unittest.TestCase):
     def test_loads_and_freezes_synthetic_catalog(self) -> None:
         catalog = self.load()
 
-        self.assertEqual(catalog.schema_version, 2)
+        self.assertEqual(catalog.schema_version, 3)
         self.assertEqual(catalog.profiles, ("open-v2",))
         self.assertEqual(len(catalog.concepts), 2)
         self.assertEqual(len(catalog.bindings), 3)
         self.assertEqual(len(catalog.vocabularies), 1)
+        self.assertEqual(len(catalog.sources), 1)
+        self.assertEqual(len(catalog.contexts), 1)
         with self.assertRaises(TypeError):
             catalog.concepts["new"] = catalog.concepts["identity.accession"]
         with self.assertRaises(FrozenInstanceError):
             catalog.bindings[0].profile = "changed"
+        with self.assertRaises(TypeError):
+            catalog.contexts["new"] = catalog.contexts[
+                "open-v2.density-interpretation"
+            ]
+        with self.assertRaises(FrozenInstanceError):
+            catalog.contexts[
+                "open-v2.density-interpretation"
+            ].claims[0].status = "changed"
         with self.assertRaises(AttributeError):
-            catalog._schema_version = 3
+            catalog._schema_version = 4
 
     def test_loads_and_freezes_table_relationship_metadata(self) -> None:
         data = synthetic_catalog()
@@ -109,6 +119,177 @@ class CatalogLoaderTests(unittest.TestCase):
             catalog.tables[0].grain = "exam"
         with self.assertRaises(FrozenInstanceError):
             catalog.relationships[0].kind = "reference"
+
+    def test_loads_strict_sourced_context_contract(self) -> None:
+        catalog = self.load()
+
+        source = catalog.sources["open-v2.release-schema"]
+        context = catalog.contexts["open-v2.density-interpretation"]
+
+        self.assertEqual(source.scope, "profile_specific")
+        self.assertEqual(source.profiles, ("open-v2",))
+        self.assertEqual(context.scope, "profile_specific")
+        self.assertEqual(
+            context.related_tables[0].identifier,
+            "open-v2:exam_level_anon",
+        )
+        self.assertEqual(context.claims[0].id, "coded-feature")
+        self.assertEqual(context.claims[0].status, "verified")
+        self.assertEqual(context.workflow_steps, ())
+
+    def test_rejects_unknown_context_references(self) -> None:
+        mutations = (
+            (
+                "related_concepts",
+                lambda data: data["contexts"][
+                    "open-v2.density-interpretation"
+                ]["related_concepts"].append("missing.concept"),
+                "unknown concepts",
+            ),
+            (
+                "related_tables",
+                lambda data: data["contexts"][
+                    "open-v2.density-interpretation"
+                ]["related_tables"].append(
+                    {"profile": "open-v2", "table": "missing_table"}
+                ),
+                "unknown table",
+            ),
+            (
+                "related_relationships",
+                lambda data: data["contexts"][
+                    "open-v2.density-interpretation"
+                ]["related_relationships"].append("missing.relationship"),
+                "unknown relationship",
+            ),
+            (
+                "claim_sources",
+                lambda data: data["contexts"][
+                    "open-v2.density-interpretation"
+                ]["claims"][0]["sources"].append("missing.source"),
+                "unknown sources",
+            ),
+        )
+        for name, mutate, message in mutations:
+            with self.subTest(name=name):
+                data = synthetic_catalog()
+                mutate(data)
+                with self.assertRaisesRegex(
+                    CatalogValidationError, message
+                ):
+                    self.load(data)
+
+    def test_rejects_context_scope_and_source_authority_mismatches(self) -> None:
+        data = synthetic_catalog()
+        source = data["sources"]["open-v2.release-schema"]
+        source["scope"] = "embed_general"
+        with self.assertRaisesRegex(
+            CatalogValidationError, "empty profile list"
+        ):
+            self.load(data)
+
+        data = synthetic_catalog()
+        context = data["contexts"]["open-v2.density-interpretation"]
+        context["scope"] = "embed_general"
+        with self.assertRaisesRegex(
+            CatalogValidationError, "empty profile list"
+        ):
+            self.load(data)
+
+        data = synthetic_catalog()
+        source = data["sources"]["open-v2.release-schema"]
+        source.update(
+            {
+                "kind": "public_documentation",
+                "scope": "embed_general",
+                "locator_kind": "url",
+                "locator": "https://example.test/embed",
+                "profiles": [],
+            }
+        )
+        with self.assertRaisesRegex(
+            CatalogValidationError, "verified.*no applicable"
+        ):
+            self.load(data)
+
+    def test_rejects_unsafe_source_locators_and_empirical_context_fields(
+        self,
+    ) -> None:
+        for locator in (
+            "/Users/example/private.md",
+            "../private.md",
+        ):
+            with self.subTest(locator=locator):
+                data = synthetic_catalog()
+                source = data["sources"]["open-v2.release-schema"]
+                source["locator_kind"] = "repository_path"
+                source["locator"] = locator
+                with self.assertRaisesRegex(
+                    CatalogValidationError, "repository-relative"
+                ):
+                    self.load(data)
+
+        for target, field in (
+            ("source", "row_count"),
+            ("context", "prevalence"),
+            ("claim", "positive_count"),
+        ):
+            with self.subTest(target=target):
+                data = synthetic_catalog()
+                if target == "source":
+                    data["sources"]["open-v2.release-schema"][field] = 10
+                elif target == "context":
+                    data["contexts"][
+                        "open-v2.density-interpretation"
+                    ][field] = 10
+                else:
+                    data["contexts"][
+                        "open-v2.density-interpretation"
+                    ]["claims"][0][field] = 10
+                with self.assertRaisesRegex(
+                    CatalogValidationError, "unexpected fields"
+                ):
+                    self.load(data)
+
+    def test_validates_ordered_workflow_steps_and_claim_ids(self) -> None:
+        data = synthetic_catalog()
+        context = data["contexts"]["open-v2.density-interpretation"]
+        context["kind"] = "clinical_workflow"
+        with self.assertRaisesRegex(
+            CatalogValidationError, "at least two ordered stages"
+        ):
+            self.load(data)
+
+        context["workflow_steps"] = [
+            {
+                "id": "interpret",
+                "label": "Interpret density",
+                "claims": ["coded-feature"],
+            },
+            {
+                "id": "review",
+                "label": "Review context",
+                "claims": ["missing-claim"],
+            },
+        ]
+        with self.assertRaisesRegex(
+            CatalogValidationError, "unknown claims"
+        ):
+            self.load(data)
+
+        duplicate = synthetic_catalog()
+        claim = copy.deepcopy(
+            duplicate["contexts"]["open-v2.density-interpretation"][
+                "claims"
+            ][0]
+        )
+        duplicate["contexts"]["open-v2.density-interpretation"][
+            "claims"
+        ].append(claim)
+        with self.assertRaisesRegex(
+            CatalogValidationError, "duplicate claim IDs"
+        ):
+            self.load(duplicate)
 
     def test_rejects_incomplete_table_and_relationship_contracts(self) -> None:
         missing_table = synthetic_catalog()
@@ -267,8 +448,8 @@ class CatalogLoaderTests(unittest.TestCase):
     def test_rejects_duplicate_json_object_keys(self) -> None:
         serialized = json.dumps(synthetic_catalog())
         serialized = serialized.replace(
-            '"schema_version": 2',
-            '"schema_version": 2, "schema_version": 2',
+            '"schema_version": 3',
+            '"schema_version": 3, "schema_version": 3',
             1,
         )
         path = self.directory / "duplicate.json"
@@ -286,15 +467,15 @@ class CatalogLoaderTests(unittest.TestCase):
         version_one.pop("relationships")
 
         future = synthetic_catalog()
-        future["schema_version"] = 3
+        future["schema_version"] = 4
         future["future_extension"] = {}
 
-        for version, data in ((1, version_one), (3, future)):
+        for version, data in ((1, version_one), (4, future)):
             with self.subTest(version=version):
                 with self.assertRaisesRegex(
                     CatalogValidationError,
                     rf"unsupported catalog schema_version {version}; "
-                    "expected integer 2",
+                    "expected integer 3",
                 ):
                     self.load(data)
 

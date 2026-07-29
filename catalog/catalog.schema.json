@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "catalog.schema.json",
-  "title": "EMBED V2 count-free feature catalog",
+  "title": "EMBED V2 count-free feature and clinical context catalog",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,18 +11,25 @@
     "grains",
     "feature_kinds",
     "domains",
+    "context_kinds",
+    "context_scopes",
+    "source_kinds",
+    "source_locator_kinds",
+    "claim_statuses",
     "concepts",
     "bindings",
     "vocabularies",
     "tables",
-    "relationships"
+    "relationships",
+    "sources",
+    "contexts"
   ],
   "properties": {
     "$schema": {
       "const": "./catalog.schema.json"
     },
     "schema_version": {
-      "const": 2
+      "const": 3
     },
     "profiles": {
       "type": "array",
@@ -79,6 +86,46 @@
         "technical"
       ]
     },
+    "context_kinds": {
+      "const": [
+        "clinical_workflow",
+        "data_representation",
+        "interpretation_guardrail",
+        "known_issue"
+      ]
+    },
+    "context_scopes": {
+      "const": [
+        "general_clinical",
+        "embed_general",
+        "profile_specific"
+      ]
+    },
+    "source_kinds": {
+      "const": [
+        "maintainer_confirmed",
+        "release_schema",
+        "release_legend",
+        "supporting_internal",
+        "public_documentation"
+      ]
+    },
+    "source_locator_kinds": {
+      "const": [
+        "url",
+        "repository_path",
+        "logical_artifact"
+      ]
+    },
+    "claim_statuses": {
+      "const": [
+        "verified",
+        "reconciled",
+        "unverified",
+        "unresolved",
+        "contradicted"
+      ]
+    },
     "concepts": {
       "type": "object",
       "minProperties": 1,
@@ -117,6 +164,24 @@
       "items": {
         "$ref": "#/$defs/relationship"
       }
+    },
+    "sources": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*$": {
+          "$ref": "#/$defs/context_source"
+        }
+      },
+      "additionalProperties": false
+    },
+    "contexts": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*$": {
+          "$ref": "#/$defs/clinical_context"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {
@@ -130,6 +195,146 @@
         "maintainer_confirmed",
         "inference",
         "unresolved"
+      ]
+    },
+    "context_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "kind",
+        "scope",
+        "locator_kind",
+        "locator",
+        "version_scope",
+        "profiles",
+        "notes"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "kind": {
+          "enum": [
+            "maintainer_confirmed",
+            "release_schema",
+            "release_legend",
+            "supporting_internal",
+            "public_documentation"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "general_clinical",
+            "embed_general",
+            "profile_specific"
+          ]
+        },
+        "locator_kind": {
+          "enum": [
+            "url",
+            "repository_path",
+            "logical_artifact"
+          ]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "version_scope": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "profiles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "release_schema",
+                  "release_legend"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "profiles": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "profile_specific"
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          },
+          "then": {
+            "properties": {
+              "profiles": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "profiles": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "locator_kind": {
+                "const": "url"
+              }
+            },
+            "required": [
+              "locator_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "^https://"
+              }
+            }
+          }
+        }
       ]
     },
     "concept": {
@@ -626,6 +831,299 @@
           }
         }
       }
+    },
+    "context_table_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "table"
+      ],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+        },
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+        }
+      }
+    },
+    "context_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "statement",
+        "status",
+        "sources",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "reconciled",
+            "unverified",
+            "unresolved",
+            "contradicted"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    "workflow_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "claims"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    "clinical_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "kind",
+        "scope",
+        "profiles",
+        "summary",
+        "domains",
+        "search_terms",
+        "related_concepts",
+        "related_tables",
+        "related_relationships",
+        "claims",
+        "workflow_steps",
+        "caveats"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "kind": {
+          "enum": [
+            "clinical_workflow",
+            "data_representation",
+            "interpretation_guardrail",
+            "known_issue"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "general_clinical",
+            "embed_general",
+            "profile_specific"
+          ]
+        },
+        "profiles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "domains": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "identity",
+              "demographics",
+              "social_determinants_of_health",
+              "exam",
+              "breast_side",
+              "imaging",
+              "mammography",
+              "ultrasound",
+              "mri",
+              "pathology",
+              "procedure",
+              "report",
+              "risk",
+              "temporal",
+              "workflow",
+              "technical"
+            ]
+          }
+        },
+        "search_terms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "related_concepts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "related_tables": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/context_table_reference"
+          }
+        },
+        "related_relationships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+          }
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/context_claim"
+          }
+        },
+        "workflow_steps": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workflow_step"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "profile_specific"
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          },
+          "then": {
+            "properties": {
+              "profiles": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "profiles": {
+                "maxItems": 0
+              },
+              "related_tables": {
+                "maxItems": 0
+              },
+              "related_relationships": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "clinical_workflow"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "workflow_steps": {
+                "minItems": 2
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "workflow_steps": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "./catalog.schema.json",
-  "schema_version": 2,
+  "schema_version": 3,
   "profiles": [
     "open-v2"
   ],
@@ -43,6 +43,36 @@
     "temporal",
     "workflow",
     "technical"
+  ],
+  "context_kinds": [
+    "clinical_workflow",
+    "data_representation",
+    "interpretation_guardrail",
+    "known_issue"
+  ],
+  "context_scopes": [
+    "general_clinical",
+    "embed_general",
+    "profile_specific"
+  ],
+  "source_kinds": [
+    "maintainer_confirmed",
+    "release_schema",
+    "release_legend",
+    "supporting_internal",
+    "public_documentation"
+  ],
+  "source_locator_kinds": [
+    "url",
+    "repository_path",
+    "logical_artifact"
+  ],
+  "claim_statuses": [
+    "verified",
+    "reconciled",
+    "unverified",
+    "unresolved",
+    "contradicted"
   ],
   "concepts": {
     "breast_side.architectural_distortion_aggregate": {
@@ -7528,5 +7558,7 @@
         "Use accession for the exam edge; retain side only for side-grain identity."
       ]
     }
-  ]
+  ],
+  "sources": {},
+  "contexts": {}
 }

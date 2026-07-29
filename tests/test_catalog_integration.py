@@ -11,6 +11,9 @@ from embed_context import load_catalog
 from embed_context.catalog import (
     BINDING_PARAMETER_KEYS,
     CARDINALITY_VALUES,
+    CLAIM_STATUSES,
+    CONTEXT_KINDS,
+    CONTEXT_SCOPES,
     DOMAINS,
     ENDPOINT_COMPLETENESS,
     EVIDENCE_VALUES,
@@ -21,14 +24,21 @@ from embed_context.catalog import (
     KEY_UNIQUENESS,
     RELATIONSHIP_KINDS,
     ROLES,
+    SOURCE_KINDS,
+    SOURCE_LOCATOR_KINDS,
     VOCABULARY_COMPLETENESS,
     VOCABULARY_PARSING,
     _BINDING_KEYS,
     _BINDING_REQUIRED_KEYS,
     _CONCEPT_KEYS,
     _CONCEPT_REQUIRED_KEYS,
+    _CLINICAL_CONTEXT_KEYS,
+    _CONTEXT_CLAIM_KEYS,
+    _CONTEXT_SOURCE_KEYS,
+    _CONTEXT_TABLE_REFERENCE_KEYS,
     _VOCABULARY_KEYS,
     _VOCABULARY_REQUIRED_KEYS,
+    _WORKFLOW_STEP_KEYS,
 )
 
 
@@ -243,6 +253,22 @@ class CheckedInCatalogTests(unittest.TestCase):
             properties["feature_kinds"]["const"], list(FEATURE_KINDS)
         )
         self.assertEqual(properties["domains"]["const"], list(DOMAINS))
+        self.assertEqual(
+            properties["context_kinds"]["const"], list(CONTEXT_KINDS)
+        )
+        self.assertEqual(
+            properties["context_scopes"]["const"], list(CONTEXT_SCOPES)
+        )
+        self.assertEqual(
+            properties["source_kinds"]["const"], list(SOURCE_KINDS)
+        )
+        self.assertEqual(
+            properties["source_locator_kinds"]["const"],
+            list(SOURCE_LOCATOR_KINDS),
+        )
+        self.assertEqual(
+            properties["claim_statuses"]["const"], list(CLAIM_STATUSES)
+        )
         definitions = schema["$defs"]
         self.assertEqual(
             set(definitions["evidence"]["enum"]), EVIDENCE_VALUES
@@ -301,6 +327,38 @@ class CheckedInCatalogTests(unittest.TestCase):
             set(definitions["cardinality_value"]["enum"]),
             CARDINALITY_VALUES,
         )
+        self.assertEqual(
+            set(definitions["context_source"]["properties"]),
+            _CONTEXT_SOURCE_KEYS,
+        )
+        self.assertEqual(
+            set(definitions["clinical_context"]["properties"]),
+            _CLINICAL_CONTEXT_KEYS,
+        )
+        self.assertEqual(
+            set(definitions["context_claim"]["properties"]),
+            _CONTEXT_CLAIM_KEYS,
+        )
+        self.assertEqual(
+            set(definitions["context_table_reference"]["properties"]),
+            _CONTEXT_TABLE_REFERENCE_KEYS,
+        )
+        self.assertEqual(
+            set(definitions["workflow_step"]["properties"]),
+            _WORKFLOW_STEP_KEYS,
+        )
+        for definition in (
+            "context_source",
+            "clinical_context",
+            "context_claim",
+            "context_table_reference",
+            "workflow_step",
+        ):
+            with self.subTest(definition=definition):
+                self.assertEqual(
+                    set(definitions[definition]["required"]),
+                    set(definitions[definition]["properties"]),
+                )
         for definition, allowed, required in (
             ("concept", _CONCEPT_KEYS, _CONCEPT_REQUIRED_KEYS),
             ("binding", _BINDING_KEYS, _BINDING_REQUIRED_KEYS),

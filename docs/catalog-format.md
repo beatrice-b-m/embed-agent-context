@@ -12,6 +12,12 @@ concept ──< binding >── profile / table / column / grain
 profile / table ──< key candidate
        │
        └──── relationship ── profile / table
+
+context ──< claim >── source
+   │
+   ├──── concept
+   ├──── profile / table
+   └──── relationship
 ```
 
 This is intentionally a small registry rather than a generic knowledge graph.
@@ -27,10 +33,13 @@ an ontology engine, database, generated documentation, or probabilistic search.
 : Stable identifiers for physical dataset variants. Concepts are shared across
   profiles; bindings select a profile.
 
-`grains`, `feature_kinds`, and `domains`
+`grains`, `feature_kinds`, `domains`, `context_kinds`, `context_scopes`,
+`source_kinds`, `source_locator_kinds`, and `claim_statuses`
 : Controlled facets used by validation and filtering. Domains are
   multi-valued, so one concept can be both demographic and a social determinant
-  of health, or both imaging and pathology-related.
+  of health, or both imaging and pathology-related. The context facets keep
+  clinical background, non-versioned EMBED documentation, and claims about one
+  physical profile distinguishable.
 
 `concepts`
 : Object keyed by stable semantic IDs. Each concept contains a label,
@@ -61,6 +70,19 @@ an ontology engine, database, generated documentation, or probabilistic search.
   ordered physical-column tuples. Relationship kind, source completeness,
   cardinality in both directions, evidence, caveats, and join hazards remain
   explicit and separate from semantic feature concepts.
+
+`sources`
+: A registry of evidence locators keyed by stable ID. Each source records its
+  kind, context scope, physical profiles when applicable, portable locator,
+  version boundary, and notes. An empty profile list means that the source
+  makes no claim about a physical catalog profile; it does not mean that the
+  source applies to every profile.
+
+`contexts`
+: Sourced clinical and procedural context keyed by stable ID. A context has one
+  homogeneous scope, controlled kind and domains, navigation-only summary,
+  related catalog entities, individually reviewable claims, and caveats.
+  Clinical workflows additionally contain ordered stages backed by claim IDs.
 
 The authoritative field constraints are in
 [`catalog/catalog.schema.json`](../catalog/catalog.schema.json).
@@ -122,6 +144,50 @@ release row totals, match rates, orphan counts, or duplicate counts. Column
 nullability, source-endpoint completeness, and referential coverage are
 different claims and must not be substituted for one another.
 
+## Clinical context and provenance
+
+Context records explain how existing feature and relationship definitions fit
+into clinical or documentation processes. They do not execute joins, construct
+cohorts, exclude rows, derive labels, or replace a versioned data toolkit.
+Substantive assertions belong in `claims`; a context `summary` is only a
+navigation aid.
+
+Every claim has a stable local ID, a review status, one or more source IDs, and
+its own caveats. A claim can therefore be addressed as
+`context-id.claim-id` without treating the whole context as uniformly
+authoritative. Status has these meanings:
+
+- `verified` — directly supported at the declared scope by applicable,
+  authoritative evidence;
+- `reconciled` — competing or differently scoped evidence has been reviewed
+  and the qualified statement records the result;
+- `unverified` — useful source material has not passed the applicable review;
+- `unresolved` — the available evidence does not establish the requested
+  meaning or policy; and
+- `contradicted` — retained provenance for a claim that conflicts with other
+  evidence and must not be presented as current guidance.
+
+Contexts are scope-homogeneous. `general_clinical` explains clinical background,
+`embed_general` describes non-profile-specific EMBED material, and
+`profile_specific` identifies one or more physical profiles. General and
+non-versioned EMBED contexts cannot reference physical tables or
+relationships. A profile-specific verified claim must cite an applicable
+maintainer-confirmed, release-schema, or release-legend source; public or
+internal background alone cannot promote a claim to verified V2 behavior.
+
+Source locators are typed as stable HTTPS URLs, repository-relative paths, or
+logical artifact names. Absolute workstation paths and parent traversal are
+rejected. Release schema and legend sources must identify their physical
+profiles. Contradicted claims require at least two sources so the conflict is
+traceable.
+
+Every context must connect to at least one existing concept, table, or
+relationship. Profile-specific references must resolve within the declared
+profile, including concept bindings. Ordered `workflow_steps` are required for
+clinical workflows and must place every claim; non-workflow contexts must keep
+that array empty. This supports branching caveats without turning free-form
+Markdown order into an implicit API.
+
 ## Relationship validation
 
 Every table declaration and relationship endpoint must resolve to bindings in
@@ -166,7 +232,10 @@ To support another EMBED variant:
 7. Validate all cross-references and compare the profile bindings with the
    source schema. Substantiate key and linkage claims separately because the
    footer-only source verifier cannot prove them.
-8. Add focused synthetic tests plus checked-in profile integration assertions
+8. Add or update profile-specific contexts only when their claims have
+   applicable sources. Do not copy general or older-release behavior into the
+   new profile, and preserve unresolved workflow policy as unresolved.
+9. Add focused synthetic tests plus checked-in profile integration assertions
    for required table declarations, key caveats, and the expected relationship
    inventory, then update profile documentation.
 
@@ -188,7 +257,10 @@ as the current format. Readers inspect `schema_version` before applying
 version-specific required-field and extension-field rules, so both legacy and
 future documents receive an explicit unsupported-version error.
 
-Schema version 2 adds required `tables` and `relationships` collections.
-Version-1 consumers must upgrade before loading a version-2 catalog. Existing
-feature lookup, search, and code-lookup result shapes remain unchanged;
-linkage queries use separate APIs.
+Schema version 2 added required `tables` and `relationships` collections.
+Schema version 3 adds the controlled context facets plus required `sources` and
+`contexts` collections. It also introduces claim-level review state, typed
+source locators, profile-aware evidence validation, and ordered workflow
+stages. Version-2 consumers must upgrade before loading a version-3 catalog.
+Existing feature, code, table, and relationship result shapes remain
+unchanged; clinical context uses a separate model and query surface.

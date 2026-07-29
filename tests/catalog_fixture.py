@@ -6,17 +6,31 @@ import json
 from pathlib import Path
 from typing import Any
 
-from embed_context.catalog import DOMAINS, FEATURE_KINDS, GRAINS
+from embed_context.catalog import (
+    CLAIM_STATUSES,
+    CONTEXT_KINDS,
+    CONTEXT_SCOPES,
+    DOMAINS,
+    FEATURE_KINDS,
+    GRAINS,
+    SOURCE_KINDS,
+    SOURCE_LOCATOR_KINDS,
+)
 
 
 def synthetic_catalog() -> dict[str, Any]:
     return {
         "$schema": "./catalog.schema.json",
-        "schema_version": 2,
+        "schema_version": 3,
         "profiles": ["open-v2"],
         "grains": list(GRAINS),
         "feature_kinds": list(FEATURE_KINDS),
         "domains": list(DOMAINS),
+        "context_kinds": list(CONTEXT_KINDS),
+        "context_scopes": list(CONTEXT_SCOPES),
+        "source_kinds": list(SOURCE_KINDS),
+        "source_locator_kinds": list(SOURCE_LOCATOR_KINDS),
+        "claim_statuses": list(CLAIM_STATUSES),
         "concepts": {
             "exam.tissue_density": {
                 "label": "Breast tissue density",
@@ -111,6 +125,51 @@ def synthetic_catalog() -> dict[str, Any]:
             },
         ],
         "relationships": [],
+        "sources": {
+            "open-v2.release-schema": {
+                "title": "Synthetic open-v2 release schema",
+                "kind": "release_schema",
+                "scope": "profile_specific",
+                "locator_kind": "logical_artifact",
+                "locator": "synthetic open-v2 footer schema",
+                "version_scope": "Synthetic open-v2 contract fixture.",
+                "profiles": ["open-v2"],
+                "notes": [],
+            }
+        },
+        "contexts": {
+            "open-v2.density-interpretation": {
+                "title": "Density interpretation boundary",
+                "kind": "interpretation_guardrail",
+                "scope": "profile_specific",
+                "profiles": ["open-v2"],
+                "summary": "Density is a coded exam feature.",
+                "domains": ["exam", "mammography"],
+                "search_terms": ["density interpretation"],
+                "related_concepts": ["exam.tissue_density"],
+                "related_tables": [
+                    {
+                        "profile": "open-v2",
+                        "table": "exam_level_anon",
+                    }
+                ],
+                "related_relationships": [],
+                "claims": [
+                    {
+                        "id": "coded-feature",
+                        "statement": (
+                            "The synthetic density field is represented as a "
+                            "coded exam feature."
+                        ),
+                        "status": "verified",
+                        "sources": ["open-v2.release-schema"],
+                        "caveats": [],
+                    }
+                ],
+                "workflow_steps": [],
+                "caveats": ["Synthetic context for contract tests."],
+            }
+        },
     }
 
 
