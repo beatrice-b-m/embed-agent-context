@@ -363,6 +363,243 @@ class CatalogQueryTests(unittest.TestCase):
             )
         )
 
+    def relationship_catalog(self):
+        data = synthetic_catalog()
+        data["relationships"] = [
+            {
+                "id": "synthetic.wide_density_projection",
+                "profile": "open-v2",
+                "kind": "projection",
+                "source": {
+                    "table": "combined_anon",
+                    "columns": ["tissueden"],
+                    "completeness": "optional",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["tissueden"],
+                },
+                "cardinality": {
+                    "targets_per_source": "unknown",
+                    "sources_per_target": "unknown",
+                },
+                "evidence": ["inference"],
+                "caveats": ["Synthetic relationship for query tests."],
+                "join_hazards": ["Values are not established as equal."],
+            },
+            {
+                "id": "synthetic.exam_identity_reference",
+                "profile": "open-v2",
+                "kind": "reference",
+                "source": {
+                    "table": "exam_level_anon",
+                    "columns": ["acc_anon"],
+                    "completeness": "required",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["acc_anon"],
+                },
+                "cardinality": {
+                    "targets_per_source": "exactly_one",
+                    "sources_per_target": "exactly_one",
+                },
+                "evidence": ["cross_table_check"],
+                "caveats": [],
+                "join_hazards": [],
+            },
+        ]
+        return load_catalog(
+            write_catalog(
+                Path(self.temporary.name) / "relationships.json",
+                data,
+            )
+        )
+
+    def test_gets_table_with_sorted_incident_relationships(self) -> None:
+        catalog = self.relationship_catalog()
+
+        result = catalog.get_table("open-v2", "exam_level_anon")
+
+        self.assertEqual(result["kind"], "table")
+        self.assertEqual(result["identifier"], "open-v2:exam_level_anon")
+        self.assertEqual(
+            result["table"],
+            {
+                "identifier": "open-v2:exam_level_anon",
+                "profile": "open-v2",
+                "table": "exam_level_anon",
+                "grain": "exam",
+                "keys": [
+                    {
+                        "id": "exam.accession",
+                        "columns": ["acc_anon"],
+                        "kind": "natural",
+                        "uniqueness": "unique",
+                        "completeness": "complete",
+                        "evidence": ["cross_table_check"],
+                        "caveats": [],
+                    }
+                ],
+                "caveats": [],
+            },
+        )
+        self.assertEqual(
+            [
+                relationship["id"]
+                for relationship in result["relationships"]["outgoing"]
+            ],
+            ["synthetic.exam_identity_reference"],
+        )
+        self.assertEqual(
+            [
+                relationship["id"]
+                for relationship in result["relationships"]["incoming"]
+            ],
+            [
+                "synthetic.exam_identity_reference",
+                "synthetic.wide_density_projection",
+            ],
+        )
+
+    def test_gets_exact_relationship_with_stable_shape(self) -> None:
+        catalog = self.relationship_catalog()
+
+        result = catalog.get_relationship(
+            "synthetic.wide_density_projection"
+        )
+
+        self.assertEqual(result["kind"], "relationship")
+        self.assertEqual(
+            result["identifier"], "synthetic.wide_density_projection"
+        )
+        self.assertEqual(
+            result["relationship"],
+            {
+                "id": "synthetic.wide_density_projection",
+                "profile": "open-v2",
+                "kind": "projection",
+                "source": {
+                    "table": "combined_anon",
+                    "columns": ["tissueden"],
+                    "completeness": "optional",
+                },
+                "target": {
+                    "table": "exam_level_anon",
+                    "columns": ["tissueden"],
+                },
+                "cardinality": {
+                    "targets_per_source": "unknown",
+                    "sources_per_target": "unknown",
+                },
+                "evidence": ["inference"],
+                "caveats": ["Synthetic relationship for query tests."],
+                "join_hazards": ["Values are not established as equal."],
+            },
+        )
+
+    def test_relationship_queries_return_mutation_isolated_results(self) -> None:
+        catalog = self.relationship_catalog()
+        table = catalog.get_table("open-v2", "exam_level_anon")
+        relationship = catalog.get_relationship(
+            "synthetic.wide_density_projection"
+        )
+        search = catalog.search_relationships()
+
+        table["table"]["keys"][0]["columns"][0] = "changed"
+        table["relationships"]["incoming"][0]["source"]["columns"][0] = (
+            "changed"
+        )
+        relationship["relationship"]["join_hazards"][0] = "Changed"
+        search["matches"][0]["source"]["columns"][0] = "changed"
+
+        fresh_table = catalog.get_table("open-v2", "exam_level_anon")
+        fresh_relationship = catalog.get_relationship(
+            "synthetic.wide_density_projection"
+        )
+        fresh_search = catalog.search_relationships()
+        self.assertEqual(
+            fresh_table["table"]["keys"][0]["columns"], ["acc_anon"]
+        )
+        self.assertEqual(
+            fresh_table["relationships"]["incoming"][0]["source"]["columns"],
+            ["acc_anon"],
+        )
+        self.assertEqual(
+            fresh_relationship["relationship"]["join_hazards"],
+            ["Values are not established as equal."],
+        )
+        self.assertEqual(
+            fresh_search["matches"][0]["source"]["columns"], ["acc_anon"]
+        )
+
+    def test_searches_relationships_with_combined_filters_and_limit(self) -> None:
+        catalog = self.relationship_catalog()
+
+        all_relationships = catalog.search_relationships(limit=1)
+        self.assertEqual(all_relationships["count"], 1)
+        self.assertEqual(all_relationships["total"], 2)
+        self.assertEqual(
+            all_relationships["matches"][0]["id"],
+            "synthetic.exam_identity_reference",
+        )
+        self.assertEqual(
+            all_relationships["filters"],
+            {
+                "profile": None,
+                "table": None,
+                "source_table": None,
+                "target_table": None,
+                "kind": None,
+            },
+        )
+
+        filtered = catalog.search_relationships(
+            profile="open-v2",
+            table="exam_level_anon",
+            source_table="combined_anon",
+            target_table="exam_level_anon",
+            kind="projection",
+        )
+        self.assertEqual(filtered["count"], 1)
+        self.assertEqual(filtered["total"], 1)
+        self.assertEqual(
+            [match["id"] for match in filtered["matches"]],
+            ["synthetic.wide_density_projection"],
+        )
+
+        empty = catalog.search_relationships(table="missing_table")
+        self.assertEqual(empty["count"], 0)
+        self.assertEqual(empty["total"], 0)
+
+    def test_relationship_queries_validate_inputs_and_report_missing(self) -> None:
+        catalog = self.relationship_catalog()
+
+        for arguments in (("", "exam_level_anon"), ("open-v2", " ")):
+            with self.subTest(arguments=arguments):
+                with self.assertRaises(CatalogValidationError):
+                    catalog.get_table(*arguments)
+        with self.assertRaises(CatalogNotFoundError):
+            catalog.get_table("open-v2", "missing_table")
+        with self.assertRaises(CatalogValidationError):
+            catalog.get_relationship(" ")
+        with self.assertRaises(CatalogNotFoundError):
+            catalog.get_relationship("missing.relationship")
+        with self.assertRaisesRegex(
+            CatalogValidationError, "unknown profile"
+        ):
+            catalog.search_relationships(profile="missing")
+        with self.assertRaisesRegex(CatalogValidationError, "unknown kind"):
+            catalog.search_relationships(kind="foreign_key")
+        for limit in (0, 501, True):
+            with self.subTest(limit=limit):
+                with self.assertRaisesRegex(CatalogValidationError, "limit"):
+                    catalog.search_relationships(limit=limit)
+        with self.assertRaisesRegex(
+            CatalogValidationError, "source_table filter"
+        ):
+            catalog.search_relationships(source_table=" ")
+
     def test_gets_exact_concept_and_physical_feature(self) -> None:
         concept = self.catalog.get_feature("exam.tissue_density")
         self.assertEqual(concept["kind"], "concept")

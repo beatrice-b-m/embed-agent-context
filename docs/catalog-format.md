@@ -85,6 +85,13 @@ Exact lookup resolves a concept ID, physical name, or profile-qualified
 physical name. Code lookup accepts any of those forms or a vocabulary ID and
 matches code strings exactly, including case.
 
+Table lookup accepts an explicit profile and table name and returns the table
+declaration plus its incoming and outgoing relationships. Relationship lookup
+accepts a stable relationship ID. Relationship search is independently
+filterable by profile, either endpoint table, directional source or target
+table, and relationship kind; results are sorted deterministically by ID.
+These APIs do not alter existing feature lookup or search result shapes.
+
 Search scans the in-memory catalog linearly. It considers concept IDs, physical
 names, labels, definitions, search terms, facets, caveats, and vocabulary
 meanings. A small prompt-word stoplist plus weighted token overlap makes short

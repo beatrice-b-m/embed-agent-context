@@ -792,6 +792,124 @@ class Catalog:
             "relationships": len(self.relationships),
         }
 
+    def get_table(self, profile: str, table: str) -> dict[str, Any]:
+        """Get one profile-specific table and its incident relationships."""
+
+        normalized_profile = _lookup_identifier(profile, "profile")
+        normalized_table = _lookup_identifier(table, "table")
+        identifier = f"{normalized_profile}:{normalized_table}"
+        table_spec = self._tables_by_qualified.get(identifier)
+        if table_spec is None:
+            raise CatalogNotFoundError(f"table {identifier!r} was not found")
+
+        outgoing = []
+        incoming = []
+        for relationship in self.relationships:
+            if relationship.profile != normalized_profile:
+                continue
+            if relationship.source.table == normalized_table:
+                outgoing.append(relationship.to_dict())
+            if relationship.target.table == normalized_table:
+                incoming.append(relationship.to_dict())
+        return {
+            "kind": "table",
+            "identifier": identifier,
+            "table": table_spec.to_dict(),
+            "relationships": {
+                "outgoing": outgoing,
+                "incoming": incoming,
+            },
+        }
+
+    def get_relationship(self, identifier: str) -> dict[str, Any]:
+        """Get one relationship by its stable identifier."""
+
+        normalized = _lookup_identifier(identifier, "identifier")
+        relationship = self._relationships_by_id.get(normalized)
+        if relationship is None:
+            raise CatalogNotFoundError(
+                f"relationship {normalized!r} was not found"
+            )
+        return {
+            "kind": "relationship",
+            "identifier": normalized,
+            "relationship": relationship.to_dict(),
+        }
+
+    def search_relationships(
+        self,
+        *,
+        profile: str | None = None,
+        table: str | None = None,
+        source_table: str | None = None,
+        target_table: str | None = None,
+        kind: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Filter relationships by profile, endpoint table, and kind."""
+
+        filters = {
+            "profile": _optional_filter(profile, "profile"),
+            "table": _optional_filter(table, "table"),
+            "source_table": _optional_filter(source_table, "source_table"),
+            "target_table": _optional_filter(target_table, "target_table"),
+            "kind": _optional_filter(kind, "kind"),
+        }
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or not 1 <= limit <= 500
+        ):
+            raise CatalogValidationError("limit must be an integer from 1 to 500")
+        controlled_filters = {
+            "profile": self.profiles,
+            "kind": RELATIONSHIP_KINDS,
+        }
+        for name, allowed in controlled_filters.items():
+            if filters[name] is not None and filters[name] not in allowed:
+                raise CatalogValidationError(
+                    f"unknown {name} filter {filters[name]!r}"
+                )
+
+        matches = []
+        for relationship in self.relationships:
+            if (
+                filters["profile"] is not None
+                and relationship.profile != filters["profile"]
+            ):
+                continue
+            if (
+                filters["table"] is not None
+                and filters["table"]
+                not in (relationship.source.table, relationship.target.table)
+            ):
+                continue
+            if (
+                filters["source_table"] is not None
+                and relationship.source.table != filters["source_table"]
+            ):
+                continue
+            if (
+                filters["target_table"] is not None
+                and relationship.target.table != filters["target_table"]
+            ):
+                continue
+            if (
+                filters["kind"] is not None
+                and relationship.kind != filters["kind"]
+            ):
+                continue
+            matches.append(relationship)
+
+        return {
+            "filters": filters,
+            "count": min(len(matches), limit),
+            "total": len(matches),
+            "matches": [
+                relationship.to_dict() for relationship in matches[:limit]
+            ],
+        }
+
     def get_feature(
         self, identifier: str, include_codes: bool = False
     ) -> dict[str, Any]:
