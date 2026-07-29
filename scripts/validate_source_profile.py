@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Verify a catalog profile against Parquet footer schemas.
+"""Verify one profile's secondary feature bindings against Parquet footers.
 
 The verifier derives its complete expected manifest from the selected profile's
-catalog bindings. It opens Parquet footers for Arrow schemas only; it does not
-read row groups, data pages, statistics, or clinical values.
+feature bindings. Clinical objects and relationships remain independent of this
+storage check. The verifier opens Parquet footers for Arrow schemas only; it
+does not read row groups, data pages, statistics, or clinical values.
 """
 
 from __future__ import annotations
@@ -72,10 +73,8 @@ def expected_profile_schema(
         raise ProfileValidationError(f"unknown catalog profile: {profile}")
 
     expected: dict[str, dict[str, ExpectedColumn]] = {}
-    for binding in catalog.bindings:
-        if binding.profile != profile:
-            continue
-
+    profile_binding = catalog.profile_bindings[profile]
+    for binding in profile_binding.feature_bindings:
         table = binding.table
         column = binding.column
         if not SAFE_TABLE_NAME.fullmatch(table):
@@ -206,7 +205,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--catalog",
         type=Path,
         default=DEFAULT_CATALOG,
-        help="feature catalog JSON path",
+        help="clinical-semantic catalog JSON path",
     )
     parser.add_argument(
         "--tables",
