@@ -29,6 +29,10 @@ class PackagingContractTests(unittest.TestCase):
             ">=3.11,<3.14",
         )
         self.assertEqual(
+            self.configuration["project"]["authors"],
+            [{"name": "Beatrice Brown-Mulry"}],
+        )
+        self.assertEqual(
             self.configuration["project"]["scripts"],
             {
                 "embed-context": "embed_context.cli:main",

@@ -304,9 +304,9 @@ The version numbers describe different things:
 
 Questions and defects belong in
 [GitHub Issues](https://github.com/beatrice-b-m/embedv2-agent-context/issues).
-Until a formal citation file is added, cite the
-[repository](https://github.com/beatrice-b-m/embedv2-agent-context) and the
-commit SHA used.
+Citation metadata is provided in [`CITATION.cff`](CITATION.cff). Cite the
+software version or commit SHA used, and cite EMBED separately according to the
+dataset's documentation.
 
 The repository currently declares no software license. Obtain the owner's
 terms before reuse or redistribution.
