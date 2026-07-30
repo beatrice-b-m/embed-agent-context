@@ -1,52 +1,58 @@
-# Documentation map
+# Documentation
 
-Choose the shortest route for what you are doing.
+Choose the page that matches what you want to do.
 
-## First-time user or agent
+## Use the catalog
 
-1. Start with the repository [README](../README.md) to install the CLI or MCP
-   server and run a clinical-first discovery query.
-2. Read the [clinical-semantic model](clinical-semantic-model.md) for the
-   object graph, outcome states, time meanings, aggregations, and interpretation
-   limits.
-3. Use `embed-context discover ... --limit 5`, then follow a returned stable ID
-   with the matching exact getter.
+Start with the repository [README](../README.md). It explains why the catalog
+exists, installs the commands with `uv tool install`, and walks through a
+clinical-first query. No EMBED data or repository checkout is needed.
 
-No EMBED data is needed for this path.
+Then read the [clinical-semantic model](clinical-semantic-model.md) when you
+need the details behind pathology outcomes, finding attribution, candidate
+dates, aggregation, and incomplete outcome capture.
 
-## Application or MCP integrator
+The usual workflow is:
 
-- [Catalog format](catalog-format.md) defines serialized records, strict
-  validation, query envelopes, and the Python/CLI/MCP surfaces.
-- [Architecture v5](architecture-v5.md) explains why portable semantics and
-  profile-specific physical bindings are separate.
-- [Migration v4 to v5](migration-v4-to-v5.md) maps removed and renamed
-  commands, methods, tools, and fields.
-- The [README MCP section](../README.md#stdio-mcp-server) contains verified
-  Codex, Claude Code, and OpenCode stdio configurations.
+```text
+ask a clinical question with `embed-context discover`
+  -> open a returned stable identifier
+  -> inspect related meaning and provenance
+  -> consult an open-v2 profile binding only when implementing against tables
+```
 
-## Contributor or maintainer
+## Integrate the catalog
 
-1. Follow [Contributing](../CONTRIBUTING.md) for environment setup, a worked
-   semantic-change flow, and the exact validation matrix.
-2. Treat [Project scope and authoring requirements](project-scope.md) as the
-   normative content and safety policy.
-3. Treat `catalog/catalog.json` as the canonical content source and
-   `catalog/catalog.schema.json` as its structural contract. Markdown explains
-   those sources; it does not override them.
+- [Catalog format](catalog-format.md) documents the serialized records,
+  validation rules, result envelopes, and Python, CLI, and MCP interfaces.
+- [Architecture v5](architecture-v5.md) explains why portable clinical meaning
+  is separate from release-specific tables and columns.
+- [Migration from v4 to v5](migration-v4-to-v5.md) maps older commands,
+  methods, tools, and fields to the current interface.
+- The README's [AI client section](../README.md#connect-an-ai-client) shows
+  Codex, Claude Code, and OpenCode stdio MCP configuration.
 
-The ignored `reference_files/` directory is optional. Never read or copy
-clinical rows, identifiers, anonymized dates, report text, statistics, or
-counts. The only permitted automated access is Parquet footer schema
-inspection through the dedicated verifier.
+## Contribute
 
-## Evidence records
+Follow [Contributing](../CONTRIBUTING.md) for the development environment,
+worked change flow, and validation matrix. The `uv run --locked` commands in
+that guide are intentionally development-only; installed users invoke
+`embed-context` directly.
 
-These files preserve review provenance; they are not general onboarding
-guides or executable workflow specifications:
+[Project scope and authoring requirements](project-scope.md) is the normative
+content and safety policy. `catalog/catalog.json` is the canonical content
+source and `catalog/catalog.schema.json` is its structural contract. Markdown
+explains those sources but does not override them.
 
-- [Manual review batches](manual-review-batches.md) records the reviewed
-  clinical responses incorporated into the catalog.
-- [Open-v2 linkage review](open-v2-linkage-review.md) records the historical
-  release-layout evidence behind physical association caveats. `open-v2` is
-  the registered EMBED V2 physical profile ID, not a catalog schema version.
+## Review evidence
+
+These pages preserve authoring provenance. They are not onboarding guides or
+executable analysis recipes:
+
+- [Manual review batches](manual-review-batches.md)
+- [Open-v2 linkage review](open-v2-linkage-review.md)
+
+The ignored `reference_files/` directory is optional maintainer material.
+Never inspect or copy clinical rows, identifiers, anonymized dates, report
+text, statistics, or counts. The dedicated source-profile verifier is limited
+to Parquet footer schemas.
