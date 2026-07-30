@@ -817,6 +817,103 @@ class CatalogQueryTests(unittest.TestCase):
             },
         )
 
+    def test_object_constraints_only_promote_explicit_claim_evidence(
+        self,
+    ) -> None:
+        data = cloned_catalog()
+        data["contexts"]["profiles.synthetic"]["claims"].append(
+            {
+                "id": "feature-only-uncertainty",
+                "statement": (
+                    "An uncertainty linked through an owned feature is "
+                    "not object evidence."
+                ),
+                "status": "unresolved",
+                "sources": ["profiles.synthetic-schema"],
+                "caveats": [],
+            }
+        )
+        catalog = Catalog.from_mapping(data)
+
+        object_result = catalog.get_clinical_object("imaging_exam")
+        feature_result = catalog.get_feature("exam.study_date")
+
+        self.assertNotIn(
+            "profiles.synthetic#feature-only-uncertainty",
+            {
+                item["id"]
+                for item in object_result["constraints"][
+                    "unresolved_claims"
+                ]
+            },
+        )
+        self.assertIn(
+            "profiles.synthetic#severity-binding",
+            {
+                item["id"]
+                for item in object_result["constraints"]["supported_facts"]
+            },
+        )
+        self.assertIn(
+            "profiles.synthetic",
+            {
+                item["id"]
+                for item in object_result["constraints"][
+                    "relevant_contexts"
+                ]
+            },
+        )
+        self.assertIn(
+            "profiles.synthetic#feature-only-uncertainty",
+            {
+                item["id"]
+                for item in feature_result["constraints"][
+                    "unresolved_claims"
+                ]
+            },
+        )
+
+    def test_imaging_finding_constraints_exclude_report_addendum_claim(
+        self,
+    ) -> None:
+        result = load_catalog().get_clinical_object("imaging_finding")
+        constraints = result["constraints"]
+
+        self.assertNotIn(
+            "open-v2.report-context#addendum-link",
+            {
+                item["id"]
+                for item in constraints["unresolved_claims"]
+            },
+        )
+        self.assertIn(
+            "open-v2.multimodal-finding-context#descriptor-families",
+            {
+                item["id"]
+                for item in constraints["supported_facts"]
+            },
+        )
+        self.assertIn(
+            "aggregation.pathology-severity-to-finding",
+            {
+                item["id"]
+                for item in constraints["analyst_choices_required"]
+            },
+        )
+        self.assertIn(
+            "open-v2.report-context",
+            {
+                item["id"] for item in constraints["relevant_contexts"]
+            },
+        )
+        self.assertIn(
+            "open-v2.multimodal-finding-context#synthetic-contralateral-finding",
+            {
+                item["id"]
+                for item in result["provenance"]["claims"]
+            },
+        )
+
     def test_feature_inherits_coverage_linked_by_applicable_guardrail(
         self,
     ) -> None:

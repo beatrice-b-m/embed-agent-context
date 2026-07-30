@@ -2298,7 +2298,10 @@ class Catalog:
                 f"{context.id}#{claim.id}"
                 for claim in context.claims
                 if f"{context.id}#{claim.id}" in direct_claim_ref_set
-                or claim.status in {"unresolved", "contradicted"}
+                or (
+                    kind != "clinical_object"
+                    and claim.status in {"unresolved", "contradicted"}
+                )
             )
         all_claim_refs = list(dict.fromkeys(all_claim_refs))
 
