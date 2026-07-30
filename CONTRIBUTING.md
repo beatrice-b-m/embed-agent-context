@@ -6,7 +6,7 @@ tables, columns, and physical associations remain secondary profile bindings.
 
 ## Development setup
 
-You need uv and Python 3.12 or 3.13:
+You need uv and Python 3.11, 3.12, or 3.13:
 
 ```bash
 git clone https://github.com/beatrice-b-m/embedv2-agent-context.git

@@ -3,7 +3,7 @@ name = "embedv2-agent-context"
 version = "0.6.0"
 description = "Count-free clinical-semantic context for EMBED data"
 readme = "README.md"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = []
 
 [project.urls]

@@ -25,6 +25,10 @@ class PackagingContractTests(unittest.TestCase):
             __version__,
         )
         self.assertEqual(
+            self.configuration["project"]["requires-python"],
+            ">=3.11,<3.14",
+        )
+        self.assertEqual(
             self.configuration["project"]["scripts"],
             {
                 "embed-context": "embed_context.cli:main",
