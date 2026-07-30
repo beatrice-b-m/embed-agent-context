@@ -82,16 +82,15 @@ class CatalogLoaderTests(unittest.TestCase):
         self.assertEqual(summary["discovery_kinds"], list(DISCOVERY_KINDS))
         self.assertEqual(summary["profile_bindings"], 2)
 
-    def test_v4_requires_explicit_migration(self) -> None:
-        data = cloned_catalog()
-        data["schema_version"] = 4
-
-        self.assert_invalid(data, "explicit migration.*schema version 5")
-
     def test_wrong_schema_version_and_schema_reference_are_rejected(self) -> None:
-        data = cloned_catalog()
-        data["schema_version"] = 6
-        self.assert_invalid(data, "unsupported catalog schema_version")
+        for version in (4, 6):
+            with self.subTest(version=version):
+                data = cloned_catalog()
+                data["schema_version"] = version
+                self.assert_invalid(
+                    data,
+                    "unsupported catalog schema_version",
+                )
 
         data = cloned_catalog()
         data["$schema"] = "catalog-v5.schema.json"

@@ -351,13 +351,10 @@ cardinality, clinical attribution, outcome capture, or availability.
 ## Documentation synchronization
 
 Any functional catalog, CLI, MCP, or schema change must update relevant usage,
-format, architecture, configuration, and migration documentation in the same
-logical commit. Examples and cross-references must be checked for stale
-identifiers, commands, filters, fields, and file paths.
-
-Schema version 5 is intentionally breaking. The migration contract is in
-[`migration-v4-to-v5.md`](migration-v4-to-v5.md); the architectural decision is
-in [`architecture-v5.md`](architecture-v5.md).
+format, architecture, and configuration documentation in the same logical
+commit. Examples and cross-references must be checked for stale identifiers,
+commands, filters, fields, and file paths. The architectural decision is
+documented in [`architecture-v5.md`](architecture-v5.md).
 
 ## Completion criteria
 

@@ -35,8 +35,7 @@ several objects.
 The catalog is a closed, count-free registry rather than a general ontology or
 an execution engine. It does not contain SQL, dataframe expressions, executable
 cohort predicates, preferred analysis policies, or empirical distributions.
-See [`architecture-v5.md`](architecture-v5.md) for the design decision and
-[`migration-v4-to-v5.md`](migration-v4-to-v5.md) for the breaking migration.
+See [`architecture-v5.md`](architecture-v5.md) for the design decision.
 
 ## Top-level contract
 
@@ -57,8 +56,8 @@ See [`architecture-v5.md`](architecture-v5.md) for the design decision and
 
 `feature_kinds`, `domains`, `context_kinds`, `context_scopes`, `source_kinds`,
 `source_locator_kinds`, and `claim_statuses`
-: Controlled facets retained from earlier schemas for feature classification,
-  discovery, context scope, provenance, and review state.
+: Controlled facets for feature classification, discovery, context scope,
+  provenance, and review state.
 
 `semantic_relationship_kinds`
 : Controlled portable relationship classes: `hierarchy`, `association`,
@@ -225,9 +224,9 @@ that each object occupies a separate table.
 
 ### Concepts and missing states
 
-`concepts` retains the stable feature identity, label, definition, feature
-kind, domains, search terms, caveats, evidence labels, and optional vocabulary
-reference from version 4. Version 5 adds:
+Each record in `concepts` includes a stable feature identity, label, definition,
+feature kind, domains, search terms, caveats, evidence labels, and optional
+vocabulary reference, together with:
 
 - required `objects`, identifying the clinical objects that own the feature;
 - optional `claim_refs`;
@@ -554,7 +553,7 @@ CLI JSON responses wrap these core results in
 `{"ok": false, "command": "...", "error": {"type": "...", "message": "..."}}`
 and exit with status 2. MCP inputs are closed against undeclared arguments.
 Results are structured JSON objects, but MCP output schemas remain generic so
-new explanatory fields do not require a tool-shape migration.
+new explanatory fields do not require a tool-schema change.
 
 ## Adding semantic content
 
@@ -598,21 +597,9 @@ Profile-specific statistics remain outside the portable catalog.
 
 ## Schema evolution
 
-Compatible content additions can retain version 5. Changes to required fields,
-field meaning, identifier resolution, controlled facets, or query semantics
-require a version decision and migration note. Readers must reject unsupported
-versions rather than ignore fields.
-
-Version 5 is intentionally incompatible with version 4:
-
-- `grains` becomes `binding_grains`;
-- task-specific analysis patterns are removed;
-- physical bindings, tables, and relationships move beneath
-  `profile_bindings`; and
-- portable objects, semantic relationships, time, aggregation, guardrail, and
-  coverage collections become required.
-
-There is no automatic conversion because physical metadata cannot establish
-clinical object identity, attribution, time meaning, aggregation, or coverage.
-See [`migration-v4-to-v5.md`](migration-v4-to-v5.md) for the complete
-disposition and interface changes.
+Content additions that preserve the documented contract can retain schema
+version 5. Changes to required fields, field meaning, identifier resolution,
+controlled facets, or query semantics require an explicit schema-version
+decision and synchronized format, architecture, interface, and usage
+documentation. Readers must reject unsupported versions rather than ignore
+fields.

@@ -59,8 +59,8 @@ Suppose a review establishes a new timestamp meaning.
    parity.
 7. Add focused synthetic unit tests, checked-in catalog acceptance assertions,
    and interface tests for every changed CLI, Python, or MCP surface.
-8. Synchronize README, format, architecture, migration, and agent instructions
-   affected by the change.
+8. Synchronize README, format, architecture, and agent instructions affected
+   by the change.
 9. Commit the coherent change with an informative
    `type(scope): subject` message.
 

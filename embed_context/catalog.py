@@ -1336,11 +1336,6 @@ class Catalog:
         data = _expect_mapping(value, "$")
         _require_keys(data, frozenset({"$schema", "schema_version"}), "$")
         version = data["schema_version"]
-        if version == 4:
-            raise CatalogValidationError(
-                "catalog schema_version 4 requires explicit migration to "
-                "schema version 5; see docs/migration-v4-to-v5.md"
-            )
         if (
             not isinstance(version, int)
             or isinstance(version, bool)

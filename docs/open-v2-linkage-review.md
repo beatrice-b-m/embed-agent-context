@@ -1,26 +1,21 @@
 # Open-v2 linkage review record
 
-This is a historical evidence record, not an onboarding guide or executable
-join specification. `open-v2` is the registered profile ID for the open EMBED
-V2 physical layout; it is not catalog schema version 2.
+This is an evidence record, not an onboarding guide or executable join
+specification. `open-v2` is the registered profile ID for the open EMBED V2
+physical layout; it is not catalog schema version 2.
 
 ## Purpose and evidence boundary
 
 This document preserves the qualitative conclusions from the open-v2 linkage
-review that originally informed the schema-v3 physical table, key, projection,
-and relationship declarations. It is retained as a versioned source so catalog
-claims do not cite the catalog that currently contains those claims.
+review that support the current physical table, key, projection, and
+relationship declarations. It provides an independent source so catalog claims
+do not cite the catalog that currently contains those claims.
 
 The review combined release-schema evidence with safe cross-table checks. It
 did not establish database constraints, complete longitudinal capture,
 clinical attribution, or contemporaneous availability. The portable catalog
 therefore uses these conclusions only as profile-specific implementation
 evidence. It does not carry empirical counts or distributions.
-
-The original evolution is recoverable in repository history, principally from
-the Phase 2 linkage commits beginning at `42677b2` and the populated open-v2
-linkage catalog at `7670c51`, with later validation corrections in `011681a`,
-`d21b2f8`, and `5e433ef`.
 
 ## Reconciled implementation conclusions
 

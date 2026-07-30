@@ -11,8 +11,6 @@ Read these in order before changing behavior or catalog meaning:
 4. `CONTRIBUTING.md` for the worked change flow and validation matrix.
 5. `docs/catalog-format.md` and `docs/architecture-v5.md` when changing the
    serialized model or query behavior.
-6. `docs/migration-v4-to-v5.md` when changing a public name, shape, or
-   compatibility statement.
 
 The current version axes are independent: software `0.6.0`, catalog schema
 version `5`, registered physical profile `open-v2`, and optional MCP SDK
@@ -97,7 +95,8 @@ locations, and run `embed-context validate` from outside the checkout.
   errors.
 - Packaging: keep the bundled catalog/schema, console scripts, package version,
   README install path, and client configurations synchronized.
-- Any public rename/removal/restoration: update the migration guide.
+- Any public interface change: update the relevant usage, format, and
+  architecture documentation.
 
 If a functional change genuinely needs no documentation update, record the
 reason in the commit message or task report.
@@ -118,5 +117,5 @@ Do not leave completed work uncommitted.
   `git log --oneline -3`.
 
 Documentation synchronization is part of each logical unit: update relevant
-user, operator, architecture, configuration, command, migration, and agent
-references before considering a functional change complete.
+user, operator, architecture, configuration, command, and agent references
+before considering a functional change complete.

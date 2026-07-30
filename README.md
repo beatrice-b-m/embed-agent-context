@@ -271,7 +271,6 @@ The version numbers describe different things:
   model or Python, CLI, and MCP interfaces.
 - [Architecture v5](docs/architecture-v5.md) — understand the separation
   between portable meaning and physical bindings.
-- [Migration from schema v4](docs/migration-v4-to-v5.md) — update older clients.
 - [Contributing](CONTRIBUTING.md) — set up a development environment and make
   catalog or code changes safely.
 

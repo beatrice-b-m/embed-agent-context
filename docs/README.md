@@ -27,8 +27,6 @@ ask a clinical question with `embed-context discover`
   validation rules, result envelopes, and Python, CLI, and MCP interfaces.
 - [Architecture v5](architecture-v5.md) explains why portable clinical meaning
   is separate from release-specific tables and columns.
-- [Migration from v4 to v5](migration-v4-to-v5.md) maps older commands,
-  methods, tools, and fields to the current interface.
 - The README's [AI client section](../README.md#connect-an-ai-client) shows
   Codex, Claude Code, and OpenCode stdio MCP configuration.
 
