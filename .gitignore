@@ -1,6 +1,9 @@
 # ignore reference files dir
 reference_files
 
+# ignore simulation study outputs dir
+simulations
+
 # general ignored
 .DS_Store
 __pycache__
