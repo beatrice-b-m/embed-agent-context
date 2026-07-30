@@ -20,7 +20,7 @@ class FakeCatalog:
     def summary(self) -> dict[str, Any]:
         self.calls.append(("summary", {}))
         return {
-            "schema_version": 5,
+            "schema_version": 6,
             "profiles": ["open-v2"],
             "binding_grains": ["patient", "exam", "imaging_finding"],
             "feature_kinds": ["date", "coded"],
@@ -454,7 +454,7 @@ class CatalogCLITests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 0)
         self.assertEqual(stdout.getvalue().strip(), f"embed-context {__version__}")
 
-    def test_validate_json_uses_stable_envelope_and_v5_inventory(self) -> None:
+    def test_validate_json_uses_stable_envelope_and_v6_inventory(self) -> None:
         status, stdout, stderr = self.run_cli(
             "--format",
             "json",
@@ -466,7 +466,7 @@ class CatalogCLITests(unittest.TestCase):
         envelope = json.loads(stdout)
         self.assertEqual(envelope["ok"], True)
         self.assertEqual(envelope["command"], "validate")
-        self.assertEqual(envelope["data"]["schema_version"], 5)
+        self.assertEqual(envelope["data"]["schema_version"], 6)
         self.assertEqual(envelope["data"]["clinical_objects"], 3)
         self.assertEqual(envelope["data"]["relationship_bindings"], 1)
 
@@ -775,6 +775,62 @@ class CatalogCLITests(unittest.TestCase):
         self.assertIn("open-v2.exam-context", stdout)
         self.assertIn("open-v2.release-schema", stdout)
 
+    def test_relationship_bindings_text_renders_path_only_results(self) -> None:
+        result = {
+            "count": 0,
+            "total": 0,
+            "matches": [],
+            "path_count": 1,
+            "path_total": 1,
+            "relationship_binding_paths": [
+                {
+                    "id": "pathology.patient",
+                    "profile": "open-v2",
+                    "semantic_relationship": (
+                        "clinical.patient-pathology-observation"
+                    ),
+                    "relationship_bindings": [
+                        "pathology.exam",
+                        "exam.patient",
+                    ],
+                    "description": (
+                        "Traverse pathology to its candidate exam, then patient."
+                    ),
+                    "claim_refs": [],
+                    "caveats": [],
+                }
+            ],
+        }
+        with patch.object(
+            self.catalog,
+            "search_relationship_bindings",
+            return_value=result,
+        ):
+            status, stdout, stderr = self.run_cli(
+                "relationship-bindings",
+                "--profile",
+                "open-v2",
+                "--semantic-relationship",
+                "clinical.patient-pathology-observation",
+            )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertNotIn("No relationship bindings.", stdout)
+        self.assertIn("relationship binding paths:", stdout)
+        self.assertIn(
+            "pathology.patient — open-v2 · "
+            "clinical.patient-pathology-observation",
+            stdout,
+        )
+        self.assertIn("steps: pathology.exam → exam.patient", stdout)
+        self.assertIn(
+            "description: Traverse pathology to its candidate exam, then "
+            "patient.",
+            stdout,
+        )
+        self.assertIn("1 relationship binding path(s).", stdout)
+
     def test_legacy_and_ambiguous_commands_are_removed(self) -> None:
         parser = build_parser()
         for command in (
@@ -896,6 +952,114 @@ class CatalogCLITests(unittest.TestCase):
         self.assertIn("provenance:", rendered)
         self.assertIn("claims: null-semantics", rendered)
         self.assertIn("sources: open-v2.schema", rendered)
+
+    def test_text_exact_getter_renders_structured_constraints_prominently(
+        self,
+    ) -> None:
+        rendered = _format_text(
+            "feature",
+            {
+                "kind": "feature",
+                "identifier": "risk.model_output",
+                "feature": {
+                    "id": "risk.model_output",
+                    "label": "Risk output",
+                },
+                "constraints": {
+                    "supported_facts": ["The output supports ranking analyses."],
+                    "unresolved_claims": [
+                        {
+                            "identifier": "coverage.risk-probability",
+                            "status": "unresolved",
+                            "summary": "Probability semantics are not verified.",
+                        }
+                    ],
+                    "unsupported_substitutions": [
+                        {
+                            "id": "guardrail.no-date-fallback",
+                            "category": "prohibition",
+                            "statement": "Do not substitute a report date.",
+                        }
+                    ],
+                    "analyst_choices_required": [
+                        {"meaning": "Choose and name the analysis endpoint."}
+                    ],
+                    "high_priority_guardrails": [
+                        {
+                            "id": "guardrail.risk-calibration",
+                            "priority": "critical",
+                            "summary": "Validate probability meaning first.",
+                        }
+                    ],
+                    "relevant_contexts": [{"id": "open-v2.risk-context"}],
+                },
+                "related": {"features": ["risk.model_name"]},
+                "provenance": {"claims": [{"id": "risk-output-semantics"}]},
+            },
+        )
+
+        self.assertIn("constraints:", rendered)
+        self.assertIn(
+            "coverage.risk-probability [unresolved] — "
+            "Probability semantics are not verified.",
+            rendered,
+        )
+        self.assertIn(
+            "guardrail.no-date-fallback [prohibition] — "
+            "Do not substitute a report date.",
+            rendered,
+        )
+        self.assertIn(
+            "guardrail.risk-calibration [critical] — "
+            "Validate probability meaning first.",
+            rendered,
+        )
+        self.assertIn("- open-v2.risk-context", rendered)
+        self.assertLess(rendered.index("constraints:"), rendered.index("related:"))
+        self.assertLess(rendered.index("constraints:"), rendered.index("provenance:"))
+
+    def test_cli_renders_optional_constraints_from_fake_result(self) -> None:
+        result = {
+            "kind": "guardrail",
+            "identifier": "guardrail.timeline-search",
+            "guardrail": {
+                "id": "guardrail.timeline-search",
+                "label": "Search the patient timeline",
+            },
+            "constraints": {
+                "supported_facts": [
+                    {
+                        "identifier": "clinical.patient-exam",
+                        "status": "supported",
+                        "statement": "Patient-level traversal is represented.",
+                    }
+                ],
+                "analyst_choices_required": [
+                    "Choose the candidate-event selection rule."
+                ],
+            },
+            "related": {"clinical_objects": ["patient"]},
+        }
+        with patch.object(
+            self.catalog,
+            "get_guardrail",
+            return_value=result,
+        ):
+            status, stdout, stderr = self.run_cli(
+                "guardrail",
+                "guardrail.timeline-search",
+            )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("constraints:", stdout)
+        self.assertIn(
+            "clinical.patient-exam [supported] — "
+            "Patient-level traversal is represented.",
+            stdout,
+        )
+        self.assertIn("- Choose the candidate-event selection rule.", stdout)
+        self.assertLess(stdout.index("constraints:"), stdout.index("related:"))
 
     def test_text_discovery_renders_structured_diagnostic_categories(self) -> None:
         rendered = _format_text(

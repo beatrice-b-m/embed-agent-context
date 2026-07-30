@@ -205,10 +205,17 @@ def build_server(catalog: CatalogProtocol) -> Any:
             "underlying reviewed claims and sources matter. "
             "Do not infer that absent pathology is negative, treat an imaging "
             "assessment as pathology truth, or move between finding, side, "
-            "exam, and patient grain without an explicit policy. No date is a "
-            "universal diagnosis date. Use secondary profile-table and physical "
-            "relationship-binding tools only after selecting semantic concepts; "
-            "they describe storage implementation and never execute a join. "
+            "exam, and patient grain without an explicit policy. Search for "
+            "longitudinal pathology candidates across the patient timeline; a "
+            "pathology accession belongs to its candidate exam and must not be "
+            "forced equal to the index accession. No date is a universal "
+            "diagnosis date, and different temporal semantics must not be "
+            "coalesced or fallback-substituted; use separately named endpoints "
+            "or sensitivity analyses instead. Treat unresolved risk-output "
+            "semantics as unsuitable for probability-calibration metrics until "
+            "validated. Use secondary profile-table and physical relationship-"
+            "binding tools only after selecting semantic concepts; they describe "
+            "storage implementation and never execute a join. "
             "The catalog does not emit SQL, pipelines, canonical cohorts, "
             "scientific-validity claims, clinical rows, or empirical counts. "
             f"Discovery filters — {discovery_filter_description}. "
@@ -256,7 +263,15 @@ def build_server(catalog: CatalogProtocol) -> Any:
 
         return catalog.get_clinical_object(identifier)
 
-    @server.tool(annotations=read_only, structured_output=True)
+    @server.tool(
+        annotations=read_only,
+        structured_output=True,
+        description=(
+            "Get one semantic feature and optional complete vocabulary code "
+            "map. Unresolved risk-output semantics do not support probability-"
+            "calibration metrics until validated."
+        ),
+    )
     def get_feature(
         identifier: str,
         include_codes: bool = False,
@@ -265,13 +280,30 @@ def build_server(catalog: CatalogProtocol) -> Any:
 
         return catalog.get_feature(identifier, include_codes=include_codes)
 
-    @server.tool(annotations=read_only, structured_output=True)
+    @server.tool(
+        annotations=read_only,
+        structured_output=True,
+        description=(
+            "Get a storage-independent clinical relationship and attribution "
+            "limits. Longitudinal pathology candidates require patient-timeline "
+            "traversal; their accessions belong to candidate exams, not "
+            "necessarily the index exam."
+        ),
+    )
     def get_semantic_relationship(identifier: str) -> dict[str, Any]:
         """Get a storage-independent clinical relationship and attribution limits."""
 
         return catalog.get_semantic_relationship(identifier)
 
-    @server.tool(annotations=read_only, structured_output=True)
+    @server.tool(
+        annotations=read_only,
+        structured_output=True,
+        description=(
+            "Get what a candidate event, documentation, or availability time "
+            "means. Never coalesce or fallback-substitute distinct semantics; "
+            "separately named endpoints and sensitivity analyses are allowed."
+        ),
+    )
     def get_temporal_semantic(identifier: str) -> dict[str, Any]:
         """Get what a candidate event, documentation, or availability time means."""
 
@@ -289,7 +321,15 @@ def build_server(catalog: CatalogProtocol) -> Any:
 
         return catalog.get_guardrail(identifier)
 
-    @server.tool(annotations=read_only, structured_output=True)
+    @server.tool(
+        annotations=read_only,
+        structured_output=True,
+        description=(
+            "Get a supported, unsupported, unresolved, or uncataloged scope "
+            "record. Unresolved risk-output semantics preclude probability-"
+            "calibration metrics until validated."
+        ),
+    )
     def get_coverage(identifier: str) -> dict[str, Any]:
         """Get a supported, unsupported, unresolved, or uncataloged scope record."""
 
@@ -325,7 +365,10 @@ def build_server(catalog: CatalogProtocol) -> Any:
         description=(
             "Filter secondary physical relationship bindings by profile and "
             "endpoint table. These are descriptive storage mappings, not "
-            f"clinical relationships or executable joins. Valid filters — "
+            "clinical relationships or executable joins. For longitudinal "
+            "pathology, traverse the patient timeline and do not force a "
+            "candidate pathology accession to equal the index accession. "
+            f"Valid filters — "
             f"{binding_filter_description}."
         ),
     )

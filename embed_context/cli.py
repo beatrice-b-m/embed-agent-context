@@ -395,10 +395,15 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
         return _format_relationship_binding_result(data)
     if command == "relationship-bindings":
         matches = data.get("matches", ())
-        if not matches:
+        paths = data.get("relationship_binding_paths", ())
+        if not matches and not paths:
             return "No relationship bindings."
         lines = [_format_relationship_binding(item) for item in matches]
         _append_result_count(lines, data, "relationship bindings")
+        if paths:
+            lines.append("relationship binding paths:")
+            lines.extend(_format_relationship_binding_path(item) for item in paths)
+            _append_path_result_count(lines, data)
         return "\n".join(lines)
     raise ValueError(f"unsupported command {command!r}")
 
@@ -808,6 +813,33 @@ def _format_relationship_binding(relationship: Mapping[str, Any]) -> str:
     return line
 
 
+def _format_relationship_binding_path(path: Mapping[str, Any]) -> str:
+    identifier = path.get("id", path.get("identifier", "unknown"))
+    profile = path.get("profile", "?")
+    semantic_relationship = path.get("semantic_relationship", "?")
+    steps = " → ".join(map(str, path.get("relationship_bindings", ())))
+    line = f"{identifier} — {profile} · {semantic_relationship}"
+    if steps:
+        line += f"\n  steps: {steps}"
+    if path.get("description"):
+        line += f"\n  description: {path['description']}"
+    return line
+
+
+def _append_path_result_count(
+    lines: list[str],
+    data: Mapping[str, Any],
+) -> None:
+    total = data.get("path_total")
+    count = data.get("path_count")
+    if not isinstance(count, int):
+        return
+    if isinstance(total, int) and total > count:
+        lines.append(f"Showing {count} of {total} relationship binding paths.")
+    else:
+        lines.append(f"{count} relationship binding path(s).")
+
+
 def _format_relationship_binding_result(data: Mapping[str, Any]) -> str:
     relationship = _entity_from_result(data, "relationship_binding")
     lines = [_format_relationship_binding(relationship)]
@@ -832,6 +864,7 @@ def _append_navigation_and_provenance(
     lines: list[str],
     result: Mapping[str, Any],
 ) -> None:
+    _append_constraints(lines, result.get("constraints"))
     for field in ("related", "provenance"):
         value = result.get(field)
         if not value:
@@ -846,6 +879,67 @@ def _append_navigation_and_provenance(
             rendered = _render_references(value)
             if rendered:
                 lines.append(f"  {rendered}")
+
+
+def _append_constraints(lines: list[str], constraints: Any) -> None:
+    if not isinstance(constraints, Mapping) or not constraints:
+        return
+    category_order = (
+        "supported_facts",
+        "unresolved_claims",
+        "unsupported_substitutions",
+        "analyst_choices_required",
+        "high_priority_guardrails",
+        "relevant_contexts",
+    )
+    categories = [
+        *(
+            category
+            for category in category_order
+            if constraints.get(category)
+        ),
+        *(
+            category
+            for category, entries in constraints.items()
+            if category not in category_order and entries
+        ),
+    ]
+    if not categories:
+        return
+    lines.append("constraints:")
+    for category in categories:
+        lines.append(f"  {category.replace('_', ' ')}:")
+        entries = constraints[category]
+        if isinstance(entries, Sequence) and not isinstance(
+            entries, (str, bytes)
+        ):
+            values = entries
+        else:
+            values = (entries,)
+        lines.extend(f"    - {_render_constraint_entry(entry)}" for entry in values)
+
+
+def _render_constraint_entry(entry: Any) -> str:
+    if not isinstance(entry, Mapping):
+        return str(entry)
+    identifier = entry.get("identifier") or entry.get("id")
+    qualifiers = [
+        str(entry[field])
+        for field in ("status", "category", "priority")
+        if entry.get(field)
+    ]
+    summary = (
+        entry.get("summary")
+        or entry.get("statement")
+        or entry.get("meaning")
+    )
+    rendered = str(identifier) if identifier else ""
+    if qualifiers:
+        qualifier_text = f"[{'; '.join(qualifiers)}]"
+        rendered += (" " if rendered else "") + qualifier_text
+    if summary:
+        rendered += (" — " if rendered else "") + str(summary)
+    return rendered or _render_references(entry)
 
 
 def _render_references(value: Any) -> str:

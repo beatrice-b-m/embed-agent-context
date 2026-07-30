@@ -311,6 +311,26 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Begin with discover", self.server.instructions)
         self.assertIn("Use get_context", self.server.instructions)
         self.assertIn("No date is a universal diagnosis date", self.server.instructions)
+        self.assertIn(
+            "longitudinal pathology candidates across the patient timeline",
+            self.server.instructions,
+        )
+        self.assertIn(
+            "must not be forced equal to the index accession",
+            self.server.instructions,
+        )
+        self.assertIn(
+            "must not be coalesced or fallback-substituted",
+            self.server.instructions,
+        )
+        self.assertIn(
+            "separately named endpoints or sensitivity analyses",
+            self.server.instructions,
+        )
+        self.assertIn(
+            "unsuitable for probability-calibration metrics until validated",
+            self.server.instructions,
+        )
         self.assertIn("secondary", self.server.instructions)
         self.assertNotIn("analysis patterns", self.server.instructions.lower())
 
@@ -507,9 +527,38 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(bindings.is_error)
         self.assertEqual(bindings.structured_content["count"], 1)
         descriptions = {tool.name: tool.description for tool in tools.tools}
+        self.assertIn(
+            "patient-timeline traversal",
+            descriptions["get_semantic_relationship"],
+        )
+        self.assertIn(
+            "not necessarily the index exam",
+            descriptions["get_semantic_relationship"],
+        )
+        self.assertIn(
+            "Never coalesce or fallback-substitute",
+            descriptions["get_temporal_semantic"],
+        )
+        self.assertIn(
+            "separately named endpoints and sensitivity analyses",
+            descriptions["get_temporal_semantic"],
+        )
+        self.assertIn(
+            "do not support probability-calibration metrics until validated",
+            descriptions["get_feature"],
+        )
+        self.assertIn(
+            "preclude probability-calibration metrics until validated",
+            descriptions["get_coverage"],
+        )
         self.assertIn("secondary", descriptions["get_profile_table"])
         self.assertIn(
             "not clinical relationships or executable joins",
+            descriptions["search_relationship_bindings"],
+        )
+        self.assertIn(
+            "do not force a candidate pathology accession to equal the index "
+            "accession",
             descriptions["search_relationship_bindings"],
         )
         self.assertEqual(
