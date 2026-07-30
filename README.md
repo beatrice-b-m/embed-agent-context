@@ -3,6 +3,14 @@
 Ask useful questions about the Emory Breast Imaging Dataset (EMBED) before
 turning table names into cohort logic.
 
+EMBED is a breast-imaging research dataset from Emory Healthcare containing
+screening and diagnostic mammography images, image metadata, and structured
+clinical information. The HITI Lab's
+[public EMBED documentation](https://docs.hitilab.com/datasets/embed) introduces
+the dataset, its organization, access requirements, and supporting resources.
+This project does not distribute the dataset or replace its official
+documentation and data-use terms.
+
 EMBED contains rich imaging, assessment, procedure, and pathology data, but its
 physical layout alone cannot tell you what a row means, whether two records can
 be attributed to each other, or which date is appropriate for a study. This

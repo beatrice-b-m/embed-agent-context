@@ -8,6 +8,12 @@ Start with the repository [README](../README.md). It explains why the catalog
 exists, installs the commands with `uv tool install`, and walks through a
 clinical-first query. No EMBED data or repository checkout is needed.
 
+If EMBED itself is new to you, begin with the HITI Lab's
+[public dataset documentation](https://docs.hitilab.com/datasets/embed) for the
+dataset overview, organization, access requirements, and data-use terms. This
+repository documents a separate clinical-semantic catalog and does not
+distribute EMBED.
+
 Then read the [clinical-semantic model](clinical-semantic-model.md) when you
 need the details behind pathology outcomes, finding attribution, candidate
 dates, aggregation, and incomplete outcome capture.

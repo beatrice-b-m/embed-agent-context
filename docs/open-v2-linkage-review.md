@@ -49,10 +49,10 @@ evidence. It does not carry empirical counts or distributions.
   outside-system outcome capture, or the causal relationship between an
   imaging finding and a later procedure or diagnosis.
 
-## Use in schema version 5
+## Use in the current catalog
 
-Schema version 5 keeps these conclusions beneath the portable clinical model.
-They support open-v2 object bindings, physical relationship bindings,
-profile-specific context claims, and coverage records. They must not be used
-to infer that another release or storage representation has the same columns,
-keys, joins, completeness, attribution, or availability behavior.
+Schema version 6 keeps these conclusions beneath the portable clinical model.
+They support open-v2 object bindings, physical relationship bindings and
+paths, profile-specific context claims, and coverage records. They must not be
+used to infer that another release or storage representation has the same
+columns, keys, joins, completeness, attribution, or availability behavior.
