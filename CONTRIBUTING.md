@@ -118,6 +118,14 @@ rows, clinical values, identifiers, anonymized dates, report text, statistics,
 or counts. `reference_files/` is not required for a fresh clone and must never
 be committed.
 
+## Continuous integration
+
+GitHub Actions runs the clone-safe baseline on Python 3.11, 3.12, and 3.13 for
+every pull request and every push to `main`. A separate packaging job builds
+the source distribution and wheel, installs the wheel with its MCP extra into
+temporary tool directories outside the checkout, and invokes both installed
+entry points. The workflow never accesses EMBED data or `reference_files/`.
+
 ## Pull request checklist
 
 - Clinical meaning and instance grain are independent of storage.

@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install locked dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run the complete test suite
+        run: uv run --locked python -m unittest discover -v
+
+      - name: Validate the bundled catalog
+        run: uv run --locked embed-context validate
+
+      - name: Verify the isolated MCP extra
+        run: >-
+          uv run --locked --no-dev --extra mcp python -m unittest
+          tests.test_mcp_server -v
+
+  package:
+    name: Build and install wheel
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Build release artifacts
+        run: uv build
+
+      - name: Install and invoke the wheel outside the checkout
+        working-directory: ${{ runner.temp }}
+        env:
+          UV_TOOL_DIR: ${{ runner.temp }}/embed-context-tools
+          UV_TOOL_BIN_DIR: ${{ runner.temp }}/embed-context-bin
+        run: |
+          uv tool install --with mcp==2.0.0 "${GITHUB_WORKSPACE}"/dist/*.whl
+          "${UV_TOOL_BIN_DIR}/embed-context" --version
+          "${UV_TOOL_BIN_DIR}/embed-context" validate
+          "${UV_TOOL_BIN_DIR}/embed-context-mcp" --version
