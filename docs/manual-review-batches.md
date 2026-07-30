@@ -1,10 +1,14 @@
 # Maintainer clarification record
 
+This is a historical evidence record, not an onboarding guide or executable
+workflow specification.
+
 ## Purpose
 
 This records the completed maintainer review of catalog questions that could
-not be settled mechanically. The detailed responses remain available in Git
-history at the parent of the implementation commit.
+not be settled mechanically on July 29, 2026. The detailed responses are
+preserved in Git commit `359cc43`; the resulting catalog implementation is
+commit `e77da91`.
 
 The catalog and this record distinguish:
 
@@ -24,8 +28,9 @@ behavior, and other mechanical checks were not part of maintainer review.
 - Exam-level and breast-side-level mass, calcification, asymmetry, and
   architectural-distortion fields are Boolean summaries of finding-level
   presence flags.
-- They aggregate only mammography findings, including FFDM, synthetic 2D, and
-  DBT, not ultrasound or MRI findings.
+- They aggregate only mammography findings, including full-field digital
+  mammography (FFDM), synthetic 2D, and digital breast tomosynthesis (DBT), not
+  ultrasound or magnetic resonance imaging (MRI) findings.
 - Left and right finding totals count distinct findings recorded on the
   respective breast during an exam. They are stored on side-level rows, but
   that storage does not give them a different row-specific meaning.
@@ -84,8 +89,9 @@ behavior, and other mechanical checks were not part of maintainer review.
 
 ### Risk outputs
 
-- Ordinary NCI and IBIS values are tentatively believed to use percentage
-  points, but the risk table has not been validated in depth.
+- Ordinary National Cancer Institute (NCI) and International Breast Cancer
+  Intervention Study (IBIS) risk-model values are tentatively believed to use
+  percentage points, but the risk table has not been validated in depth.
 - Meanings of `-35`, `-2`, and `100` remain unknown.
 - NCI and IBIS model versions remain unknown.
 - Definitions of `IBISPOP10`, `IBISPOPL`, and `IBIS_TD1` through `IBIS_TD4`

@@ -1,5 +1,9 @@
 # Open-v2 linkage review record
 
+This is a historical evidence record, not an onboarding guide or executable
+join specification. `open-v2` is the registered profile ID for the open EMBED
+V2 physical layout; it is not catalog schema version 2.
+
 ## Purpose and evidence boundary
 
 This document preserves the qualitative conclusions from the open-v2 linkage

@@ -21,8 +21,8 @@ import pyarrow.parquet as pq
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
-    # Keep direct ``python scripts/...`` execution working in an uninstalled
-    # repository; the project intentionally has no packaged runtime.
+    # Keep direct ``python scripts/...`` execution working from a source
+    # checkout even when the package has not been installed in this environment.
     sys.path.insert(0, str(REPO_ROOT))
 
 from embed_context import Catalog, CatalogError, load_catalog
