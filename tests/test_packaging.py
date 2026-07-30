@@ -54,7 +54,7 @@ class PackagingContractTests(unittest.TestCase):
         path = default_catalog_path()
 
         self.assertTrue(path.is_file(), path)
-        self.assertEqual(load_catalog().schema_version, 5)
+        self.assertEqual(load_catalog().schema_version, 6)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 {
   "$schema": "./catalog.schema.json",
-  "schema_version": 5,
+  "schema_version": 6,
   "profiles": [
     "open-v2"
   ],
@@ -1572,26 +1572,31 @@
     },
     "imaging.finding_number": {
       "label": "Finding number",
-      "definition": "Ordinal finding number within an accession, except for reserved synthetic entries.",
+      "definition": "Finding identifier within an accession, except for reserved synthetic entries.",
       "feature_kind": "identifier",
       "domains": [
         "identity",
         "imaging"
       ],
       "search_terms": [
-        "finding number"
+        "finding number",
+        "one row per finding",
+        "finding key",
+        "clinical finding identity",
+        "finding row multiplicity"
       ],
       "caveats": [
         "The reserved value -9 identifies a derived synthetic contralateral negative finding implied by a non-negative finding on the other breast but not explicitly entered in MagView.",
         "Synthetic contralateral negatives are derived records rather than manually entered findings.",
-        "Semantics of zero and any other nonpositive values remain unresolved."
+        "After excluding the reserved -9 synthetic records, (acc_anon, numfind) identifies a distinct clinical finding within an accession; side is not part of that clinical identity.",
+        "One clinical finding can occupy multiple physical rows because of attached procedures or later table construction and merges.",
+        "The tuple is not a persistent lesion identifier across accessions, episodes, or modalities."
       ],
       "evidence": [
         "release_schema",
         "release_legend",
         "observed_v2_values",
-        "maintainer_confirmed",
-        "unresolved"
+        "maintainer_confirmed"
       ],
       "objects": [
         "imaging_finding"
@@ -2727,7 +2732,7 @@
         "biopsy side"
       ],
       "caveats": [
-        "Null semantics are not documented and must not be inferred from the code meanings."
+        "Null semantics are occurrence- and profile-specific; inspect the selected binding rather than inferring them from the code meanings."
       ],
       "evidence": [
         "release_schema",
@@ -2875,11 +2880,16 @@
         "temporal"
       ],
       "search_terms": [
-        "anonymized procedure date"
+        "anonymized procedure date",
+        "procedure date fallback",
+        "coalesce procedure report exam date",
+        "proxy event date"
       ],
       "caveats": [
         "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved.",
-        "Procedure information may be post-exam and requires a task-specific temporal anchor."
+        "Procedure information may be post-exam and requires a task-specific temporal anchor.",
+        "Do not coalesce this procedure-event date with specimen, pathology-report, or imaging-exam dates as fallback values for the same endpoint.",
+        "If procedure-event time is the selected endpoint, a missing value remains missing; another temporal semantic may be analyzed only as a separately named endpoint or sensitivity analysis."
       ],
       "evidence": [
         "release_schema",
@@ -2918,11 +2928,16 @@
         "temporal"
       ],
       "search_terms": [
-        "anonymized pathology report date"
+        "anonymized pathology report date",
+        "pathology report date fallback",
+        "coalesce procedure report exam date",
+        "proxy diagnosis date"
       ],
       "caveats": [
         "The absolute calendar date is shifted and must not be interpreted literally; within-patient ordering and date differences are preserved.",
-        "Pathology-report information may be post-exam and requires a task-specific temporal anchor."
+        "Pathology-report information may be post-exam and requires a task-specific temporal anchor.",
+        "Do not coalesce this documentation date with procedure, specimen, or imaging-exam dates as fallback values for the same endpoint.",
+        "If pathology-report documentation time is the selected endpoint, a missing value remains missing; another temporal semantic may be analyzed only as a separately named endpoint or sensitivity analysis."
       ],
       "evidence": [
         "release_schema",
@@ -3814,11 +3829,12 @@
         "source": "optional",
         "target": "required"
       },
-      "attribution": "Patient ownership of an imaging accession.",
+      "attribution": "Patient ownership of each imaging accession, supporting traversal across all represented exams in that patient's timeline.",
       "attribution_limitations": [
-        "Release-local identifiers and incomplete longitudinal capture limit portability."
+        "Release-local identifiers and incomplete longitudinal capture limit portability.",
+        "A task may retain exam-side or finding output grain, but searches for prior, subsequent, nearest, or interval events must first consider candidate exams across the patient timeline rather than only the index accession."
       ],
-      "temporal_qualification": "Exams have their own event dates within a patient timeline.",
+      "temporal_qualification": "Each exam has its own event date within a patient timeline; same-day inclusion, episode membership, and tie-breaking remain declared analyst choices.",
       "temporal_semantics": [
         "time.exam-event"
       ],
@@ -3828,11 +3844,19 @@
       ],
       "search_terms": [
         "patient exams",
-        "patient accession"
+        "patient accession",
+        "patient timeline",
+        "prior exam",
+        "subsequent exam",
+        "nearest exam",
+        "history",
+        "within days",
+        "longitudinal candidate search"
       ],
       "claim_refs": [],
       "caveats": [
-        "This direct relation does not replace the clinically useful episode layer."
+        "This direct relation does not replace the clinically useful episode layer.",
+        "Do not equate a candidate event's accession with an index accession merely because the final result is reported at exam-side or finding grain."
       ]
     },
     "clinical.exam-side": {
@@ -4159,11 +4183,13 @@
         "source": "optional",
         "target": "required"
       },
-      "attribution": "Patient attribution inherited through represented accession and procedure context.",
+      "attribution": "Patient attribution inherited by traversing from each candidate pathology observation's associated accession to that candidate exam and then to its patient.",
       "attribution_limitations": [
-        "A profile may carry patient attribution indirectly through an exam or accession relationship."
+        "A profile may carry patient attribution indirectly through an exam or accession relationship.",
+        "The pathology row's accession identifies its own associated candidate exam; it is not necessarily the index exam accession used by a longitudinal analysis.",
+        "The pathology-to-exam association alone does not implement patient-level longitudinal ascertainment; the candidate exam must also be attributed to the patient."
       ],
-      "temporal_qualification": "The observation occurs within the patient's represented clinical timeline.",
+      "temporal_qualification": "The observation occurs within the patient's represented clinical timeline and can be compared with qualifying index exams only after patient attribution; same-day inclusion and nearest-event tie-breaking remain analyst choices.",
       "temporal_semantics": [
         "time.procedure-event",
         "time.pathology-report-documentation",
@@ -4175,11 +4201,18 @@
       ],
       "search_terms": [
         "patient pathology",
-        "patient diagnosis observations"
+        "patient diagnosis observations",
+        "patient timeline pathology",
+        "prior cancer",
+        "subsequent cancer",
+        "nearest pathology",
+        "cancer history",
+        "within days",
+        "longitudinal cancer ascertainment"
       ],
       "claim_refs": [],
       "caveats": [
-        "This semantic relation may require traversal through an exam binding."
+        "This semantic relation requires the two-edge open-v2 traversal pathology accession to candidate exam to patient; no single pathology-to-exam binding is a complete patient-pathology implementation."
       ]
     },
     "clinical.exam-pathology-observation": {
@@ -4504,7 +4537,10 @@
       "search_terms": [
         "procedure date",
         "biopsy date",
-        "surgery date"
+        "surgery date",
+        "procedure report fallback",
+        "coalesce event dates",
+        "proxy date"
       ],
       "claim_refs": [
         "open-v2.temporal-availability-context#date-representation",
@@ -4512,7 +4548,9 @@
       ],
       "caveats": [
         "The procedure can occur after the associated imaging exam.",
-        "Procedure date is not interchangeable with specimen or pathology-report time."
+        "Procedure date is not interchangeable with specimen or pathology-report time.",
+        "Do not coalesce procedure, specimen, report, or imaging-exam dates into one event timestamp.",
+        "Missing procedure-event time remains missing for that endpoint; another time meaning may be studied only as a separately named endpoint or sensitivity analysis."
       ]
     },
     "time.specimen-collection": {
@@ -4566,7 +4604,10 @@
       "search_terms": [
         "pathology report date",
         "diagnosis report time",
-        "pathology documentation"
+        "pathology documentation",
+        "procedure report fallback",
+        "coalesce event dates",
+        "proxy diagnosis date"
       ],
       "claim_refs": [
         "open-v2.temporal-availability-context#date-representation",
@@ -4574,7 +4615,9 @@
       ],
       "caveats": [
         "Documentation time may differ from procedure, specimen, clinical recognition, and data availability.",
-        "The field is not designated as a universal diagnosis date."
+        "The field is not designated as a universal diagnosis date.",
+        "Do not coalesce procedure, specimen, report, or imaging-exam dates into one event timestamp.",
+        "Missing pathology-report documentation time remains missing for that endpoint; another time meaning may be studied only as a separately named endpoint or sensitivity analysis."
       ]
     },
     "time.downstream-availability": {
@@ -4702,7 +4745,7 @@
     },
     "aggregation.pathology-severity-to-finding": {
       "label": "Pathology severity to imaging finding",
-      "status": "unresolved",
+      "status": "analyst_defined",
       "source_object": "pathology_diagnosis",
       "target_object": "imaging_finding",
       "source_concept": "pathology.severity",
@@ -4711,22 +4754,26 @@
         "clinical.pathology-observation-diagnosis",
         "clinical.finding-pathology-observation"
       ],
-      "method": "No supplied finding-level severity aggregation is established.",
-      "ordering": "An analyst-defined reconciliation would have to address optional many-to-many attribution.",
+      "method": "No supplied finding-level severity aggregation is established; an analyst may declare a task-specific policy such as any linked outcome, earliest linked outcome, or minimum linked severity.",
+      "ordering": "The declared policy must address optional many-to-many attribution, row multiplication, time, and estimand dependence.",
       "domains": [
         "imaging",
         "pathology"
       ],
       "search_terms": [
         "finding pathology aggregate",
-        "finding cancer label"
+        "finding cancer label",
+        "analyst defined finding outcome",
+        "earliest linked outcome",
+        "minimum linked severity"
       ],
       "claim_refs": [
         "open-v2.pathology-procedure-context#imaging-link-tuple"
       ],
       "caveats": [
         "Do not silently deduplicate multiplied joins.",
-        "The catalog does not select a finding-level outcome policy."
+        "The catalog does not select a finding-level outcome policy.",
+        "Incomplete linkage and multiplicity remain visible limitations even when a declared policy is reasonable."
       ]
     },
     "aggregation.pathology-severity-to-patient": {
@@ -4762,6 +4809,8 @@
   "guardrails": {
     "guardrail.null-pathology-not-negative": {
       "title": "Unattached pathology is not a negative diagnosis",
+      "category": "prohibition",
+      "priority": "critical",
       "statement": "Do not classify null pathology severity or absent attached pathology as benign, no cancer, or adequate negative follow-up.",
       "rationale": "The represented null state means no pathology is attached; it does not establish disease absence or outcome ascertainment.",
       "scope": "profile_specific",
@@ -4798,6 +4847,8 @@
     },
     "guardrail.assessment-not-pathology": {
       "title": "Imaging assessment is not pathology truth",
+      "category": "prohibition",
+      "priority": "high",
       "statement": "Do not substitute an imaging assessment or recommendation for a tissue diagnosis.",
       "rationale": "Assessment guides next clinical actions; pathology observations and diagnoses are distinct downstream objects.",
       "scope": "general_clinical",
@@ -4836,6 +4887,8 @@
     },
     "guardrail.downstream-temporal-leakage": {
       "title": "Downstream clinical information may cause temporal leakage",
+      "category": "prohibition",
+      "priority": "critical",
       "statement": "Procedure, pathology, and later report information must not be assumed available at an earlier imaging or prediction time.",
       "rationale": "Event, documentation, and availability times differ, and wide-row co-location does not prove co-availability.",
       "scope": "profile_specific",
@@ -4886,6 +4939,8 @@
     },
     "guardrail.explicit-attribution-policy": {
       "title": "Finding-to-pathology attribution requires an explicit policy",
+      "category": "analyst_choice",
+      "priority": "high",
       "statement": "Do not treat finding, procedure, or pathology attribution as one-to-one or silently deduplicate multiplied rows.",
       "rationale": "Represented attribution is optional and many-to-many; incomplete tuples and duplicate matches can change grain and interpretation.",
       "scope": "embed_general",
@@ -4929,6 +4984,8 @@
     },
     "guardrail.explicit-grain-aggregation": {
       "title": "Changing clinical grain requires an explicit aggregation policy",
+      "category": "analyst_choice",
+      "priority": "high",
       "statement": "Moving among finding, side, exam, episode, and patient grain requires a declared aggregation, multiplicity, and time policy.",
       "rationale": "The same person can have multiple exams, sides, findings, procedures, and diagnoses; supplied aggregates cover only documented transitions.",
       "scope": "profile_specific",
@@ -4980,10 +5037,134 @@
         "The catalog does not select a canonical cohort or patient-level outcome."
       ]
     },
+    "guardrail.longitudinal-search-is-patient-scoped": {
+      "title": "Longitudinal candidate search is patient-scoped",
+      "category": "prohibition",
+      "priority": "critical",
+      "statement": "Search candidate prior or subsequent exams, procedures, and pathology across the represented patient timeline; do not restrict candidate ascertainment to the index accession.",
+      "rationale": "The output can remain at exam-side or finding grain, but a candidate pathology row's accession identifies its own associated exam. Patient-level traversal requires pathology accession to candidate exam to patient before comparison with qualifying index exams for that patient.",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "objects": [
+        "patient",
+        "imaging_exam",
+        "procedure",
+        "pathology_observation",
+        "pathology_diagnosis"
+      ],
+      "concepts": [
+        "identity.patient_identifier",
+        "exam.accession_identifier",
+        "exam.study_date",
+        "pathology.procedure_date",
+        "pathology.report_date",
+        "pathology.severity"
+      ],
+      "semantic_relationships": [
+        "clinical.patient-exam",
+        "clinical.patient-pathology-observation",
+        "clinical.exam-pathology-observation"
+      ],
+      "temporal_semantics": [
+        "time.exam-event",
+        "time.procedure-event",
+        "time.pathology-report-documentation"
+      ],
+      "aggregations": [
+        "aggregation.pathology-severity-to-patient"
+      ],
+      "coverage": [
+        "coverage.open-v2.outcome-capture",
+        "coverage.open-v2.patient-pathology-aggregate"
+      ],
+      "domains": [
+        "identity",
+        "exam",
+        "pathology",
+        "temporal"
+      ],
+      "search_terms": [
+        "patient timeline",
+        "longitudinal candidate search",
+        "nearest subsequent cancer",
+        "most recent prior cancer",
+        "cancer history",
+        "prior pathology",
+        "subsequent pathology",
+        "within days",
+        "index accession restriction"
+      ],
+      "claim_refs": [
+        "open-v2.pathology-procedure-context#patient-aggregate-absence",
+        "open-v2.pathology-procedure-context#outcome-capture-not-established"
+      ],
+      "caveats": [
+        "Incomplete represented follow-up still limits ascertainment after patient-scoped traversal.",
+        "This guardrail does not choose same-day boundaries, episode definitions, tie-breaking, or a preferred event timestamp."
+      ]
+    },
+    "guardrail.longitudinal-boundaries-are-analyst-choices": {
+      "title": "Longitudinal boundaries and tie-breaking require declared choices",
+      "category": "analyst_choice",
+      "priority": "high",
+      "statement": "Declare whether subsequent excludes same-day events, whether separate same-day procedures remain distinct, how episodes are defined, and how equally near candidates are handled.",
+      "rationale": "These choices determine temporal membership and multiplicity but are not representation failures, and the catalog does not select them.",
+      "scope": "embed_general",
+      "profiles": [],
+      "objects": [
+        "patient",
+        "breast_imaging_episode",
+        "imaging_exam",
+        "procedure",
+        "pathology_observation"
+      ],
+      "concepts": [
+        "exam.study_date",
+        "pathology.procedure_date",
+        "pathology.report_date"
+      ],
+      "semantic_relationships": [
+        "clinical.patient-exam",
+        "clinical.episode-exam",
+        "clinical.patient-pathology-observation"
+      ],
+      "temporal_semantics": [
+        "time.exam-event",
+        "time.procedure-event",
+        "time.pathology-report-documentation"
+      ],
+      "aggregations": [],
+      "coverage": [],
+      "domains": [
+        "exam",
+        "pathology",
+        "procedure",
+        "temporal"
+      ],
+      "search_terms": [
+        "same day boundary",
+        "strictly subsequent",
+        "episode definition",
+        "nearest event tie",
+        "tie breaking",
+        "same day procedures",
+        "analyst choice"
+      ],
+      "claim_refs": [
+        "clinical.screening-diagnostic-pathway#pathology-follows-sampling"
+      ],
+      "caveats": [
+        "A study request may itself fix one of these policies; otherwise it should be declared by the analyst."
+      ]
+    },
     "guardrail.timestamps-answer-different-questions": {
       "title": "Different clinical timestamps answer different questions",
-      "statement": "Exam, procedure, specimen, pathology-report, and availability times must be selected by their clinical meaning rather than treated as interchangeable diagnosis dates.",
-      "rationale": "These timestamps refer to different events or documentation stages; one universal diagnosis date would erase that distinction.",
+      "category": "prohibition",
+      "priority": "critical",
+      "statement": "Select exam, procedure, specimen, pathology-report, and availability times by their clinical meaning. Do not coalesce them into a single event timestamp or use one as a fallback for a missing value of another semantic endpoint.",
+      "rationale": "These timestamps refer to different events or documentation stages. Missingness in the selected temporal semantic remains missing; another semantic may be analyzed as a separately named endpoint or sensitivity analysis, not substituted into the same endpoint.",
       "scope": "profile_specific",
       "profiles": [
         "open-v2"
@@ -5023,17 +5204,25 @@
         "diagnosis date",
         "index date",
         "candidate dates",
-        "timeline"
+        "timeline",
+        "fallback date",
+        "coalesce procedure report exam",
+        "date proxy",
+        "proxy timestamp",
+        "non substitutable times"
       ],
       "claim_refs": [
         "open-v2.temporal-availability-context#date-representation"
       ],
       "caveats": [
-        "Agents and users remain responsible for task-specific anchors and windows."
+        "Agents and users remain responsible for task-specific anchors and windows.",
+        "A cancer-associated imaging exam remains a valid anchor when that is the explicitly named estimand; it is not a replacement for a different clinical event."
       ]
     },
     "guardrail.inverse-severity-ordering": {
       "title": "Pathology severity uses inverse ordering",
+      "category": "prohibition",
+      "priority": "high",
       "statement": "Do not select the numeric maximum as the most severe pathology result.",
       "rationale": "Values 0 through 5 run from invasive breast cancer toward non-breast cancer, and supplied side/exam aggregates use the minimum.",
       "scope": "profile_specific",
@@ -5077,10 +5266,71 @@
         "Null remains an attachment state, not an ordered negative category."
       ]
     },
+    "guardrail.risk-probability-readiness": {
+      "title": "Risk outputs require validation before probability metrics",
+      "category": "prohibition",
+      "priority": "critical",
+      "statement": "Do not use the represented risk outputs as probability-like predictions for calibration slope, Brier score, or predicted-versus-observed calibration until their scale, units, exceptional values, model version, horizon meaning, and probability semantics are validated.",
+      "rationale": "Association or ranking studies may be possible with an explicitly qualified score interpretation, but values such as -35, -2, and 100 and the generating model versions remain unresolved in open-v2.",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "objects": [
+        "risk_assessment"
+      ],
+      "concepts": [
+        "risk.ibis_brca1",
+        "risk.ibis_brca2",
+        "risk.ibis_lifetime",
+        "risk.ibis_population_lifetime",
+        "risk.ibis_population_ten_year",
+        "risk.ibis_td1",
+        "risk.ibis_td2",
+        "risk.ibis_td3",
+        "risk.ibis_td4",
+        "risk.ibis_ten_year",
+        "risk.nci_five_year",
+        "risk.nci_lifetime"
+      ],
+      "semantic_relationships": [
+        "clinical.patient-risk-assessment",
+        "clinical.exam-risk-assessment"
+      ],
+      "temporal_semantics": [],
+      "aggregations": [],
+      "coverage": [
+        "coverage.open-v2.risk-probability-calibration-readiness"
+      ],
+      "domains": [
+        "risk",
+        "workflow"
+      ],
+      "search_terms": [
+        "risk probability",
+        "risk calibration",
+        "calibration slope",
+        "Brier score",
+        "predicted versus observed",
+        "risk score scale",
+        "exceptional risk values",
+        "risk model version",
+        "risk horizon"
+      ],
+      "claim_refs": [
+        "open-v2.risk-context#risk-semantics"
+      ],
+      "caveats": [
+        "This constraint does not mark the physical risk fields unsupported.",
+        "A separately justified association or ranking analysis must still report the unresolved score interpretation."
+      ]
+    },
     "guardrail.attached-pathology-selection": {
       "title": "Attached pathology conditions on represented tissue sampling",
-      "statement": "Restricting observations to attached pathology also restricts them to represented procedures that produced tissue and must not be treated as a neutral outcome-availability filter.",
-      "rationale": "Tissue sampling occurs downstream of clinical selection and is not performed for every patient, exam, side, or finding, so pathology-observed groups can differ systematically from unsampled groups.",
+      "category": "interpretation_limit",
+      "priority": "high",
+      "statement": "Restricting observations to attached pathology defines a tissue-sampled or pathology-observed estimand rather than a neutral outcome-availability filter.",
+      "rationale": "Tissue sampling occurs downstream of clinical selection and is not performed for every patient, exam, side, or finding, so pathology-observed groups can differ systematically from unsampled groups; such a cohort is not inherently invalid, but its generalizability and causal interpretation require care.",
       "scope": "embed_general",
       "profiles": [],
       "objects": [
@@ -5123,11 +5373,14 @@
         "embed.finding-procedure-recording#multiple-procedures"
       ],
       "caveats": [
-        "The catalog identifies the selection mechanism but does not prescribe an inclusion, exclusion, weighting, or causal-analysis policy."
+        "The catalog identifies the selection mechanism but does not prescribe an inclusion, exclusion, weighting, or causal-analysis policy.",
+        "Accurately name conclusions as applying to the represented tissue-sampled or pathology-observed population."
       ]
     },
     "guardrail.non-breast-cancer-not-no-malignancy": {
       "title": "Non-breast cancer is not absence of malignancy",
+      "category": "interpretation_limit",
+      "priority": "high",
       "statement": "The non-breast-cancer pathology-severity state must not be interpreted as benign, healthy, or free of malignancy.",
       "rationale": "The state distinguishes a malignancy that is not classified as breast cancer from benign pathology and from the separate unattached-pathology state.",
       "scope": "profile_specific",
@@ -5166,6 +5419,8 @@
     },
     "guardrail.colocation-not-coavailability": {
       "title": "Physical co-location does not imply clinical co-availability",
+      "category": "prohibition",
+      "priority": "critical",
       "statement": "Do not infer that values projected into the same wide row were observed or available at the same clinical time.",
       "rationale": "Denormalization combines fields from different events and documentation stages without establishing their availability boundary.",
       "scope": "profile_specific",
@@ -5212,8 +5467,10 @@
     },
     "guardrail.incomplete-outcome-capture": {
       "title": "No observed diagnosis is not proven disease absence",
-      "statement": "Do not treat absence of a represented breast-cancer diagnosis during an arbitrary period as complete negative outcome ascertainment.",
-      "rationale": "Outside-system outcomes, incomplete attribution, release coverage, and follow-up opportunity are not established by the portable metadata.",
+      "category": "interpretation_limit",
+      "priority": "high",
+      "statement": "A zero may validly mean no represented biopsy or cancer event under a declared extraction policy, but it must not be interpreted as never biopsied, cancer-free, or complete negative outcome ascertainment.",
+      "rationale": "Represented-event endpoints can be useful when accurately named. Outside-system outcomes, incomplete attribution, release coverage, and follow-up opportunity limit stronger disease-absence or complete-follow-up claims.",
       "scope": "embed_general",
       "profiles": [],
       "objects": [
@@ -5241,13 +5498,18 @@
       "search_terms": [
         "no observed cancer",
         "follow-up completeness",
-        "outcome ascertainment"
+        "outcome ascertainment",
+        "represented biopsy endpoint",
+        "represented cancer endpoint",
+        "binary represented event",
+        "observation proxy"
       ],
       "claim_refs": [
         "embed.finding-procedure-recording#screening-attribution-gap"
       ],
       "caveats": [
-        "Follow-up windows, censoring, exclusions, and outcomes are analysis policies."
+        "Follow-up windows, censoring, exclusions, and outcomes are analysis policies.",
+        "Follow-up opportunity measures may be used as observation proxies when named as proxies rather than proof of complete follow-up."
       ]
     }
   },
@@ -5297,7 +5559,10 @@
         "data availability timestamp",
         "known at prediction time",
         "downstream information availability",
-        "temporal leakage boundary"
+        "temporal leakage boundary",
+        "fallback date",
+        "coalesce procedure report exam",
+        "proxy timestamp"
       ],
       "claim_refs": [
         "open-v2.temporal-availability-context#date-representation",
@@ -5305,7 +5570,9 @@
         "open-v2.temporal-availability-context#unsupported-time-bindings"
       ],
       "caveats": [
-        "Do not infer field availability from wide-row co-location or substitute event and report dates without an analysis-specific justification."
+        "Do not infer field availability from wide-row co-location.",
+        "Do not coalesce or substitute event, documentation, or imaging-exam dates as fallback values for one another.",
+        "A different temporal semantic may be evaluated as a separately named endpoint or sensitivity analysis, not used to fill missingness in the selected endpoint."
       ]
     },
     "coverage.open-v2.outcome-capture": {
@@ -5335,6 +5602,36 @@
       "caveats": [
         "No empirical capture rate belongs in the portable catalog.",
         "Absence of a represented diagnosis is not proof of disease absence."
+      ]
+    },
+    "coverage.open-v2.risk-probability-calibration-readiness": {
+      "subject_kind": "topic",
+      "subject": "open-v2.risk-context",
+      "status": "unresolved",
+      "scope": "profile_specific",
+      "profiles": [
+        "open-v2"
+      ],
+      "summary": "Open-v2 risk fields are physically represented, but their scale, units, exceptional values, model versions, horizon semantics, and readiness for probability-calibration metrics have not been validated.",
+      "domains": [
+        "risk",
+        "workflow"
+      ],
+      "search_terms": [
+        "risk probability readiness",
+        "risk calibration readiness",
+        "Brier score readiness",
+        "calibration slope",
+        "risk exceptional values",
+        "risk model version",
+        "risk score scale"
+      ],
+      "claim_refs": [
+        "open-v2.risk-context#risk-semantics"
+      ],
+      "caveats": [
+        "This unresolved readiness statement does not mark the physical risk fields unsupported.",
+        "Association or ranking analyses may be possible when score interpretation and remaining uncertainty are explicitly qualified."
       ]
     },
     "coverage.open-v2.patient-pathology-aggregate": {
@@ -7585,14 +7882,15 @@
         },
         {
           "id": "synthetic-contralateral-finding",
-          "statement": "Ordinary finding numbers are ordinal within an accession; finding number -9 identifies a derived synthetic contralateral negative finding implied by a non-negative finding on the other breast but not explicitly entered in MagView.",
+          "statement": "After excluding finding number -9, accession and finding number identify a distinct clinical finding within an accession; -9 identifies a derived synthetic contralateral negative finding implied by a non-negative finding on the other breast but not explicitly entered in MagView.",
           "status": "verified",
           "sources": [
             "open-v2.release-schema",
             "open-v2.maintainer-clarification-2026-07-29"
           ],
           "caveats": [
-            "Synthetic contralateral negatives are derived records, and semantics of zero or other nonpositive finding numbers remain unresolved."
+            "Synthetic contralateral negatives are derived records.",
+            "The clinical identity can occupy multiple physical rows and is not a persistent lesion identifier across accessions, episodes, or modalities."
           ]
         },
         {
@@ -7929,7 +8227,15 @@
         "risk temporal availability"
       ],
       "related_concepts": [
+        "risk.ibis_brca1",
+        "risk.ibis_brca2",
         "risk.ibis_lifetime",
+        "risk.ibis_population_lifetime",
+        "risk.ibis_population_ten_year",
+        "risk.ibis_td1",
+        "risk.ibis_td2",
+        "risk.ibis_td3",
+        "risk.ibis_td4",
         "risk.ibis_ten_year",
         "risk.nci_five_year",
         "risk.nci_lifetime"
@@ -8434,7 +8740,20 @@
           "grain": "breast_side",
           "role": "canonical",
           "physical_type": "string",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "null",
+              "meaning": "Laterality is unknown or missing for this breast-side record; it does not mean a bilateral clinical finding.",
+              "status": "verified",
+              "claim_refs": [
+                "open-v2.multimodal-finding-context#finding-side-null"
+              ],
+              "caveats": [
+                "This occurrence represents breast-side record laterality, not finding-side or procedure-side laterality."
+              ]
+            }
+          ]
         },
         {
           "table": "side_level_anon",
@@ -8533,7 +8852,20 @@
           "grain": "imaging_finding",
           "role": "reference",
           "physical_type": "string",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "null",
+              "meaning": "The clinical imaging finding is bilateral.",
+              "status": "verified",
+              "claim_refs": [
+                "open-v2.multimodal-finding-context#finding-side-null"
+              ],
+              "caveats": [
+                "This bilateral meaning is specific to finding-side laterality."
+              ]
+            }
+          ]
         },
         {
           "table": "imaging_findings_anon",
@@ -9007,7 +9339,21 @@
           "grain": "pathology_finding",
           "role": "reference",
           "physical_type": "string",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "null",
+              "meaning": "The associated clinical finding side is bilateral.",
+              "status": "verified",
+              "claim_refs": [
+                "open-v2.multimodal-finding-context#finding-side-null",
+                "open-v2.pathology-procedure-context#finding-versus-biopsy-side"
+              ],
+              "caveats": [
+                "This is finding-side laterality and must not be substituted for biopsy side."
+              ]
+            }
+          ]
         },
         {
           "table": "pathology_findings_anon",
@@ -9070,7 +9416,21 @@
           "grain": "pathology_finding",
           "role": "canonical",
           "physical_type": "string",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "null",
+              "meaning": "Biopsy or procedure side is unknown or missing; null is not bilateral.",
+              "status": "verified",
+              "claim_refs": [
+                "open-v2.multimodal-finding-context#finding-side-null",
+                "open-v2.pathology-procedure-context#finding-versus-biopsy-side"
+              ],
+              "caveats": [
+                "Do not inherit the bilateral null meaning from the separate finding-side field."
+              ]
+            }
+          ]
         },
         {
           "table": "pathology_findings_anon",
@@ -9379,7 +9739,42 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "-35",
+              "meaning": "Exceptional value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Exclude or otherwise handle only under a declared policy after validation."
+              ]
+            },
+            {
+              "representation": "-2",
+              "meaning": "Exceptional value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Exclude or otherwise handle only under a declared policy after validation."
+              ]
+            },
+            {
+              "representation": "100",
+              "meaning": "Exceptional or boundary value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Do not assume this is a valid 100-percent probability."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9388,7 +9783,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "100",
+              "meaning": "Exceptional or boundary value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Do not assume this is a valid 100-percent probability."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9397,7 +9805,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "100",
+              "meaning": "Exceptional or boundary value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Do not assume this is a valid 100-percent probability."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9406,7 +9827,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "100",
+              "meaning": "Exceptional or boundary value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Do not assume this is a valid 100-percent probability."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9415,7 +9849,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "100",
+              "meaning": "Exceptional or boundary value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Do not assume this is a valid 100-percent probability."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9424,7 +9871,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "exceptional numeric value",
+              "meaning": "The meaning of an exceptional numeric value in this field is unresolved; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "The available evidence does not establish which exceptional values occur in this specific field; validate its observed representation before defining a handling policy."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9433,7 +9893,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "exceptional numeric value",
+              "meaning": "The meaning of an exceptional numeric value in this field is unresolved; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "The available evidence does not establish which exceptional values occur in this specific field; validate its observed representation before defining a handling policy."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9442,7 +9915,42 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "-35",
+              "meaning": "Exceptional value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Exclude or otherwise handle only under a declared policy after validation."
+              ]
+            },
+            {
+              "representation": "-2",
+              "meaning": "Exceptional value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Exclude or otherwise handle only under a declared policy after validation."
+              ]
+            },
+            {
+              "representation": "100",
+              "meaning": "Exceptional or boundary value with unresolved meaning; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "Do not assume this is a valid 100-percent probability."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9451,7 +9959,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "exceptional numeric value",
+              "meaning": "The meaning of an exceptional numeric value in this field is unresolved; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "The available evidence does not establish which exceptional values occur in this specific field; validate its observed representation before defining a handling policy."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9460,7 +9981,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "exceptional numeric value",
+              "meaning": "The meaning of an exceptional numeric value in this field is unresolved; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "The available evidence does not establish which exceptional values occur in this specific field; validate its observed representation before defining a handling policy."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9469,7 +10003,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "exceptional numeric value",
+              "meaning": "The meaning of an exceptional numeric value in this field is unresolved; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "The available evidence does not establish which exceptional values occur in this specific field; validate its observed representation before defining a handling policy."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9478,7 +10025,20 @@
           "grain": "risk_assessment",
           "role": "canonical",
           "physical_type": "double",
-          "nullable": true
+          "nullable": true,
+          "occurrence_interpretations": [
+            {
+              "representation": "exceptional numeric value",
+              "meaning": "The meaning of an exceptional numeric value in this field is unresolved; it is not validated as a probability-like prediction.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.risk-context#risk-semantics"
+              ],
+              "caveats": [
+                "The available evidence does not establish which exceptional values occur in this specific field; validate its observed representation before defining a handling policy."
+              ]
+            }
+          ]
         },
         {
           "table": "risk_anon",
@@ -9790,6 +10350,20 @@
           "nullable": true,
           "notes": [
             "Transfers canonical feature context only; value equality, derivation, observed domain, and occurrence-specific missingness were not established."
+          ],
+          "occurrence_interpretations": [
+            {
+              "representation": "null",
+              "meaning": "The occurrence-specific laterality meaning of null in this wide side projection is unresolved.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.multimodal-finding-context#finding-side-null",
+                "open-v2.temporal-availability-context#wide-object-projection"
+              ],
+              "caveats": [
+                "Do not assume this projected null is bilateral, left, right, or unknown without establishing its row role."
+              ]
+            }
           ]
         },
         {
@@ -10499,6 +11073,20 @@
           "nullable": true,
           "notes": [
             "Transfers canonical feature context only; value equality, derivation, observed domain, and occurrence-specific missingness were not established."
+          ],
+          "occurrence_interpretations": [
+            {
+              "representation": "null",
+              "meaning": "The occurrence-specific biopsy-side meaning of null in this wide projection is unresolved.",
+              "status": "unresolved",
+              "claim_refs": [
+                "open-v2.multimodal-finding-context#finding-side-null",
+                "open-v2.temporal-availability-context#wide-object-projection"
+              ],
+              "caveats": [
+                "Do not treat this projected null as bilateral or automatically transfer the normalized biopsy-side interpretation."
+              ]
+            }
           ]
         },
         {
@@ -10817,8 +11405,30 @@
             "open-v2.multimodal-finding-context#synthetic-contralateral-finding"
           ],
           "caveats": [
-            "The reserved finding number -9 denotes a derived synthetic finding."
-          ]
+            "The clinical identity omits side and may occupy multiple physical rows."
+          ],
+          "instance_identity": {
+            "columns": [
+              "acc_anon",
+              "numfind"
+            ],
+            "scope": "Distinct clinical finding within one accession after excluding reserved synthetic entries.",
+            "reserved_exceptions": [
+              {
+                "column": "numfind",
+                "representation": "-9",
+                "meaning": "Derived synthetic contralateral negative finding rather than an ordinary clinical finding identity.",
+                "claim_refs": [
+                  "open-v2.multimodal-finding-context#synthetic-contralateral-finding"
+                ],
+                "caveats": [
+                  "Exclude this reserved value when identifying ordinary distinct clinical findings."
+                ]
+              }
+            ],
+            "rows_per_instance": "one_or_more",
+            "longitudinal_identity": false
+          }
         },
         {
           "object": "imaging_interpretation",
@@ -10994,8 +11604,31 @@
             "open-v2.temporal-availability-context#wide-object-projection"
           ],
           "caveats": [
-            "The wide projection can contain rows without a resolving normalized imaging index and does not establish a cross-release finding key."
-          ]
+            "The wide projection can contain rows without a resolving normalized imaging index and does not establish a cross-release finding key.",
+            "The clinical identity omits side and may occupy multiple physical rows."
+          ],
+          "instance_identity": {
+            "columns": [
+              "acc_anon",
+              "numfind"
+            ],
+            "scope": "Distinct clinical finding within one accession after excluding reserved synthetic entries.",
+            "reserved_exceptions": [
+              {
+                "column": "numfind",
+                "representation": "-9",
+                "meaning": "Derived synthetic contralateral negative finding rather than an ordinary clinical finding identity.",
+                "claim_refs": [
+                  "open-v2.multimodal-finding-context#synthetic-contralateral-finding"
+                ],
+                "caveats": [
+                  "Exclude this reserved value when identifying ordinary distinct clinical findings."
+                ]
+              }
+            ],
+            "rows_per_instance": "one_or_more",
+            "longitudinal_identity": false
+          }
         },
         {
           "object": "imaging_interpretation",
@@ -11833,14 +12466,16 @@
             "unresolved"
           ],
           "caveats": [
-            "The expected accession hierarchy is not an enforced foreign-key claim."
+            "The expected accession hierarchy is not an enforced foreign-key claim.",
+            "The pathology row's acc_anon identifies its own associated candidate exam, not necessarily an analysis's index exam."
           ],
           "join_hazards": [
-            "Pathology timing may follow the imaging exam and must not be treated as contemporaneous by default."
+            "Pathology timing may follow the imaging exam and must not be treated as contemporaneous by default.",
+            "Do not equate pathology acc_anon to the index accession as a longitudinal-search shortcut; traverse from the candidate exam to the patient, then compare against qualifying index exams for that patient.",
+            "This pathology-to-exam edge alone does not implement clinical.patient-pathology-observation."
           ],
           "semantic_relationships": [
-            "clinical.exam-pathology-observation",
-            "clinical.patient-pathology-observation"
+            "clinical.exam-pathology-observation"
           ],
           "claim_refs": []
         },
@@ -12110,6 +12745,24 @@
             "clinical.exam-side"
           ],
           "claim_refs": []
+        }
+      ],
+      "relationship_binding_paths": [
+        {
+          "id": "open-v2.pathology_findings_anon.patient",
+          "semantic_relationship": "clinical.patient-pathology-observation",
+          "relationship_bindings": [
+            "open-v2.pathology_findings_anon.exam",
+            "open-v2.exam_level_anon.patient"
+          ],
+          "description": "Traverse from each candidate pathology row's accession to its associated candidate exam, then from that exam to the patient before comparing the candidate with qualifying index exams for the same patient.",
+          "claim_refs": [
+            "open-v2.pathology-procedure-context#separate-pathology-surface"
+          ],
+          "caveats": [
+            "The path is descriptive binding metadata, not an executable join or a guarantee of complete longitudinal outcome capture.",
+            "Do not require the candidate pathology accession to equal the index exam accession."
+          ]
         }
       ]
     }

@@ -74,6 +74,7 @@ class CatalogSchemaParityTests(unittest.TestCase):
         for profile in data["profile_bindings"].values():
             for relationship in profile["relationship_bindings"]:
                 relationship["semantic_relationships"] = []
+            profile["relationship_binding_paths"] = []
         for collection in (
             "semantic_relationships",
             "temporal_semantics",
@@ -92,6 +93,50 @@ class CatalogSchemaParityTests(unittest.TestCase):
             "notes"
         ] = []
         self.assert_invalid_in_both(data)
+
+    def test_v6_binding_metadata_shapes_are_closed(self) -> None:
+        mutations = []
+
+        occurrence = synthetic_catalog()
+        occurrence["profile_bindings"]["profile-a"]["feature_bindings"][2][
+            "occurrence_interpretations"
+        ][0]["unexpected"] = True
+        mutations.append(occurrence)
+
+        identity = synthetic_catalog()
+        identity["profile_bindings"]["profile-b"]["object_bindings"][0][
+            "instance_identity"
+        ]["unexpected"] = True
+        mutations.append(identity)
+
+        path = synthetic_catalog()
+        path["profile_bindings"]["profile-b"][
+            "relationship_binding_paths"
+        ][0]["unexpected"] = True
+        mutations.append(path)
+
+        for data in mutations:
+            with self.subTest():
+                self.assert_invalid_in_both(data)
+
+    def test_v6_controlled_values_are_enforced(self) -> None:
+        guardrail = synthetic_catalog()
+        guardrail["guardrails"]["pathology.null-is-not-negative"][
+            "priority"
+        ] = "urgent"
+        self.assert_invalid_in_both(guardrail)
+
+        interpretation = synthetic_catalog()
+        interpretation["profile_bindings"]["profile-a"][
+            "feature_bindings"
+        ][2]["occurrence_interpretations"][0]["status"] = "assumed"
+        self.assert_invalid_in_both(interpretation)
+
+        identity = synthetic_catalog()
+        identity["profile_bindings"]["profile-b"]["object_bindings"][0][
+            "instance_identity"
+        ]["rows_per_instance"] = "many"
+        self.assert_invalid_in_both(identity)
 
     def test_every_profile_has_at_least_one_feature_binding(self) -> None:
         data = synthetic_catalog()

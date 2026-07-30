@@ -1,4 +1,4 @@
-"""Unit tests for schema-v5 loading, validation, and semantic discovery."""
+"""Unit tests for schema-v6 loading, validation, and semantic discovery."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from embed_context import (
     CatalogValidationError,
     load_catalog,
 )
+from embed_context.catalog import GUARDRAIL_CATEGORIES, GUARDRAIL_PRIORITIES
 from tests.catalog_fixture import cloned_catalog, synthetic_catalog, write_catalog
 
 
@@ -44,13 +45,14 @@ class CatalogLoaderTests(unittest.TestCase):
     def test_loads_and_freezes_two_profile_catalog(self) -> None:
         catalog = self.load()
 
-        self.assertEqual(catalog.schema_version, 5)
+        self.assertEqual(catalog.schema_version, 6)
         self.assertEqual(catalog.profiles, ("profile-a", "profile-b"))
         self.assertEqual(len(catalog.clinical_objects), 3)
         self.assertEqual(len(catalog.concepts), 4)
         self.assertEqual(len(catalog.feature_bindings), 8)
         self.assertEqual(len(catalog.object_bindings), 6)
         self.assertEqual(len(catalog.relationship_bindings), 1)
+        self.assertEqual(len(catalog.relationship_binding_paths), 1)
         self.assertNotIn("analysis_patterns", catalog.summary())
         self.assertFalse(hasattr(catalog, "grains"))
         with self.assertRaises(TypeError):
@@ -60,7 +62,7 @@ class CatalogLoaderTests(unittest.TestCase):
         with self.assertRaises(AttributeError):
             catalog._schema_version = 6
 
-    def test_summary_exposes_v5_facets_and_layer_counts(self) -> None:
+    def test_summary_exposes_v6_facets_and_layer_counts(self) -> None:
         summary = self.load().summary()
 
         self.assertEqual(summary["binding_grains"], list(BINDING_GRAINS))
@@ -79,11 +81,17 @@ class CatalogLoaderTests(unittest.TestCase):
             summary["relationship_binding_kinds"],
             sorted(RELATIONSHIP_BINDING_KINDS),
         )
+        self.assertEqual(
+            summary["guardrail_categories"], list(GUARDRAIL_CATEGORIES)
+        )
+        self.assertEqual(
+            summary["guardrail_priorities"], list(GUARDRAIL_PRIORITIES)
+        )
         self.assertEqual(summary["discovery_kinds"], list(DISCOVERY_KINDS))
         self.assertEqual(summary["profile_bindings"], 2)
 
     def test_wrong_schema_version_and_schema_reference_are_rejected(self) -> None:
-        for version in (4, 6):
+        for version in (5, 7):
             with self.subTest(version=version):
                 data = cloned_catalog()
                 data["schema_version"] = version
@@ -93,7 +101,7 @@ class CatalogLoaderTests(unittest.TestCase):
                 )
 
         data = cloned_catalog()
-        data["$schema"] = "catalog-v5.schema.json"
+        data["$schema"] = "catalog-v6.schema.json"
         self.assert_invalid(data, r"\$\.\$schema must equal")
 
     def test_unknown_and_missing_top_level_fields_are_rejected(self) -> None:
@@ -125,7 +133,7 @@ class CatalogLoaderTests(unittest.TestCase):
     ) -> None:
         duplicate_path = self.directory / "duplicate.json"
         duplicate_path.write_text(
-            '{"schema_version": 5, "schema_version": 5}',
+            '{"schema_version": 6, "schema_version": 6}',
             encoding="utf-8",
         )
         with self.assertRaisesRegex(
@@ -407,6 +415,130 @@ class CatalogLoaderTests(unittest.TestCase):
         ] = ["profiles.profile-a-only#severity-binding"]
         self.assert_invalid(data, "claim.*outside selected profiles")
 
+    def test_occurrence_interpretations_are_structured_and_scoped(self) -> None:
+        catalog = Catalog.from_mapping(cloned_catalog())
+        interpretation = catalog.profile_bindings[
+            "profile-a"
+        ].feature_bindings[2].occurrence_interpretations[0]
+        self.assertEqual(interpretation.representation, "null")
+        self.assertEqual(interpretation.status, "verified")
+
+        data = cloned_catalog()
+        interpretations = data["profile_bindings"]["profile-a"][
+            "feature_bindings"
+        ][2]["occurrence_interpretations"]
+        interpretations.append(dict(interpretations[0]))
+        self.assert_invalid(data, "duplicate representations")
+
+        data = cloned_catalog()
+        data["profile_bindings"]["profile-a"]["feature_bindings"][2][
+            "occurrence_interpretations"
+        ][0]["claim_refs"] = ["missing.context#claim"]
+        self.assert_invalid(data, "references unknown claims")
+
+    def test_instance_identity_columns_exceptions_and_claims_are_validated(
+        self,
+    ) -> None:
+        catalog = Catalog.from_mapping(cloned_catalog())
+        identity = catalog.profile_bindings["profile-b"].object_bindings[
+            0
+        ].instance_identity
+        self.assertIsNotNone(identity)
+        assert identity is not None
+        self.assertEqual(identity.columns, ("pid",))
+        self.assertTrue(identity.longitudinal_identity)
+
+        data = cloned_catalog()
+        data["profile_bindings"]["profile-b"]["object_bindings"][0][
+            "instance_identity"
+        ]["columns"] = ["unknown_column"]
+        self.assert_invalid(data, "columns outside the object binding")
+
+        data = cloned_catalog()
+        identity_data = data["profile_bindings"]["profile-b"][
+            "object_bindings"
+        ][0]["instance_identity"]
+        identity_data["reserved_exceptions"] = [
+            {
+                "column": "exam_id",
+                "representation": "-9",
+                "meaning": "Synthetic record.",
+                "claim_refs": ["profiles.synthetic#severity-binding"],
+                "caveats": [],
+            }
+        ]
+        self.assert_invalid(data, "non-identity column")
+
+        data = cloned_catalog()
+        identity_data = data["profile_bindings"]["profile-b"][
+            "object_bindings"
+        ][0]["instance_identity"]
+        identity_data["reserved_exceptions"] = [
+            {
+                "column": "pid",
+                "representation": "-9",
+                "meaning": "Synthetic record.",
+                "claim_refs": ["missing.context#claim"],
+                "caveats": [],
+            }
+        ]
+        self.assert_invalid(data, "references unknown claims")
+
+    def test_relationship_binding_paths_resolve_and_require_adjacency(
+        self,
+    ) -> None:
+        catalog = Catalog.from_mapping(cloned_catalog())
+        path = catalog.relationship_binding_paths[0]
+        self.assertEqual(path.semantic_relationship, "patient.has_exam")
+        self.assertEqual(
+            path.relationship_bindings, ("profile-b.exams.patient",)
+        )
+
+        data = cloned_catalog()
+        data["profile_bindings"]["profile-b"][
+            "relationship_binding_paths"
+        ][0]["semantic_relationship"] = "unknown.relationship"
+        self.assert_invalid(data, "unknown semantic relationship")
+
+        data = cloned_catalog()
+        data["profile_bindings"]["profile-b"][
+            "relationship_binding_paths"
+        ][0]["relationship_bindings"] = ["profile-a.unknown"]
+        self.assert_invalid(
+            data, "unknown relationship bindings in profile"
+        )
+
+        data = cloned_catalog()
+        profile = data["profile_bindings"]["profile-b"]
+        second = {
+            **profile["relationship_bindings"][0],
+            "id": "profile-b.patients.self",
+            "kind": "reference",
+            "semantic_relationships": [],
+            "source": {
+                "table": "patients_b",
+                "columns": ["pid"],
+                "completeness": "required",
+            },
+            "target": {"table": "patients_b", "columns": ["pid"]},
+            "cardinality": {
+                "targets_per_source": "exactly_one",
+                "sources_per_target": "zero_or_more",
+            },
+        }
+        profile["relationship_bindings"].append(second)
+        profile["relationship_binding_paths"][0][
+            "relationship_bindings"
+        ].append("profile-b.patients.self")
+        Catalog.from_mapping(data)
+
+        second["source"] = {
+            "table": "exams_b",
+            "columns": ["pid"],
+            "completeness": "required",
+        }
+        self.assert_invalid(data, "non-adjacent steps")
+
     def test_relationship_binding_semantics_columns_types_and_keys_are_validated(
         self,
     ) -> None:
@@ -563,6 +695,15 @@ class CatalogQueryTests(unittest.TestCase):
                 ]
             ],
         )
+        self.assertIn(
+            "profile-b.patient-exam-path",
+            [
+                item["id"]
+                for item in relationship["related"][
+                    "relationship_binding_paths"
+                ]
+            ],
+        )
         self.assertEqual(temporal["temporal_semantic"]["feature_refs"], [])
         self.assertIn(
             "specimen-time.profile-support",
@@ -575,6 +716,178 @@ class CatalogQueryTests(unittest.TestCase):
         self.assertEqual(
             coverage["related"]["subject"]["identifier"],
             "specimen.collection_time",
+        )
+
+    def test_exact_getters_return_six_derived_constraint_groups(self) -> None:
+        results = (
+            self.catalog.get_clinical_object("imaging_exam"),
+            self.catalog.get_feature("pathology.severity"),
+            self.catalog.get_semantic_relationship("patient.has_exam"),
+            self.catalog.get_temporal_semantic("exam.event_time"),
+            self.catalog.get_aggregation(
+                "pathology.severity-to-patient"
+            ),
+            self.catalog.get_guardrail(
+                "pathology.null-is-not-negative"
+            ),
+            self.catalog.get_coverage("specimen-time.profile-support"),
+            self.catalog.get_context("embed.semantic"),
+            self.catalog.get_profile_table("profile-b", "exams_b"),
+            self.catalog.get_relationship_binding(
+                "profile-b.exams.patient"
+            ),
+        )
+        expected = {
+            "supported_facts",
+            "unresolved_claims",
+            "unsupported_substitutions",
+            "analyst_choices_required",
+            "high_priority_guardrails",
+            "relevant_contexts",
+        }
+        for result in results:
+            with self.subTest(kind=result["kind"]):
+                self.assertEqual(set(result["constraints"]), expected)
+
+        feature = results[1]
+        self.assertIn(
+            "pathology.severity-to-patient",
+            {
+                item["id"]
+                for item in feature["constraints"][
+                    "analyst_choices_required"
+                ]
+            },
+        )
+        self.assertIn(
+            "pathology.null-is-not-negative",
+            {
+                item["id"]
+                for item in feature["constraints"][
+                    "high_priority_guardrails"
+                ]
+            },
+        )
+        self.assertIn(
+            "profiles.synthetic",
+            {
+                item["id"]
+                for item in feature["constraints"]["relevant_contexts"]
+            },
+        )
+        self.assertIn(
+            "profiles.synthetic",
+            feature["related"]["contexts"],
+        )
+
+    def test_reverse_linked_unresolved_claims_are_prominent(self) -> None:
+        data = cloned_catalog()
+        data["contexts"]["profiles.synthetic"]["claims"].append(
+            {
+                "id": "unresolved-interpretation",
+                "statement": "A reverse-linked interpretation is unresolved.",
+                "status": "unresolved",
+                "sources": ["profiles.synthetic-schema"],
+                "caveats": [],
+            }
+        )
+        catalog = Catalog.from_mapping(data)
+
+        result = catalog.get_feature("pathology.severity")
+
+        self.assertIn(
+            "profiles.synthetic#unresolved-interpretation",
+            {
+                item["id"]
+                for item in result["constraints"]["unresolved_claims"]
+            },
+        )
+        self.assertNotIn(
+            "embed.semantic#patient-meaning",
+            {
+                item["id"]
+                for item in result["constraints"]["supported_facts"]
+            },
+        )
+        self.assertIn(
+            "embed.semantic",
+            {
+                item["id"]
+                for item in result["constraints"]["relevant_contexts"]
+            },
+        )
+
+    def test_feature_inherits_coverage_linked_by_applicable_guardrail(
+        self,
+    ) -> None:
+        data = cloned_catalog()
+        data["guardrails"]["pathology.null-is-not-negative"][
+            "coverage"
+        ] = ["specimen-time.profile-support"]
+        catalog = Catalog.from_mapping(data)
+
+        result = catalog.get_feature("pathology.severity")
+
+        self.assertIn(
+            "specimen-time.profile-support",
+            result["related"]["coverage"],
+        )
+        self.assertIn(
+            "specimen-time.profile-support",
+            {
+                item["id"]
+                for item in result["constraints"]["unresolved_claims"]
+            },
+        )
+
+    def test_profiled_relationship_discovery_includes_composed_paths(
+        self,
+    ) -> None:
+        result = self.catalog.discover(
+            "patient exam",
+            profile="profile-b",
+            kinds=["semantic_relationship"],
+            limit=10,
+        )
+        relationship = next(
+            item
+            for item in result["matches"]
+            if item["identifier"] == "patient.has_exam"
+        )
+
+        self.assertEqual(
+            [
+                item["id"]
+                for item in relationship["implementation_bindings"][
+                    "relationship_binding_paths"
+                ]
+            ],
+            ["profile-b.patient-exam-path"],
+        )
+
+    def test_temporal_prohibitions_surface_as_unsupported_substitutions(
+        self,
+    ) -> None:
+        data = cloned_catalog()
+        guardrail = data["guardrails"][
+            "temporal.no-universal-diagnosis-date"
+        ]
+        guardrail["category"] = "prohibition"
+        guardrail["statement"] = (
+            "Do not use a report timestamp as a fallback or proxy."
+        )
+        catalog = Catalog.from_mapping(data)
+
+        result = catalog.get_temporal_semantic("exam.event_time")
+
+        self.assertIn(
+            "temporal.no-universal-diagnosis-date",
+            {
+                item["id"]
+                for item in result["constraints"][
+                    "unsupported_substitutions"
+                ]
+            },
         )
 
     def test_context_getter_resolves_claim_sources_and_navigation(self) -> None:
@@ -672,10 +985,75 @@ class CatalogQueryTests(unittest.TestCase):
         self.assertEqual(
             exact["semantic_relationships"][0]["id"], "patient.has_exam"
         )
+        self.assertEqual(
+            [
+                item["id"]
+                for item in exact["relationship_binding_paths"]
+            ],
+            ["profile-b.patient-exam-path"],
+        )
         self.assertEqual(searched["count"], 1)
         self.assertEqual(
             searched["matches"][0]["id"], "profile-b.exams.patient"
         )
+        self.assertEqual(searched["path_count"], 1)
+        self.assertEqual(searched["path_total"], 1)
+        self.assertEqual(
+            searched["relationship_binding_paths"][0]["id"],
+            "profile-b.patient-exam-path",
+        )
+
+    def test_relationship_search_returns_composed_semantic_paths(
+        self,
+    ) -> None:
+        data = cloned_catalog()
+        relationship = dict(
+            data["semantic_relationships"]["patient.has_exam"]
+        )
+        relationship.update(
+            {
+                "label": "Patient has represented pathology",
+                "kind": "association",
+                "target_object": "pathology_diagnosis",
+            }
+        )
+        data["semantic_relationships"][
+            "patient.has_pathology"
+        ] = relationship
+        data["profile_bindings"]["profile-b"][
+            "relationship_binding_paths"
+        ][0]["semantic_relationship"] = "patient.has_pathology"
+        catalog = Catalog.from_mapping(data)
+
+        result = catalog.search_relationship_bindings(
+            profile="profile-b",
+            source_table="exams_b",
+            target_table="patients_b",
+            semantic_relationship="patient.has_pathology",
+        )
+
+        self.assertEqual(result["count"], 0)
+        self.assertEqual(result["matches"], [])
+        self.assertEqual(result["path_count"], 1)
+        self.assertEqual(result["path_total"], 1)
+        self.assertEqual(
+            result["relationship_binding_paths"][0][
+                "relationship_bindings"
+            ],
+            ["profile-b.exams.patient"],
+        )
+
+        by_table = catalog.search_relationship_bindings(
+            table="patients_b",
+            semantic_relationship="patient.has_pathology",
+        )
+        self.assertEqual(by_table["path_count"], 1)
+
+        edge_kind_only = catalog.search_relationship_bindings(
+            kind="hierarchy",
+            semantic_relationship="patient.has_pathology",
+        )
+        self.assertEqual(edge_kind_only["path_count"], 0)
 
     def test_relationship_search_validates_filters_and_limit(self) -> None:
         calls = (
@@ -851,6 +1229,78 @@ class CatalogQueryTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first["count"], 3)
         self.assertGreater(first["total"], first["count"])
+
+    def test_discovery_intent_bonuses_are_transparently_explained(
+        self,
+    ) -> None:
+        queries = {
+            "nearest prior exam": "longitudinal",
+            "fallback coalesce proxy date": "temporal_fallback",
+            "calibration probability risk": "probability_calibration",
+            "one row per finding key": "finding_identity",
+            "laterality side null": "laterality_role",
+            "represented binary cancer endpoint": (
+                "represented_binary_endpoint"
+            ),
+        }
+        for query, intent in queries.items():
+            with self.subTest(intent=intent):
+                result = self.catalog.discover(query, limit=10)
+                reasons = [
+                    reason
+                    for match in result["matches"]
+                    for reason in match["match_reasons"]
+                    if reason.get("intent") == intent
+                ]
+                self.assertTrue(reasons)
+                self.assertTrue(
+                    all(
+                        reason["field"] == "query_intent"
+                        and reason["semantic_cues"]
+                        and reason["score_bonus"] > 0
+                        for reason in reasons
+                    )
+                )
+
+    def test_discovery_reserves_limited_safety_results_and_respects_kinds(
+        self,
+    ) -> None:
+        data = cloned_catalog()
+        guardrail = data["guardrails"][
+            "temporal.no-universal-diagnosis-date"
+        ]
+        guardrail["category"] = "prohibition"
+        guardrail["priority"] = "critical"
+        guardrail["search_terms"].extend(["fallback", "coalesce", "proxy"])
+        catalog = Catalog.from_mapping(data)
+
+        result = catalog.discover(
+            "procedure report exam fallback coalesce proxy date",
+            limit=2,
+        )
+        self.assertEqual(result["count"], 2)
+        self.assertIn(
+            "temporal.no-universal-diagnosis-date",
+            {match["identifier"] for match in result["matches"]},
+        )
+        self.assertLessEqual(
+            sum(
+                match["kind"] in {"guardrail", "coverage"}
+                for match in result["matches"]
+            ),
+            1,
+        )
+
+        feature_only = catalog.discover(
+            "procedure report exam fallback coalesce proxy date",
+            kinds=["feature"],
+            limit=2,
+        )
+        self.assertTrue(feature_only["matches"])
+        self.assertEqual(
+            {match["kind"] for match in feature_only["matches"]},
+            {"feature"},
+        )
 
 
 if __name__ == "__main__":

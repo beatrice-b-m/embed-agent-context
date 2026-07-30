@@ -17,7 +17,7 @@ from typing import Any
 
 
 SCHEMA_REFERENCE = "./catalog.schema.json"
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 BINDING_GRAINS = (
     "patient",
@@ -100,6 +100,12 @@ AGGREGATION_STATUSES = (
     "unresolved",
 )
 COVERAGE_STATUSES = ("supported", "unsupported", "unresolved", "not_cataloged")
+GUARDRAIL_CATEGORIES = (
+    "prohibition",
+    "analyst_choice",
+    "interpretation_limit",
+)
+GUARDRAIL_PRIORITIES = ("critical", "high", "standard")
 DISCOVERY_KINDS = (
     "clinical_object",
     "feature",
@@ -188,6 +194,103 @@ _SEARCH_STOPWORDS = frozenset(
         "with",
     }
 )
+
+_DISCOVERY_INTENT_AFFINITIES: Mapping[str, frozenset[str]] = {
+    "longitudinal": frozenset(
+        {
+            "accession",
+            "candidate",
+            "exam",
+            "history",
+            "longitudinal",
+            "nearest",
+            "pathology",
+            "patient",
+            "prior",
+            "subsequent",
+            "timeline",
+        }
+    ),
+    "temporal_fallback": frozenset(
+        {
+            "coalesce",
+            "date",
+            "fallback",
+            "interchangeable",
+            "missingness",
+            "proxy",
+            "report",
+            "specimen",
+            "substitute",
+            "substitution",
+            "temporal",
+            "timestamp",
+        }
+    ),
+    "probability_calibration": frozenset(
+        {
+            "brier",
+            "calibration",
+            "exceptional",
+            "horizon",
+            "model",
+            "probability",
+            "risk",
+            "scale",
+            "score",
+            "unit",
+            "version",
+        }
+    ),
+    "finding_identity": frozenset(
+        {
+            "finding",
+            "identity",
+            "instance",
+            "key",
+            "longitudinal",
+            "multiplicity",
+            "numfind",
+            "row",
+            "synthetic",
+        }
+    ),
+    "laterality_role": frozenset(
+        {
+            "bilateral",
+            "bside",
+            "laterality",
+            "null",
+            "procedure",
+            "side",
+            "unknown",
+        }
+    ),
+    "represented_binary_endpoint": frozenset(
+        {
+            "binary",
+            "biopsy",
+            "cancer",
+            "endpoint",
+            "event",
+            "outcome",
+            "represented",
+            "zero",
+        }
+    ),
+    "finding_attribution_aggregation": frozenset(
+        {
+            "aggregate",
+            "aggregation",
+            "attribution",
+            "finding",
+            "multiplicity",
+            "pathology",
+            "policy",
+            "severity",
+        }
+    ),
+}
 
 _TOP_LEVEL_KEYS = frozenset(
     {
@@ -310,6 +413,8 @@ _GUARDRAIL_KEYS = frozenset(
         "title",
         "statement",
         "rationale",
+        "category",
+        "priority",
         "scope",
         "profiles",
         "objects",
@@ -377,7 +482,13 @@ _CONTEXT_CLAIM_KEYS = frozenset(
 )
 _WORKFLOW_STEP_KEYS = frozenset({"id", "label", "claims"})
 _PROFILE_BINDING_KEYS = frozenset(
-    {"feature_bindings", "object_bindings", "tables", "relationship_bindings"}
+    {
+        "feature_bindings",
+        "object_bindings",
+        "tables",
+        "relationship_bindings",
+        "relationship_binding_paths",
+    }
 )
 _BINDING_KEYS = frozenset(
     {
@@ -390,11 +501,43 @@ _BINDING_KEYS = frozenset(
         "nullable",
         "parameters",
         "notes",
+        "occurrence_interpretations",
     }
 )
-_BINDING_REQUIRED_KEYS = _BINDING_KEYS - {"parameters", "notes"}
+_BINDING_REQUIRED_KEYS = _BINDING_KEYS - {
+    "parameters",
+    "notes",
+    "occurrence_interpretations",
+}
+_OCCURRENCE_INTERPRETATION_KEYS = frozenset(
+    {"representation", "meaning", "status", "claim_refs", "caveats"}
+)
 _OBJECT_BINDING_KEYS = frozenset(
-    {"object", "table", "columns", "representation", "claim_refs", "caveats"}
+    {
+        "object",
+        "table",
+        "columns",
+        "representation",
+        "claim_refs",
+        "caveats",
+        "instance_identity",
+    }
+)
+_OBJECT_BINDING_REQUIRED_KEYS = _OBJECT_BINDING_KEYS - {"instance_identity"}
+_INSTANCE_IDENTITY_KEYS = frozenset(
+    {
+        "columns",
+        "scope",
+        "reserved_exceptions",
+        "rows_per_instance",
+        "longitudinal_identity",
+    }
+)
+_RESERVED_IDENTITY_EXCEPTION_KEYS = frozenset(
+    {"column", "representation", "meaning", "claim_refs", "caveats"}
+)
+_ROWS_PER_INSTANCE_VALUES = frozenset(
+    {"exactly_one", "one_or_more", "unknown"}
 )
 _TABLE_KEYS = frozenset({"table", "grain", "keys", "caveats"})
 _KEY_KEYS = frozenset(
@@ -424,6 +567,16 @@ _RELATIONSHIP_BINDING_KEYS = frozenset(
 )
 _SOURCE_ENDPOINT_KEYS = frozenset({"table", "columns", "completeness"})
 _TARGET_ENDPOINT_KEYS = frozenset({"table", "columns"})
+_RELATIONSHIP_BINDING_PATH_KEYS = frozenset(
+    {
+        "id",
+        "semantic_relationship",
+        "relationship_bindings",
+        "description",
+        "claim_refs",
+        "caveats",
+    }
+)
 
 
 class CatalogError(Exception):
@@ -644,6 +797,8 @@ class Guardrail:
     title: str
     statement: str
     rationale: str
+    category: str
+    priority: str
     scope: str
     profiles: tuple[str, ...]
     objects: tuple[str, ...]
@@ -663,6 +818,8 @@ class Guardrail:
             "title": self.title,
             "statement": self.statement,
             "rationale": self.rationale,
+            "category": self.category,
+            "priority": self.priority,
             "scope": self.scope,
             "profiles": list(self.profiles),
             "objects": list(self.objects),
@@ -836,6 +993,24 @@ class ClinicalContext:
 
 
 @dataclass(frozen=True, slots=True)
+class OccurrenceInterpretation:
+    representation: str
+    meaning: str
+    status: str
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "representation": self.representation,
+            "meaning": self.meaning,
+            "status": self.status,
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Binding:
     profile: str
     table: str
@@ -847,6 +1022,7 @@ class Binding:
     nullable: bool
     parameters: tuple[tuple[str, int], ...] = ()
     notes: tuple[str, ...] = ()
+    occurrence_interpretations: tuple[OccurrenceInterpretation, ...] = ()
 
     @property
     def identifier(self) -> str:
@@ -873,7 +1049,49 @@ class Binding:
             result["parameters"] = dict(self.parameters)
         if self.notes:
             result["notes"] = list(self.notes)
+        if self.occurrence_interpretations:
+            result["occurrence_interpretations"] = [
+                item.to_dict() for item in self.occurrence_interpretations
+            ]
         return result
+
+
+@dataclass(frozen=True, slots=True)
+class ReservedIdentityException:
+    column: str
+    representation: str
+    meaning: str
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "column": self.column,
+            "representation": self.representation,
+            "meaning": self.meaning,
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class InstanceIdentity:
+    columns: tuple[str, ...]
+    scope: str
+    reserved_exceptions: tuple[ReservedIdentityException, ...]
+    rows_per_instance: str
+    longitudinal_identity: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "columns": list(self.columns),
+            "scope": self.scope,
+            "reserved_exceptions": [
+                item.to_dict() for item in self.reserved_exceptions
+            ],
+            "rows_per_instance": self.rows_per_instance,
+            "longitudinal_identity": self.longitudinal_identity,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -885,9 +1103,10 @@ class ObjectBinding:
     representation: str
     claim_refs: tuple[str, ...]
     caveats: tuple[str, ...]
+    instance_identity: InstanceIdentity | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "profile": self.profile,
             "object": self.object,
             "table": self.table,
@@ -896,6 +1115,9 @@ class ObjectBinding:
             "claim_refs": list(self.claim_refs),
             "caveats": list(self.caveats),
         }
+        if self.instance_identity is not None:
+            result["instance_identity"] = self.instance_identity.to_dict()
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -994,12 +1216,35 @@ class RelationshipBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class RelationshipBindingPath:
+    id: str
+    profile: str
+    semantic_relationship: str
+    relationship_bindings: tuple[str, ...]
+    description: str
+    claim_refs: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "profile": self.profile,
+            "semantic_relationship": self.semantic_relationship,
+            "relationship_bindings": list(self.relationship_bindings),
+            "description": self.description,
+            "claim_refs": list(self.claim_refs),
+            "caveats": list(self.caveats),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ProfileBinding:
     profile: str
     feature_bindings: tuple[Binding, ...]
     object_bindings: tuple[ObjectBinding, ...]
     tables: tuple[TableSpec, ...]
     relationship_bindings: tuple[RelationshipBinding, ...]
+    relationship_binding_paths: tuple[RelationshipBindingPath, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -1009,6 +1254,9 @@ class ProfileBinding:
             "tables": [item.to_dict() for item in self.tables],
             "relationship_bindings": [
                 item.to_dict() for item in self.relationship_bindings
+            ],
+            "relationship_binding_paths": [
+                item.to_dict() for item in self.relationship_binding_paths
             ],
         }
 
@@ -1027,7 +1275,7 @@ class _DiscoveryDocument:
 
 
 class Catalog:
-    """Validated immutable schema-v5 catalog with deterministic indexes."""
+    """Validated immutable schema-v6 catalog with deterministic indexes."""
 
     __slots__ = (
         "_schema_version",
@@ -1046,6 +1294,7 @@ class Catalog:
         "_object_bindings",
         "_tables",
         "_relationship_bindings",
+        "_relationship_binding_paths",
         "_tables_by_qualified",
         "_relationship_bindings_by_id",
         "_bindings_by_concept",
@@ -1142,10 +1391,25 @@ class Catalog:
                 key=lambda item: item.id,
             )
         )
+        relationship_paths = tuple(
+            sorted(
+                (
+                    path
+                    for profile in profiles
+                    for path in profile_bindings[
+                        profile
+                    ].relationship_binding_paths
+                ),
+                key=lambda item: item.id,
+            )
+        )
         object.__setattr__(self, "_bindings", bindings)
         object.__setattr__(self, "_object_bindings", object_bindings)
         object.__setattr__(self, "_tables", tables)
         object.__setattr__(self, "_relationship_bindings", relationships)
+        object.__setattr__(
+            self, "_relationship_binding_paths", relationship_paths
+        )
         object.__setattr__(
             self,
             "_tables_by_qualified",
@@ -1270,6 +1534,14 @@ class Catalog:
         return tuple(sorted(RELATIONSHIP_BINDING_KINDS))
 
     @property
+    def guardrail_categories(self) -> tuple[str, ...]:
+        return GUARDRAIL_CATEGORIES
+
+    @property
+    def guardrail_priorities(self) -> tuple[str, ...]:
+        return GUARDRAIL_PRIORITIES
+
+    @property
     def clinical_objects(self) -> Mapping[str, ClinicalObject]:
         return self._clinical_objects
 
@@ -1330,6 +1602,12 @@ class Catalog:
     @property
     def relationship_bindings(self) -> tuple[RelationshipBinding, ...]:
         return self._relationship_bindings
+
+    @property
+    def relationship_binding_paths(
+        self,
+    ) -> tuple[RelationshipBindingPath, ...]:
+        return self._relationship_binding_paths
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> Catalog:
@@ -1504,6 +1782,8 @@ class Catalog:
             "temporal_kinds": list(self.temporal_kinds),
             "aggregation_statuses": list(self.aggregation_statuses),
             "coverage_statuses": list(self.coverage_statuses),
+            "guardrail_categories": list(self.guardrail_categories),
+            "guardrail_priorities": list(self.guardrail_priorities),
             "relationship_binding_kinds": list(
                 self.relationship_binding_kinds
             ),
@@ -1523,6 +1803,9 @@ class Catalog:
             "object_bindings": len(self.object_bindings),
             "tables": len(self.profile_tables),
             "relationship_bindings": len(self.relationship_bindings),
+            "relationship_binding_paths": len(
+                self.relationship_binding_paths
+            ),
         }
 
     def get_clinical_object(self, identifier: str) -> dict[str, Any]:
@@ -1532,14 +1815,46 @@ class Catalog:
             raise CatalogNotFoundError(
                 f"clinical object {normalized!r} was not found"
             )
+        related = self._related_entities(
+            "clinical_object", normalized, entity
+        )
+        claim_refs = tuple(
+            dict.fromkeys(
+                (
+                    *entity.claim_refs,
+                    *(
+                        reference
+                        for binding in self.object_bindings
+                        if binding.object == normalized
+                        for reference in (
+                            *binding.claim_refs,
+                            *(
+                                exception_ref
+                                for exception in (
+                                    binding.instance_identity.reserved_exceptions
+                                    if binding.instance_identity is not None
+                                    else ()
+                                )
+                                for exception_ref in exception.claim_refs
+                            ),
+                        )
+                    ),
+                )
+            )
+        )
         return {
             "kind": "clinical_object",
             "identifier": normalized,
             "clinical_object": entity.to_dict(),
-            "related": self._related_entities(
-                "clinical_object", normalized, entity
+            "constraints": self._constraint_summary(
+                "clinical_object",
+                normalized,
+                entity,
+                related,
+                claim_refs,
             ),
-            "provenance": self._provenance(entity.claim_refs),
+            "related": related,
+            "provenance": self._provenance(claim_refs),
         }
 
     def get_feature(
@@ -1549,40 +1864,40 @@ class Catalog:
         feature = self.concepts.get(normalized)
         if feature is not None:
             vocabulary = self._vocabulary_for_feature(feature)
-            claim_refs = tuple(
-                dict.fromkeys(
-                    (
-                        *feature.claim_refs,
-                        *(
-                            reference
-                            for state in feature.missing_states
-                            for reference in state.claim_refs
-                        ),
-                    )
-                )
+            bindings = self._bindings_by_concept.get(feature.id, ())
+            claim_refs = self._feature_claim_refs(feature, bindings)
+            related = self._related_entities(
+                "feature", feature.id, feature
             )
             return {
                 "kind": "feature",
                 "identifier": feature.id,
                 "feature": feature.to_dict(),
                 "bindings": [
-                    item.to_dict()
-                    for item in self._bindings_by_concept.get(feature.id, ())
+                    item.to_dict() for item in bindings
                 ],
                 "vocabulary": (
                     vocabulary.to_dict(include_codes=include_codes)
                     if vocabulary
                     else None
                 ),
-                "related": self._related_entities(
-                    "feature", feature.id, feature
+                "constraints": self._constraint_summary(
+                    "feature",
+                    feature.id,
+                    feature,
+                    related,
+                    claim_refs,
+                    bindings=bindings,
                 ),
+                "related": related,
                 "provenance": self._provenance(claim_refs),
             }
 
         bindings = self._resolve_physical(normalized)
         feature = self.concepts[bindings[0].concept]
         vocabulary = self._vocabulary_for_feature(feature)
+        related = self._related_entities("feature", feature.id, feature)
+        claim_refs = self._feature_claim_refs(feature, bindings)
         result: dict[str, Any] = {
             "kind": "feature_binding" if len(bindings) == 1 else "feature_binding_set",
             "identifier": normalized,
@@ -1593,23 +1908,16 @@ class Catalog:
                 if vocabulary
                 else None
             ),
-            "related": self._related_entities(
-                "feature", feature.id, feature
+            "constraints": self._constraint_summary(
+                "feature",
+                feature.id,
+                feature,
+                related,
+                claim_refs,
+                bindings=bindings,
             ),
-            "provenance": self._provenance(
-                tuple(
-                    dict.fromkeys(
-                        (
-                            *feature.claim_refs,
-                            *(
-                                reference
-                                for state in feature.missing_states
-                                for reference in state.claim_refs
-                            ),
-                        )
-                    )
-                )
-            ),
+            "related": related,
+            "provenance": self._provenance(claim_refs),
         }
         if len(bindings) == 1:
             result["binding"] = bindings[0].to_dict()
@@ -1654,13 +1962,21 @@ class Catalog:
         claim_refs = tuple(
             f"{context.id}#{claim.id}" for claim in context.claims
         )
+        related = self._related_entities(
+            "context", normalized, context
+        )
         return {
             "kind": "context",
             "identifier": normalized,
             "context": context.to_dict(),
-            "related": self._related_entities(
-                "context", normalized, context
+            "constraints": self._constraint_summary(
+                "context",
+                normalized,
+                context,
+                related,
+                claim_refs,
             ),
+            "related": related,
             "provenance": self._provenance(claim_refs),
         }
 
@@ -1673,11 +1989,19 @@ class Catalog:
             raise CatalogNotFoundError(
                 f"{kind.replace('_', ' ')} {normalized!r} was not found"
             )
+        related = self._related_entities(kind, normalized, entity)
         return {
             "kind": kind,
             "identifier": normalized,
             kind: entity.to_dict(),
-            "related": self._related_entities(kind, normalized, entity),
+            "constraints": self._constraint_summary(
+                kind,
+                normalized,
+                entity,
+                related,
+                entity.claim_refs,
+            ),
+            "related": related,
             "provenance": self._provenance(entity.claim_refs),
         }
 
@@ -1728,6 +2052,11 @@ class Catalog:
                 ],
             }
         if kind == "feature":
+            guardrail_ids = sorted(
+                item.id
+                for item in self.guardrails.values()
+                if identifier in item.concepts
+            )
             return {
                 "clinical_objects": list(entity.objects),
                 "temporal_semantics": sorted(
@@ -1751,16 +2080,28 @@ class Catalog:
                         ),
                     }
                 ),
-                "guardrails": sorted(
-                    item.id
-                    for item in self.guardrails.values()
-                    if identifier in item.concepts
-                ),
+                "guardrails": guardrail_ids,
                 "coverage": sorted(
+                    {
+                        *(
+                            item.id
+                            for item in self.coverage.values()
+                            if item.subject_kind == "concept"
+                            and item.subject == identifier
+                        ),
+                        *(
+                            coverage_id
+                            for guardrail_id in guardrail_ids
+                            for coverage_id in self.guardrails[
+                                guardrail_id
+                            ].coverage
+                        ),
+                    }
+                ),
+                "contexts": sorted(
                     item.id
-                    for item in self.coverage.values()
-                    if item.subject_kind == "concept"
-                    and item.subject == identifier
+                    for item in self.contexts.values()
+                    if identifier in item.related_concepts
                 ),
             }
         if kind == "semantic_relationship":
@@ -1785,6 +2126,11 @@ class Catalog:
                     item.to_dict()
                     for item in self.relationship_bindings
                     if identifier in item.semantic_relationships
+                ],
+                "relationship_binding_paths": [
+                    item.to_dict()
+                    for item in self.relationship_binding_paths
+                    if item.semantic_relationship == identifier
                 ],
             }
         if kind == "temporal_semantic":
@@ -1873,6 +2219,241 @@ class Catalog:
                 ),
             }
         return {}
+
+    def _feature_claim_refs(
+        self,
+        feature: Concept,
+        bindings: Sequence[Binding],
+    ) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(
+                (
+                    *feature.claim_refs,
+                    *(
+                        reference
+                        for state in feature.missing_states
+                        for reference in state.claim_refs
+                    ),
+                    *(
+                        reference
+                        for binding in bindings
+                        for interpretation in binding.occurrence_interpretations
+                        for reference in interpretation.claim_refs
+                    ),
+                )
+            )
+        )
+
+    def _constraint_summary(
+        self,
+        kind: str,
+        identifier: str,
+        entity: Any,
+        related: Mapping[str, Any],
+        claim_refs: Sequence[str],
+        *,
+        bindings: Sequence[Binding] = (),
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Resolve the most decision-relevant constraints for exact getters."""
+
+        direct_claim_refs = tuple(dict.fromkeys(claim_refs))
+        context_ids = {
+            reference.split("#", 1)[0] for reference in claim_refs
+        }
+        context_ids.update(related.get("contexts", ()))
+        if kind == "context":
+            context_ids.add(identifier)
+        if kind == "clinical_object":
+            feature_ids = set(related.get("features", ()))
+            context_ids.update(
+                context.id
+                for context in self.contexts.values()
+                if feature_ids & set(context.related_concepts)
+            )
+        if kind == "semantic_relationship":
+            physical_ids = {
+                binding.id
+                for binding in self.relationship_bindings
+                if identifier in binding.semantic_relationships
+            }
+            physical_ids.update(
+                binding_id
+                for path in self.relationship_binding_paths
+                if path.semantic_relationship == identifier
+                for binding_id in path.relationship_bindings
+            )
+            context_ids.update(
+                context.id
+                for context in self.contexts.values()
+                if physical_ids & set(context.related_relationships)
+            )
+
+        all_claim_refs = list(direct_claim_refs)
+        direct_claim_ref_set = set(direct_claim_refs)
+        for context_id in sorted(context_ids):
+            context = self.contexts.get(context_id)
+            if context is None:
+                continue
+            all_claim_refs.extend(
+                f"{context.id}#{claim.id}"
+                for claim in context.claims
+                if f"{context.id}#{claim.id}" in direct_claim_ref_set
+                or claim.status in {"unresolved", "contradicted"}
+            )
+        all_claim_refs = list(dict.fromkeys(all_claim_refs))
+
+        supported_facts: list[dict[str, Any]] = []
+        unresolved_claims: list[dict[str, Any]] = []
+        for reference in all_claim_refs:
+            claim = self._claims_by_ref[reference]
+            compact = {
+                "id": reference,
+                "status": claim.status,
+                "summary": claim.statement,
+            }
+            if claim.status in {"verified", "reconciled"}:
+                supported_facts.append(compact)
+            else:
+                unresolved_claims.append(compact)
+
+        coverage_ids = set(related.get("coverage", ()))
+        if kind == "coverage":
+            coverage_ids.add(identifier)
+        for coverage_id in sorted(coverage_ids):
+            record = self.coverage[coverage_id]
+            compact = {
+                "id": record.id,
+                "status": record.status,
+                "summary": record.summary,
+            }
+            if record.status == "supported":
+                supported_facts.append(compact)
+            elif record.status in {
+                "unsupported",
+                "unresolved",
+                "not_cataloged",
+            }:
+                unresolved_claims.append(compact)
+
+        for binding in bindings:
+            for interpretation in binding.occurrence_interpretations:
+                compact = {
+                    "id": (
+                        f"{binding.qualified_identifier}:"
+                        f"{interpretation.representation}"
+                    ),
+                    "status": interpretation.status,
+                    "summary": interpretation.meaning,
+                }
+                if interpretation.status in {"verified", "reconciled"}:
+                    supported_facts.append(compact)
+                else:
+                    unresolved_claims.append(compact)
+
+        guardrail_ids = set(related.get("guardrails", ()))
+        if kind == "guardrail":
+            guardrail_ids.add(identifier)
+        if kind == "context":
+            context_features = set(entity.related_concepts)
+            guardrail_ids.update(
+                guardrail.id
+                for guardrail in self.guardrails.values()
+                if context_features & set(guardrail.concepts)
+            )
+        applicable_guardrails = [
+            self.guardrails[item] for item in sorted(guardrail_ids)
+        ]
+        high_priority_guardrails = [
+            {
+                "id": guardrail.id,
+                "status": guardrail.priority,
+                "summary": guardrail.statement,
+                "category": guardrail.category,
+            }
+            for guardrail in applicable_guardrails
+            if guardrail.priority in {"critical", "high"}
+        ]
+
+        temporal_prohibition_terms = {
+            "coalesce",
+            "fallback",
+            "interchangeable",
+            "proxy",
+            "substitute",
+            "substitution",
+            "temporal",
+            "timestamp",
+        }
+        unsupported_substitutions = []
+        for guardrail in applicable_guardrails:
+            text = " ".join(
+                (
+                    guardrail.title,
+                    guardrail.statement,
+                    guardrail.rationale,
+                    *guardrail.search_terms,
+                    *guardrail.caveats,
+                )
+            )
+            if (
+                guardrail.category == "prohibition"
+                and temporal_prohibition_terms & set(_tokens(text))
+            ):
+                unsupported_substitutions.append(
+                    {
+                        "id": guardrail.id,
+                        "status": guardrail.priority,
+                        "summary": guardrail.statement,
+                    }
+                )
+
+        aggregation_ids = set(related.get("aggregations", ()))
+        if kind == "aggregation":
+            aggregation_ids.add(identifier)
+        analyst_choices_required = [
+            {
+                "id": aggregation.id,
+                "status": aggregation.status,
+                "summary": aggregation.method,
+            }
+            for aggregation in (
+                self.aggregations[item] for item in sorted(aggregation_ids)
+            )
+            if aggregation.status == "analyst_defined"
+        ]
+        analyst_choices_required.extend(
+            {
+                "id": guardrail.id,
+                "status": guardrail.priority,
+                "summary": guardrail.statement,
+            }
+            for guardrail in applicable_guardrails
+            if guardrail.category == "analyst_choice"
+        )
+
+        relevant_contexts = []
+        for context_id in sorted(context_ids):
+            context = self.contexts.get(context_id)
+            if context is None:
+                continue
+            relevant_contexts.append(
+                {
+                    "id": context.id,
+                    "status": sorted(
+                        {claim.status for claim in context.claims}
+                    ),
+                    "summary": context.summary,
+                }
+            )
+
+        return {
+            "supported_facts": supported_facts,
+            "unresolved_claims": unresolved_claims,
+            "unsupported_substitutions": unsupported_substitutions,
+            "analyst_choices_required": analyst_choices_required,
+            "high_priority_guardrails": high_priority_guardrails,
+            "relevant_contexts": relevant_contexts,
+        }
 
     def _provenance(
         self, claim_refs: Sequence[str]
@@ -1979,26 +2560,91 @@ class Catalog:
                 outgoing.append(relationship.to_dict())
             if relationship.target.table == normalized_table:
                 incoming.append(relationship.to_dict())
+        feature_bindings = [
+            item
+            for item in self.feature_bindings
+            if item.profile == normalized_profile
+            and item.table == normalized_table
+        ]
+        object_bindings = [
+            item
+            for item in self.object_bindings
+            if item.profile == normalized_profile
+            and item.table == normalized_table
+        ]
+        concept_ids = {item.concept for item in feature_bindings}
+        object_ids = {item.object for item in object_bindings}
+        related = {
+            "guardrails": sorted(
+                guardrail.id
+                for guardrail in self.guardrails.values()
+                if concept_ids & set(guardrail.concepts)
+                or object_ids & set(guardrail.objects)
+            ),
+            "coverage": sorted(
+                record.id
+                for record in self.coverage.values()
+                if (
+                    record.subject_kind == "concept"
+                    and record.subject in concept_ids
+                )
+                or (
+                    record.subject_kind == "clinical_object"
+                    and record.subject in object_ids
+                )
+            ),
+            "aggregations": sorted(
+                aggregation.id
+                for aggregation in self.aggregations.values()
+                if aggregation.source_concept in concept_ids
+                or aggregation.result_concept in concept_ids
+            ),
+            "contexts": sorted(
+                context.id
+                for context in self.contexts.values()
+                if concept_ids & set(context.related_concepts)
+            ),
+        }
+        claim_refs = tuple(
+            dict.fromkeys(
+                (
+                    *(
+                        reference
+                        for binding in object_bindings
+                        for reference in binding.claim_refs
+                    ),
+                    *(
+                        reference
+                        for binding in feature_bindings
+                        for interpretation in binding.occurrence_interpretations
+                        for reference in interpretation.claim_refs
+                    ),
+                )
+            )
+        )
         return {
             "kind": "profile_table",
             "identifier": identifier,
             "table": table_spec.to_dict(),
             "feature_bindings": [
-                item.to_dict()
-                for item in self.feature_bindings
-                if item.profile == normalized_profile
-                and item.table == normalized_table
+                item.to_dict() for item in feature_bindings
             ],
             "object_bindings": [
                 self._object_binding_result(item)
-                for item in self.object_bindings
-                if item.profile == normalized_profile
-                and item.table == normalized_table
+                for item in object_bindings
             ],
             "relationship_bindings": {
                 "outgoing": outgoing,
                 "incoming": incoming,
             },
+            "constraints": self._constraint_summary(
+                "profile_table",
+                identifier,
+                table_spec,
+                related,
+                claim_refs,
+                bindings=feature_bindings,
+            ),
         }
 
     def get_relationship_binding(self, identifier: str) -> dict[str, Any]:
@@ -2008,6 +2654,25 @@ class Catalog:
             raise CatalogNotFoundError(
                 f"relationship binding {normalized!r} was not found"
             )
+        semantic_ids = set(entity.semantic_relationships)
+        related = {
+            "guardrails": sorted(
+                guardrail.id
+                for guardrail in self.guardrails.values()
+                if semantic_ids & set(guardrail.semantic_relationships)
+            ),
+            "coverage": sorted(
+                record.id
+                for record in self.coverage.values()
+                if record.subject_kind == "semantic_relationship"
+                and record.subject in semantic_ids
+            ),
+            "aggregations": sorted(
+                aggregation.id
+                for aggregation in self.aggregations.values()
+                if semantic_ids & set(aggregation.semantic_relationships)
+            ),
+        }
         return {
             "kind": "relationship_binding",
             "identifier": normalized,
@@ -2016,6 +2681,18 @@ class Catalog:
                 self.semantic_relationships[item].to_dict()
                 for item in entity.semantic_relationships
             ],
+            "relationship_binding_paths": [
+                path.to_dict()
+                for path in self.relationship_binding_paths
+                if normalized in path.relationship_bindings
+            ],
+            "constraints": self._constraint_summary(
+                "relationship_binding",
+                normalized,
+                entity,
+                related,
+                entity.claim_refs,
+            ),
             "provenance": self._provenance(entity.claim_refs),
         }
 
@@ -2098,11 +2775,61 @@ class Catalog:
             ):
                 continue
             matches.append(item)
+        relationships_by_id = {
+            item.id: item for item in self.relationship_bindings
+        }
+        path_matches = []
+        if not filters["kind"]:
+            for path in self.relationship_binding_paths:
+                if (
+                    filters["profile"]
+                    and path.profile != filters["profile"]
+                ):
+                    continue
+                if (
+                    filters["semantic_relationship"]
+                    and path.semantic_relationship
+                    != filters["semantic_relationship"]
+                ):
+                    continue
+                steps = [
+                    relationships_by_id[identifier]
+                    for identifier in path.relationship_bindings
+                ]
+                path_tables = {
+                    table_name
+                    for step in steps
+                    for table_name in (
+                        step.source.table,
+                        step.target.table,
+                    )
+                }
+                if (
+                    filters["table"]
+                    and filters["table"] not in path_tables
+                ):
+                    continue
+                if (
+                    filters["source_table"]
+                    and steps[0].source.table != filters["source_table"]
+                ):
+                    continue
+                if (
+                    filters["target_table"]
+                    and steps[-1].target.table != filters["target_table"]
+                ):
+                    continue
+                path_matches.append(path)
         return {
             "filters": filters,
             "count": min(len(matches), limit),
             "total": len(matches),
             "matches": [item.to_dict() for item in matches[:limit]],
+            "path_count": min(len(path_matches), limit),
+            "path_total": len(path_matches),
+            "relationship_binding_paths": [
+                item.to_dict() for item in path_matches[:limit]
+            ],
         }
 
     def discover(
@@ -2120,6 +2847,7 @@ class Catalog:
             raise CatalogValidationError("query must be a string")
         _validate_limit(limit)
         query_text = query.strip().casefold()
+        query_intents = _recognized_discovery_intents(query_text)
         query_tokens = frozenset(
             token
             for token in _tokens(query_text)
@@ -2191,7 +2919,10 @@ class Catalog:
                     for token in _tokens(text)
                 )
             matched = query_tokens & frozenset(active_tokens)
-            if query_tokens and not matched:
+            intent_reasons = _discovery_intent_reasons(
+                document, query_intents
+            )
+            if query_tokens and not matched and not intent_reasons:
                 continue
             reasons = _discovery_reasons(
                 document,
@@ -2199,6 +2930,14 @@ class Catalog:
                 query_tokens,
                 profile=filters["profile"],
             )
+            reasons.extend(intent_reasons)
+            intent_terms = {
+                term
+                for reason in intent_reasons
+                for term in reason["terms"]
+                if term in query_tokens
+            }
+            matched = matched | frozenset(intent_terms)
             score = _discovery_score(document, query_text, matched, reasons)
             text_candidates.append((score, document, reasons, matched))
 
@@ -2228,6 +2967,11 @@ class Catalog:
             key=lambda item: (-item[0], item[1].kind, item[1].identifier)
         )
         total = len(selected_candidates)
+        composed_candidates = _compose_discovery_candidates(
+            selected_candidates,
+            limit=limit,
+            has_query_intents=bool(query_intents),
+        )
         matches = [
             self._discovery_match(
                 document,
@@ -2237,7 +2981,7 @@ class Catalog:
                 query_tokens,
                 profile=filters["profile"],
             )
-            for score, document, reasons, matched in selected_candidates[:limit]
+            for score, document, reasons, matched in composed_candidates
         ]
         matched_terms = sorted(
             set().union(
@@ -2598,6 +3342,8 @@ class Catalog:
                     ("title", item.title),
                     ("statement", item.statement),
                     ("rationale", item.rationale),
+                    ("category", item.category),
+                    ("priority", item.priority),
                     ("objects", " ".join(item.objects)),
                     ("features", " ".join(item.concepts)),
                     (
@@ -2782,6 +3528,12 @@ class Catalog:
                 and relationship_ids.intersection(
                     item.semantic_relationships
                 )
+            ],
+            "relationship_binding_paths": [
+                item.to_dict()
+                for item in self.relationship_binding_paths
+                if item.profile == profile
+                and item.semantic_relationship in relationship_ids
             ],
         }
 
@@ -3109,6 +3861,12 @@ def _parse_guardrail(
         ),
         rationale=_nonempty_string(
             data["rationale"], f"{path}.rationale"
+        ),
+        category=_controlled_string(
+            data["category"], f"{path}.category", GUARDRAIL_CATEGORIES
+        ),
+        priority=_controlled_string(
+            data["priority"], f"{path}.priority", GUARDRAIL_PRIORITIES
         ),
         scope=scope,
         profiles=selected_profiles,
@@ -3458,12 +4216,26 @@ def _parse_profile_binding(
             )
         )
     )
+    relationship_paths = tuple(
+        _parse_relationship_binding_path(
+            profile,
+            raw,
+            f"{path}.relationship_binding_paths[{index}]",
+        )
+        for index, raw in enumerate(
+            _expect_list(
+                data["relationship_binding_paths"],
+                f"{path}.relationship_binding_paths",
+            )
+        )
+    )
     return ProfileBinding(
         profile=profile,
         feature_bindings=feature_bindings,
         object_bindings=object_bindings,
         tables=tables,
         relationship_bindings=relationships,
+        relationship_binding_paths=relationship_paths,
     )
 
 
@@ -3507,6 +4279,25 @@ def _parse_binding(profile: str, value: object, path: str) -> Binding:
         if "notes" in data
         else ()
     )
+    occurrence_interpretations = tuple(
+        _parse_occurrence_interpretation(
+            raw, f"{path}.occurrence_interpretations[{index}]"
+        )
+        for index, raw in enumerate(
+            _expect_list(
+                data.get("occurrence_interpretations", []),
+                f"{path}.occurrence_interpretations",
+            )
+        )
+    )
+    representations = [
+        item.representation for item in occurrence_interpretations
+    ]
+    if len(representations) != len(set(representations)):
+        raise CatalogValidationError(
+            f"{path}.occurrence_interpretations contains duplicate "
+            "representations"
+        )
     return Binding(
         profile=profile,
         table=_physical_component(data["table"], f"{path}.table"),
@@ -3522,6 +4313,32 @@ def _parse_binding(profile: str, value: object, path: str) -> Binding:
         nullable=nullable,
         parameters=tuple(sorted(parameters)),
         notes=notes,
+        occurrence_interpretations=occurrence_interpretations,
+    )
+
+
+def _parse_occurrence_interpretation(
+    value: object, path: str
+) -> OccurrenceInterpretation:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data,
+        _OCCURRENCE_INTERPRETATION_KEYS,
+        _OCCURRENCE_INTERPRETATION_KEYS,
+        path,
+    )
+    return OccurrenceInterpretation(
+        representation=_nonempty_string(
+            data["representation"], f"{path}.representation"
+        ),
+        meaning=_nonempty_string(data["meaning"], f"{path}.meaning"),
+        status=_controlled_string(
+            data["status"], f"{path}.status", CLAIM_STATUSES
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
     )
 
 
@@ -3530,7 +4347,17 @@ def _parse_object_binding(
 ) -> ObjectBinding:
     data = _expect_mapping(value, path)
     _require_exact_keys(
-        data, _OBJECT_BINDING_KEYS, _OBJECT_BINDING_KEYS, path
+        data,
+        _OBJECT_BINDING_REQUIRED_KEYS,
+        _OBJECT_BINDING_KEYS,
+        path,
+    )
+    instance_identity = (
+        _parse_instance_identity(
+            data["instance_identity"], f"{path}.instance_identity"
+        )
+        if "instance_identity" in data
+        else None
     )
     return ObjectBinding(
         profile=profile,
@@ -3544,6 +4371,75 @@ def _parse_object_binding(
             f"{path}.representation",
             OBJECT_BINDING_REPRESENTATIONS,
         ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
+        instance_identity=instance_identity,
+    )
+
+
+def _parse_instance_identity(
+    value: object, path: str
+) -> InstanceIdentity:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data, _INSTANCE_IDENTITY_KEYS, _INSTANCE_IDENTITY_KEYS, path
+    )
+    longitudinal_identity = data["longitudinal_identity"]
+    if not isinstance(longitudinal_identity, bool):
+        raise CatalogValidationError(
+            f"{path}.longitudinal_identity must be a boolean"
+        )
+    reserved_exceptions = tuple(
+        _parse_reserved_identity_exception(
+            raw, f"{path}.reserved_exceptions[{index}]"
+        )
+        for index, raw in enumerate(
+            _expect_list(
+                data["reserved_exceptions"], f"{path}.reserved_exceptions"
+            )
+        )
+    )
+    exception_keys = [
+        (item.column, item.representation) for item in reserved_exceptions
+    ]
+    if len(exception_keys) != len(set(exception_keys)):
+        raise CatalogValidationError(
+            f"{path}.reserved_exceptions contains duplicate column and "
+            "representation pairs"
+        )
+    return InstanceIdentity(
+        columns=_physical_component_array(
+            data["columns"], f"{path}.columns", minimum=1
+        ),
+        scope=_nonempty_string(data["scope"], f"{path}.scope"),
+        reserved_exceptions=reserved_exceptions,
+        rows_per_instance=_controlled_string(
+            data["rows_per_instance"],
+            f"{path}.rows_per_instance",
+            _ROWS_PER_INSTANCE_VALUES,
+        ),
+        longitudinal_identity=longitudinal_identity,
+    )
+
+
+def _parse_reserved_identity_exception(
+    value: object, path: str
+) -> ReservedIdentityException:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data,
+        _RESERVED_IDENTITY_EXCEPTION_KEYS,
+        _RESERVED_IDENTITY_EXCEPTION_KEYS,
+        path,
+    )
+    return ReservedIdentityException(
+        column=_physical_component(data["column"], f"{path}.column"),
+        representation=_nonempty_string(
+            data["representation"], f"{path}.representation"
+        ),
+        meaning=_nonempty_string(data["meaning"], f"{path}.meaning"),
         claim_refs=_claim_ref_array(
             data["claim_refs"], f"{path}.claim_refs"
         ),
@@ -3674,6 +4570,37 @@ def _parse_relationship_endpoint(
             data["columns"], f"{path}.columns", minimum=1
         ),
         completeness=completeness,
+    )
+
+
+def _parse_relationship_binding_path(
+    profile: str, value: object, path: str
+) -> RelationshipBindingPath:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(
+        data,
+        _RELATIONSHIP_BINDING_PATH_KEYS,
+        _RELATIONSHIP_BINDING_PATH_KEYS,
+        path,
+    )
+    return RelationshipBindingPath(
+        id=_identifier(data["id"], f"{path}.id"),
+        profile=profile,
+        semantic_relationship=_identifier(
+            data["semantic_relationship"], f"{path}.semantic_relationship"
+        ),
+        relationship_bindings=_identifier_array(
+            data["relationship_bindings"],
+            f"{path}.relationship_bindings",
+            minimum=1,
+        ),
+        description=_nonempty_string(
+            data["description"], f"{path}.description"
+        ),
+        claim_refs=_claim_ref_array(
+            data["claim_refs"], f"{path}.claim_refs"
+        ),
+        caveats=_string_array(data["caveats"], f"{path}.caveats"),
     )
 
 
@@ -4164,6 +5091,7 @@ def _validate_profile_bindings(
             + ", ".join(empty_profiles)
         )
     global_relationship_ids: set[str] = set()
+    global_relationship_path_ids: set[str] = set()
     qualified_bindings: set[str] = set()
     for profile_id, profile in profile_bindings.items():
         columns_by_table: defaultdict[str, dict[str, Binding]] = defaultdict(dict)
@@ -4182,6 +5110,18 @@ def _validate_profile_bindings(
             qualified_bindings.add(binding.qualified_identifier)
             columns_by_table[binding.table][binding.column] = binding
             grains_by_table[binding.table].add(binding.grain)
+            for interpretation in binding.occurrence_interpretations:
+                _validate_scoped_claim_refs(
+                    scope="profile_specific",
+                    profiles=(profile_id,),
+                    references=interpretation.claim_refs,
+                    claims=claims,
+                    label=(
+                        "feature binding "
+                        f"{binding.qualified_identifier!r} occurrence "
+                        f"{interpretation.representation!r}"
+                    ),
+                )
 
         tables_by_name: dict[str, TableSpec] = {}
         for table in profile.tables:
@@ -4264,6 +5204,37 @@ def _validate_profile_bindings(
                     f"{profile_id}:{binding.table}"
                 )
             seen_object_bindings.add(identity)
+            if binding.instance_identity is not None:
+                instance_identity = binding.instance_identity
+                missing_identity_columns = sorted(
+                    set(instance_identity.columns) - set(binding.columns)
+                )
+                if missing_identity_columns:
+                    raise CatalogValidationError(
+                        f"object binding {profile_id}:{binding.table} "
+                        "instance_identity references columns outside the "
+                        "object binding: "
+                        + ", ".join(missing_identity_columns)
+                    )
+                for exception in instance_identity.reserved_exceptions:
+                    if exception.column not in instance_identity.columns:
+                        raise CatalogValidationError(
+                            f"object binding {profile_id}:{binding.table} "
+                            "reserved identity exception references "
+                            f"non-identity column {exception.column!r}"
+                        )
+                    _validate_scoped_claim_refs(
+                        scope="profile_specific",
+                        profiles=(profile_id,),
+                        references=exception.claim_refs,
+                        claims=claims,
+                        label=(
+                            f"object binding {profile_id}:{binding.table} "
+                            f"reserved identity exception "
+                            f"{exception.column}="
+                            f"{exception.representation}"
+                        ),
+                    )
             _validate_scoped_claim_refs(
                 scope="profile_specific",
                 profiles=(profile_id,),
@@ -4299,6 +5270,51 @@ def _validate_profile_bindings(
                 relationship, columns_by_table, tables_by_name
             )
         _validate_physical_hierarchy_acyclic(profile.relationship_bindings)
+        relationships_by_id = {
+            relationship.id: relationship
+            for relationship in profile.relationship_bindings
+        }
+        for path in profile.relationship_binding_paths:
+            if path.id in global_relationship_path_ids:
+                raise CatalogValidationError(
+                    f"duplicate relationship binding path ID {path.id!r}"
+                )
+            global_relationship_path_ids.add(path.id)
+            if path.semantic_relationship not in semantic_relationships:
+                raise CatalogValidationError(
+                    f"relationship binding path {path.id!r} references "
+                    "unknown semantic relationship "
+                    f"{path.semantic_relationship!r}"
+                )
+            missing_steps = sorted(
+                set(path.relationship_bindings) - set(relationships_by_id)
+            )
+            if missing_steps:
+                raise CatalogValidationError(
+                    f"relationship binding path {path.id!r} references "
+                    "unknown relationship bindings in profile "
+                    f"{profile_id!r}: " + ", ".join(missing_steps)
+                )
+            steps = [
+                relationships_by_id[identifier]
+                for identifier in path.relationship_bindings
+            ]
+            for previous, following in zip(steps, steps[1:]):
+                if previous.target.table != following.source.table:
+                    raise CatalogValidationError(
+                        f"relationship binding path {path.id!r} has "
+                        "non-adjacent steps "
+                        f"{previous.id!r} and {following.id!r}: "
+                        f"{previous.target.table!r} does not match "
+                        f"{following.source.table!r}"
+                    )
+            _validate_scoped_claim_refs(
+                scope="profile_specific",
+                profiles=(profile_id,),
+                references=path.claim_refs,
+                claims=claims,
+                label=f"relationship binding path {path.id!r}",
+            )
 
 
 def _validate_physical_relationship(
@@ -4456,7 +5472,7 @@ def default_catalog_path() -> Path:
 
 
 def load_catalog(path: str | Path | None = None) -> Catalog:
-    """Read and validate a schema-v5 catalog.
+    """Read and validate a schema-v6 catalog.
 
     JSON duplicate keys and the non-standard ``NaN``/``Infinity`` constants
     are rejected before semantic validation so the resulting catalog has one
@@ -4780,6 +5796,282 @@ def _normalize_token(token: str) -> str:
     return token
 
 
+def _recognized_discovery_intents(
+    query_text: str,
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Recognize safety-relevant query intent from ordinary language."""
+
+    tokens = frozenset(_tokens(query_text))
+    recognized: list[tuple[str, tuple[str, ...]]] = []
+
+    def add(name: str, terms: set[str]) -> None:
+        if terms:
+            recognized.append((name, tuple(sorted(terms))))
+
+    add(
+        "longitudinal",
+        set(tokens)
+        & {
+            "history",
+            "longitudinal",
+            "nearest",
+            "prior",
+            "subsequent",
+            "within",
+        },
+    )
+    add(
+        "temporal_fallback",
+        set(tokens)
+        & {
+            "coalesce",
+            "fallback",
+            "proxy",
+            "substitute",
+            "substitution",
+        },
+    )
+    add(
+        "probability_calibration",
+        set(tokens) & {"brier", "calibration", "probability"},
+    )
+    finding_terms = set(tokens) & {
+        "finding",
+        "identity",
+        "instance",
+        "key",
+        "numfind",
+        "row",
+    }
+    if "finding" in tokens and finding_terms & {
+        "identity",
+        "instance",
+        "key",
+        "numfind",
+        "row",
+    }:
+        add("finding_identity", finding_terms)
+    laterality_terms = set(tokens) & {
+        "bilateral",
+        "bside",
+        "laterality",
+        "null",
+        "side",
+    }
+    if laterality_terms & {"bilateral", "bside", "laterality"} or {
+        "side",
+        "null",
+    }.issubset(tokens):
+        add("laterality_role", laterality_terms)
+    binary_terms = set(tokens) & {
+        "binary",
+        "biopsy",
+        "cancer",
+        "endpoint",
+        "event",
+        "outcome",
+        "represented",
+        "zero",
+    }
+    if "binary" in tokens or (
+        "represented" in tokens
+        and binary_terms & {"biopsy", "cancer", "endpoint", "event", "outcome"}
+    ):
+        add("represented_binary_endpoint", binary_terms)
+    if (
+        "finding" in tokens
+        and "pathology" in tokens
+        and tokens & {"aggregate", "aggregation", "severity"}
+    ):
+        add(
+            "finding_attribution_aggregation",
+            set(tokens)
+            & {
+                "aggregate",
+                "aggregation",
+                "finding",
+                "pathology",
+                "severity",
+            },
+        )
+    return tuple(recognized)
+
+
+def _discovery_intent_reasons(
+    document: _DiscoveryDocument,
+    intents: Sequence[tuple[str, tuple[str, ...]]],
+) -> list[dict[str, Any]]:
+    """Return explainable intent bonuses supported by document vocabulary."""
+
+    reasons: list[dict[str, Any]] = []
+    discriminating_cues = {
+        "longitudinal": {
+            "accession",
+            "candidate",
+            "history",
+            "longitudinal",
+            "nearest",
+            "prior",
+            "subsequent",
+            "timeline",
+        },
+        "temporal_fallback": {
+            "coalesce",
+            "fallback",
+            "interchangeable",
+            "missingness",
+            "proxy",
+            "substitute",
+            "substitution",
+        },
+        "probability_calibration": {
+            "brier",
+            "calibration",
+            "exceptional",
+            "horizon",
+            "probability",
+            "risk",
+            "scale",
+        },
+        "finding_identity": {
+            "identity",
+            "instance",
+            "key",
+            "longitudinal",
+            "multiplicity",
+            "numfind",
+            "row",
+            "synthetic",
+        },
+        "laterality_role": {
+            "bilateral",
+            "bside",
+            "laterality",
+            "null",
+            "side",
+        },
+        "represented_binary_endpoint": {
+            "binary",
+            "cancer",
+            "endpoint",
+            "event",
+            "outcome",
+            "represented",
+            "zero",
+        },
+        "finding_attribution_aggregation": {
+            "aggregate",
+            "aggregation",
+            "attribution",
+            "multiplicity",
+            "policy",
+            "severity",
+        },
+    }
+    for intent, query_terms in intents:
+        semantic_cues = sorted(
+            document.all_tokens & _DISCOVERY_INTENT_AFFINITIES[intent]
+        )
+        if not semantic_cues:
+            continue
+        cue_set = set(semantic_cues)
+        has_discriminating_cue = bool(
+            cue_set & discriminating_cues[intent]
+        )
+        longitudinal_patient_pathology = (
+            intent == "longitudinal"
+            and document.kind == "semantic_relationship"
+            and {"patient", "pathology"}.issubset(cue_set)
+        )
+        if not has_discriminating_cue and not longitudinal_patient_pathology:
+            continue
+        bonus = 45 + 8 * min(len(semantic_cues), 5)
+        if longitudinal_patient_pathology:
+            bonus += 50
+        if (
+            document.kind == "guardrail"
+            and document.entity.priority in {"critical", "high"}
+        ):
+            bonus += 55
+        elif (
+            document.kind == "coverage"
+            and document.entity.status in {"unsupported", "unresolved"}
+        ):
+            bonus += 45
+        reasons.append(
+            {
+                "field": "query_intent",
+                "intent": intent,
+                "terms": list(query_terms),
+                "matched_terms": list(query_terms),
+                "semantic_cues": semantic_cues,
+                "score_bonus": bonus,
+            }
+        )
+    return reasons
+
+
+def _compose_discovery_candidates(
+    candidates: Sequence[
+        tuple[int, _DiscoveryDocument, list[dict[str, Any]], frozenset[str]]
+    ],
+    *,
+    limit: int,
+    has_query_intents: bool,
+) -> list[
+    tuple[int, _DiscoveryDocument, list[dict[str, Any]], frozenset[str]]
+]:
+    """Reserve a bounded share for eligible safety/uncertainty records."""
+
+    selected = list(candidates[:limit])
+    if not has_query_intents or not candidates:
+        return selected
+    reserved_slots = min(2, max(1, limit // 4))
+    reservable = [
+        candidate
+        for candidate in candidates
+        if any(
+            reason.get("field") == "query_intent"
+            for reason in candidate[2]
+        )
+        and (
+            (
+                candidate[1].kind == "guardrail"
+                and candidate[1].entity.priority in {"critical", "high"}
+            )
+            or (
+                candidate[1].kind == "coverage"
+                and candidate[1].entity.status
+                in {"unsupported", "unresolved"}
+            )
+        )
+    ][:reserved_slots]
+    reserved_keys = {
+        (candidate[1].kind, candidate[1].identifier)
+        for candidate in reservable
+    }
+    selected_keys = {
+        (candidate[1].kind, candidate[1].identifier)
+        for candidate in selected
+    }
+    selected.extend(
+        candidate
+        for candidate in reservable
+        if (candidate[1].kind, candidate[1].identifier)
+        not in selected_keys
+    )
+    while len(selected) > limit:
+        for index in range(len(selected) - 1, -1, -1):
+            key = (selected[index][1].kind, selected[index][1].identifier)
+            if key not in reserved_keys:
+                selected.pop(index)
+                break
+    selected.sort(
+        key=lambda item: (-item[0], item[1].kind, item[1].identifier)
+    )
+    return selected
+
+
 def _discovery_reasons(
     document: _DiscoveryDocument,
     query_text: str,
@@ -4858,6 +6150,9 @@ def _discovery_score(
         "caveats": 5,
     }
     for reason in reasons:
+        if "score_bonus" in reason:
+            score += int(reason["score_bonus"])
+            continue
         weight = field_weights.get(str(reason["field"]), 8)
         score += weight * len(reason.get("matched_terms", ()))
         if reason.get("phrase_match"):

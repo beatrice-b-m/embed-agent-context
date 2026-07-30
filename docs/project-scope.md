@@ -8,6 +8,8 @@ clinical question and determine:
 
 - which clinical objects and observations are represented;
 - what one instance of each object means;
+- how a selected profile identifies a clinical instance, including identity
+  scope and the absence of longitudinal identity;
 - how objects relate, including cardinality, optionality, and attribution
   limitations;
 - which features describe each object and what their codes and missing states
@@ -19,7 +21,7 @@ clinical question and determine:
 - what evidence supports each assertion, at what profile scope, and which
   questions remain unresolved; and
 - how a selected release binds those semantics to physical tables, columns,
-  types, keys, and joins.
+  types, keys, joins, occurrence-specific interpretations, and composed paths.
 
 The tool supplies trustworthy context for agents to design their own cohorts,
 pipelines, and analyses. It does not prescribe those designs.
@@ -32,7 +34,7 @@ pipelines, and analyses. It does not prescribe those designs.
 - directly usable without a database, index service, or generated Markdown;
 - clinically normalized independently of physical storage;
 - explicit about evidence, coverage, missing states, uncertainty, attribution,
-  time meaning, and aggregation;
+  time meaning, aggregation, identity scope, and occurrence interpretation;
 - discoverable from clinical language without table names or stable IDs;
 - safe to bind to normalized tables, denormalized views, databases, or future
   releases without copying semantic definitions; and
@@ -77,7 +79,7 @@ implementation layer containing:
 - feature-to-column bindings;
 - object-to-table representations;
 - table grains and key candidates; and
-- physical relationship bindings and join hazards.
+- physical relationship bindings, composed binding paths, and join hazards.
 
 A clinical object does not need its own table. One row can represent parts of
 several objects, and the same semantic model can bind to a different layout.
@@ -110,7 +112,21 @@ registers a supported aggregation. The catalog does not choose such a policy.
 
 Outcome coverage must state what is known and unknown about capture and
 follow-up. Absence of a recorded outcome is not proof that the outcome did not
-occur.
+occur. A represented binary endpoint may validly encode “no represented event
+under this extraction policy,” but it must not be described as “never biopsied”
+or “cancer-free.” Restricting an estimand to pathology-observed records is not
+inherently invalid; the conditioning and its limits on generalizability must be
+named.
+
+Longitudinal pathology candidate discovery operates at patient scope even when
+the requested output grain is an exam side or finding. A candidate pathology
+accession belongs to the candidate pathology-associated exam and must not be
+forced equal to the index exam accession.
+
+Risk outputs with unresolved scale, horizon, model-version, exceptional-value,
+or probability semantics can remain useful for association or ranking. They
+must not be treated as calibrated probabilities or used for calibration and
+Brier-score interpretation until those semantics are validated.
 
 ## Temporal semantics
 
@@ -126,7 +142,9 @@ single diagnosis date. Relevant distinctions include:
 Open-v2 can explicitly mark a clinically meaningful candidate such as specimen
 collection time as unsupported when no supported feature represents it. The
 catalog must not invent a proxy or silently substitute procedure or report
-time.
+time. Missingness remains missing for the selected semantic endpoint. A
+different time may be studied only as a separately named endpoint or sensitivity
+analysis, never as a silent fallback or coalesced replacement.
 
 No candidate is a universal diagnosis date. Agents and users remain responsible
 for choosing task-specific anchors, follow-up windows, outcomes, exclusions,
@@ -151,7 +169,10 @@ coverage should include:
 Guardrails may link to relevant objects, concepts, relationships, time,
 aggregation, coverage, and evidence. They must not grow into named research
 workflows or encode cases, controls, exclusions, follow-up windows, or
-preferred estimands.
+preferred estimands. A controlled category distinguishes `prohibition`,
+`analyst_choice`, and `interpretation_limit`; priority (`critical`, `high`, or
+`standard`) makes the most important applicable constraints prominent without
+turning them into policy.
 
 ## Discovery requirements
 
@@ -166,6 +187,13 @@ Every match must explain why it matched through:
 - unmatched query terms; and
 - deterministic score.
 
+Discovery uses deterministic query intents for clinically important language,
+including longitudinal search, temporal fallback, probability calibration,
+identity, laterality, and represented endpoints. Applicable high-priority
+guardrails and unresolved coverage may receive reserved result slots. Every
+boost remains visible in match reasons, explicit kind filters remain binding,
+and ordering is deterministic.
+
 No-result diagnostics must distinguish:
 
 - filters excluding otherwise matching entries;
@@ -176,7 +204,8 @@ No-result diagnostics must distinguish:
 
 An empty result must never be presented as evidence that a clinical object,
 state, relationship, or event is absent from EMBED. Exact semantic getters
-support follow-up navigation; profile-binding lookup is secondary.
+support follow-up navigation and return resolved constraints; profile-binding
+lookup is secondary.
 
 ## Portability and count-free policy
 
@@ -217,6 +246,11 @@ Technical concepts may have no clinical-object owner. They must remain
 explicitly technical and must not be promoted to clinical identity, ordering,
 or linkage across releases.
 
+An object binding's optional `instance_identity` states identifying columns,
+identity scope, reserved synthetic exceptions, physical rows per clinical
+instance, and whether identity persists longitudinally. Row keys remain storage
+metadata and must not be promoted to clinical identity.
+
 ### Missing states and vocabularies
 
 Record field-specific missing states with their source representation, meaning,
@@ -227,6 +261,11 @@ Reusable code dictionaries belong under `vocabularies`. Vocabulary completeness
 and parsing behavior stay explicit. A released list is not automatically
 exhaustive, and a composed string must not be split when delimiter semantics
 are undocumented.
+
+When the same portable concept has different value or null meaning at different
+physical occurrences, record `occurrence_interpretations` on the feature
+binding rather than applying one global meaning. Representation, meaning,
+review status, claim references, and caveats remain occurrence-specific.
 
 ### Relationships
 
@@ -243,6 +282,11 @@ Every semantic relationship records:
 These are clinical-semantic claims, not join claims. A profile's physical
 relationship binding separately records tables, column tuples, source
 completeness, physical cardinality, evidence, and join hazards.
+
+When one semantic relationship requires multiple physical hops, register an
+ordered `relationship_binding_paths` entry. Every step must resolve within the
+same profile and adjacent endpoints must be compatible. The path is descriptive
+navigation, not an executable join.
 
 ### Time, aggregation, and coverage
 
@@ -335,12 +379,18 @@ A profile is complete when:
 - each feature binding references a portable concept and a declared table;
 - each nonempty object binding references a portable object, declared table,
   and bound columns;
+- declared `instance_identity` is scoped and does not confuse physical rows
+  with persistent clinical identity;
+- occurrence interpretations qualify the physical binding whose value or null
+  meaning they describe;
 - every bound table has one table specification at the correct binding grain;
 - key candidates state kind, uniqueness, completeness, evidence, and caveats;
 - physical relationship endpoints resolve to compatible bound columns;
 - relationship bindings retain source completeness, bidirectional
   cardinality, evidence, caveats, join hazards, claim references, and relevant
-  semantic links; and
+  semantic links;
+- composed relationship paths contain valid ordered steps with compatible
+  adjacent tables; and
 - unsupported capture or representation is recorded through coverage rather
   than inferred from missing columns.
 
@@ -353,8 +403,9 @@ cardinality, clinical attribution, outcome capture, or availability.
 Any functional catalog, CLI, MCP, or schema change must update relevant usage,
 format, architecture, and configuration documentation in the same logical
 commit. Examples and cross-references must be checked for stale identifiers,
-commands, filters, fields, and file paths. The architectural decision is
-documented in [`architecture-v5.md`](architecture-v5.md).
+commands, filters, fields, and file paths. The current architectural decision
+is documented in [`architecture-v6.md`](architecture-v6.md). Schema v5 is
+retained in [`architecture-v5.md`](architecture-v5.md) as history.
 
 ## Completion criteria
 
@@ -376,9 +427,12 @@ A clinical-semantic change is complete when it:
 - preserves claim-level provenance and unresolved questions;
 - keeps profile tables, columns, types, keys, and joins in the secondary
   binding layer;
+- represents bounded clinical-instance identity, occurrence-specific meanings,
+  and multi-edge physical paths explicitly;
 - adds no executable policy or empirical dataset summary;
 - supports clinical-first discovery with match explanations and diagnostic
-  no-result states;
+  no-result states, deterministic intent boosts, and constraint-aware result
+  composition;
 - includes focused synthetic tests and checked-in integration assertions for
   changed behavior; and
 - includes synchronized documentation and a focused Git commit.

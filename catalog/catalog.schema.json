@@ -37,7 +37,7 @@
       "const": "./catalog.schema.json"
     },
     "schema_version": {
-      "const": 5
+      "const": 6
     },
     "profiles": {
       "type": "array",
@@ -797,6 +797,8 @@
         "title",
         "statement",
         "rationale",
+        "category",
+        "priority",
         "scope",
         "profiles",
         "objects",
@@ -819,6 +821,20 @@
         },
         "rationale": {
           "$ref": "#/$defs/nonblank_string"
+        },
+        "category": {
+          "enum": [
+            "prohibition",
+            "analyst_choice",
+            "interpretation_limit"
+          ]
+        },
+        "priority": {
+          "enum": [
+            "critical",
+            "high",
+            "standard"
+          ]
         },
         "scope": {
           "enum": [
@@ -1362,6 +1378,40 @@
         }
       }
     },
+    "occurrence_interpretation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation",
+        "meaning",
+        "status",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "representation": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "meaning": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "reconciled",
+            "unverified",
+            "unresolved",
+            "contradicted"
+          ]
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
     "feature_binding": {
       "type": "object",
       "additionalProperties": false,
@@ -1437,6 +1487,80 @@
           "items": {
             "$ref": "#/$defs/nonblank_string"
           }
+        },
+        "occurrence_interpretations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/occurrence_interpretation"
+          }
+        }
+      }
+    },
+    "reserved_identity_exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "representation",
+        "meaning",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "column": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "representation": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "meaning": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "instance_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "columns",
+        "scope",
+        "reserved_exceptions",
+        "rows_per_instance",
+        "longitudinal_identity"
+      ],
+      "properties": {
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/physical_name"
+          }
+        },
+        "scope": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "reserved_exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reserved_identity_exception"
+          }
+        },
+        "rows_per_instance": {
+          "enum": [
+            "exactly_one",
+            "one_or_more",
+            "unknown"
+          ]
+        },
+        "longitudinal_identity": {
+          "type": "boolean"
         }
       }
     },
@@ -1479,6 +1603,9 @@
         },
         "caveats": {
           "$ref": "#/$defs/nonblank_strings"
+        },
+        "instance_identity": {
+          "$ref": "#/$defs/instance_identity"
         }
       }
     },
@@ -1673,6 +1800,43 @@
         }
       }
     },
+    "relationship_binding_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "semantic_relationship",
+        "relationship_bindings",
+        "description",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "semantic_relationship": {
+          "$ref": "#/$defs/identifier"
+        },
+        "relationship_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "description": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
     "profile_binding": {
       "type": "object",
       "additionalProperties": false,
@@ -1680,7 +1844,8 @@
         "feature_bindings",
         "object_bindings",
         "tables",
-        "relationship_bindings"
+        "relationship_bindings",
+        "relationship_binding_paths"
       ],
       "properties": {
         "feature_bindings": {
@@ -1706,6 +1871,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/relationship_binding"
+          }
+        },
+        "relationship_binding_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship_binding_path"
           }
         }
       }

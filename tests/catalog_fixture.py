@@ -1,4 +1,4 @@
-"""Synthetic schema-v5 catalog fixtures shared by core tests."""
+"""Synthetic schema-v6 catalog fixtures shared by core tests."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def synthetic_catalog() -> dict[str, Any]:
 
     return {
         "$schema": "./catalog.schema.json",
-        "schema_version": 5,
+        "schema_version": 6,
         "profiles": ["profile-a", "profile-b"],
         "binding_grains": list(BINDING_GRAINS),
         "feature_kinds": list(FEATURE_KINDS),
@@ -234,6 +234,8 @@ def synthetic_catalog() -> dict[str, Any]:
                 "title": "Unattached pathology is not negative pathology",
                 "statement": "Do not classify unattached pathology as benign or no cancer.",
                 "rationale": "Attachment and diagnosis are different states.",
+                "category": "prohibition",
+                "priority": "critical",
                 "scope": "embed_general",
                 "profiles": [],
                 "objects": ["pathology_diagnosis"],
@@ -251,6 +253,8 @@ def synthetic_catalog() -> dict[str, Any]:
                 "title": "No universal diagnosis date",
                 "statement": "Choose task-specific anchors from dates with different meanings.",
                 "rationale": "Event and documentation times answer different questions.",
+                "category": "interpretation_limit",
+                "priority": "high",
                 "scope": "embed_general",
                 "profiles": [],
                 "objects": ["imaging_exam", "pathology_diagnosis"],
@@ -487,6 +491,19 @@ def synthetic_catalog() -> dict[str, Any]:
                         "role": "wide_projection",
                         "physical_type": "int8",
                         "nullable": True,
+                        "occurrence_interpretations": [
+                            {
+                                "representation": "null",
+                                "meaning": "No severity is attached in this projection.",
+                                "status": "verified",
+                                "claim_refs": [
+                                    "profiles.synthetic#severity-binding"
+                                ],
+                                "caveats": [
+                                    "This is not a negative diagnosis."
+                                ],
+                            }
+                        ],
                     },
                 ],
                 "object_bindings": [
@@ -534,6 +551,7 @@ def synthetic_catalog() -> dict[str, Any]:
                     }
                 ],
                 "relationship_bindings": [],
+                "relationship_binding_paths": [],
             },
             "profile-b": {
                 "feature_bindings": [
@@ -591,6 +609,13 @@ def synthetic_catalog() -> dict[str, Any]:
                         "representation": "canonical",
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": [],
+                        "instance_identity": {
+                            "columns": ["pid"],
+                            "scope": "Within the profile.",
+                            "reserved_exceptions": [],
+                            "rows_per_instance": "exactly_one",
+                            "longitudinal_identity": True,
+                        },
                     },
                     {
                         "object": "imaging_exam",
@@ -671,6 +696,20 @@ def synthetic_catalog() -> dict[str, Any]:
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": [],
                         "join_hazards": ["Joining patient values repeats them at exam grain."],
+                    }
+                ],
+                "relationship_binding_paths": [
+                    {
+                        "id": "profile-b.patient-exam-path",
+                        "semantic_relationship": "patient.has_exam",
+                        "relationship_bindings": [
+                            "profile-b.exams.patient"
+                        ],
+                        "description": "The exam-to-patient binding implements patient navigation.",
+                        "claim_refs": [
+                            "profiles.synthetic#severity-binding"
+                        ],
+                        "caveats": [],
                     }
                 ],
             },

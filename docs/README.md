@@ -17,7 +17,7 @@ The usual workflow is:
 ```text
 ask a clinical question with `embed-context discover`
   -> open a returned stable identifier
-  -> inspect related meaning and provenance
+  -> inspect resolved constraints, related meaning, and provenance
   -> consult an open-v2 profile binding only when implementing against tables
 ```
 
@@ -25,8 +25,11 @@ ask a clinical question with `embed-context discover`
 
 - [Catalog format](catalog-format.md) documents the serialized records,
   validation rules, result envelopes, and Python, CLI, and MCP interfaces.
-- [Architecture v5](architecture-v5.md) explains why portable clinical meaning
-  is separate from release-specific tables and columns.
+- [Architecture v6](architecture-v6.md) explains why portable clinical meaning
+  is separate from occurrence-aware release bindings and how query results
+  surface applicable constraints.
+- [Architecture v5](architecture-v5.md) preserves the preceding schema-v5
+  design as history.
 - The README's [AI client section](../README.md#connect-an-ai-client) shows
   Codex, Claude Code, and OpenCode stdio MCP configuration.
 

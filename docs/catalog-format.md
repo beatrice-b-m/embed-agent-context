@@ -2,7 +2,7 @@
 
 ## Design
 
-Schema version 5 separates a portable clinical-semantic model from the
+Schema version 6 separates a portable clinical-semantic model from the
 profile-specific structures that implement it:
 
 ```text
@@ -20,10 +20,10 @@ portable clinical semantics
 
 profile binding
 │
-├── object ── table / columns / representation
-├── concept ── table / column / physical type / binding grain
+├── object ── table / columns / representation / instance identity
+├── concept ── table / column / type / grain / occurrence interpretation
 ├── table ── key candidate
-└── semantic relationship ── physical relationship / join tuple
+└── semantic relationship ── physical relationship / ordered binding path
 ```
 
 The portable layer describes clinical meaning, adjacency, time, aggregation,
@@ -35,12 +35,14 @@ several objects.
 The catalog is a closed, count-free registry rather than a general ontology or
 an execution engine. It does not contain SQL, dataframe expressions, executable
 cohort predicates, preferred analysis policies, or empirical distributions.
-See [`architecture-v5.md`](architecture-v5.md) for the design decision.
+See [`architecture-v6.md`](architecture-v6.md) for the current design decision.
+[`architecture-v5.md`](architecture-v5.md) remains the historical schema-v5
+record.
 
 ## Top-level contract
 
 `schema_version`
-: Integer format version. Version 5 readers reject every other version before
+: Integer format version. Version 6 readers reject every other version before
   interpreting version-specific fields.
 
 `profiles`
@@ -75,6 +77,10 @@ See [`architecture-v5.md`](architecture-v5.md) for the design decision.
 : Controlled statements of `supported`, `unsupported`, `unresolved`, or
   `not_cataloged` coverage.
 
+Guardrail category and priority values are schema-controlled. Categories are
+`prohibition`, `analyst_choice`, and `interpretation_limit`; priorities are
+`critical`, `high`, and `standard`.
+
 `clinical_objects`, `concepts`, `semantic_relationships`,
 `temporal_semantics`, `aggregations`, `guardrails`, and `coverage`
 : ID-keyed portable semantic collections.
@@ -84,7 +90,8 @@ See [`architecture-v5.md`](architecture-v5.md) for the design decision.
 
 `profile_bindings`
 : ID-keyed implementation layer. Each profile contains feature bindings, object
-  bindings, table specifications, and physical relationship bindings.
+  bindings, table specifications, physical relationship bindings, and composed
+  relationship binding paths.
 
 The authoritative field constraints are in
 [`catalog/catalog.schema.json`](../catalog/catalog.schema.json). Every object
@@ -284,7 +291,10 @@ Exam study time, procedure time, specimen collection time, pathology report
 time, and data availability answer different questions. A profile can mark a
 clinically meaningful time as unsupported through `coverage`; absence of a
 binding must not cause the catalog to invent a date. The catalog does not
-designate any candidate as a universal diagnosis date. A temporal semantic
+designate any candidate as a universal diagnosis date. Distinct temporal
+semantics must not be coalesced or fallback-substituted. Missingness remains
+missing for the selected endpoint; another time can be used only as a
+separately named endpoint or sensitivity analysis. A temporal semantic
 without `feature_refs` must have `unsupported` or `unresolved` coverage for
 every declared profile, either through profile-specific records or one
 applicable general record.
@@ -319,16 +329,22 @@ as unsupported.
 ### Reusable guardrails
 
 `guardrails` contains interpretation constraints that apply across research
-questions. A guardrail has a title, statement, rationale, scope, profile list,
-domains, search terms, claim references, caveats, and links to relevant
-objects, concepts, semantic relationships, temporal semantics, aggregations,
-and coverage entries.
+questions. A guardrail has a title, statement, rationale, controlled `category`
+and `priority`, scope, profile list, domains, search terms, claim references,
+caveats, and links to relevant objects, concepts, semantic relationships,
+temporal semantics, aggregations, and coverage entries.
 
 Guardrails can state, for example, that absent pathology is not a negative
 diagnosis, imaging assessment is not pathology truth, downstream data may leak
 future information, many-to-many attribution requires reconciliation, or grain
 changes require an explicit aggregation policy. They do not define cases,
 controls, windows, exclusions, or preferred pipelines.
+
+`prohibition` identifies an invalid interpretation or substitution.
+`analyst_choice` identifies a decision that must be declared for the research
+question. `interpretation_limit` qualifies what the represented data can
+support. Priority controls salience in constraint summaries and discovery; it
+does not convert a guardrail into an executable rule.
 
 General-clinical and EMBED-general guardrails have an empty `profiles` list.
 Profile-specific guardrails declare at least one profile.
@@ -356,7 +372,7 @@ Substantive portable assertions link to context claims with
 `context-id#claim-id`. The fragment form distinguishes a single reviewed claim
 from an entire context and must resolve exactly.
 
-Contexts retain the version-4 claim model:
+Contexts use this claim model:
 
 - each claim has a stable local ID, review status, one or more source IDs, and
   caveats;
@@ -391,14 +407,21 @@ requires the binding keys to match `profiles`.
 
 ### Feature bindings
 
-`feature_bindings` preserves the version-4 physical feature metadata except for
-the moved profile:
+`feature_bindings` records:
 
 - table and column;
 - semantic concept ID;
 - controlled binding grain and binding role;
-- physical type and schema nullability; and
+- physical type and schema nullability;
+- optional `occurrence_interpretations`; and
 - optional closed parameters and notes.
+
+Each occurrence interpretation contains `representation`, `meaning`, review
+`status`, `claim_refs`, and `caveats`. It qualifies a particular physical
+occurrence of the portable concept, including an occurrence-specific value or
+null meaning. It does not change the reusable concept globally. This permits,
+for example, a null laterality occurrence to mean bilateral in one binding and
+unknown in another, while leaving unresolved projections explicit.
 
 The only defined parameter is `parameters.slot`, and it is reserved for
 `pathology.diagnosis_code_slot`. Every binding for that exact concept must
@@ -428,14 +451,28 @@ substantiate the binding. Because object bindings have no standalone stable ID
 or exact getter, object, discovery, and profile-table responses resolve each
 binding's claims, contexts, and sources in an embedded `provenance` section.
 
+An object binding may include `instance_identity`:
+
+- `columns` identifying one represented clinical instance;
+- a human-readable `scope`;
+- `reserved_exceptions`, each with `column`, `representation`, `meaning`,
+  `claim_refs`, and `caveats`;
+- `rows_per_instance`: `exactly_one`, `one_or_more`, or `unknown`; and
+- `longitudinal_identity`, a boolean stating whether identity persists across
+  encounters or accessions.
+
+Instance identity is a clinical representation claim, not a table uniqueness
+claim. For example, a finding number may identify a finding only within an
+accession even when several physical rows represent that finding. Table key
+candidates and technical export indices remain separate.
+
 ### Tables and physical relationship bindings
 
 `tables` retains profile-specific table grain, natural and technical key
 candidates, uniqueness, completeness, evidence, and caveats. A key candidate
 is descriptive metadata, not a database constraint.
 
-`relationship_bindings` retains the version-4 physical relationship shape
-except for the moved profile. It includes:
+`relationship_bindings` includes:
 
 - stable physical relationship ID and kind;
 - ordered source and target table-column endpoints;
@@ -448,6 +485,18 @@ Physical relationship kinds remain `hierarchy`, `reference`, and `projection`.
 They are not interchangeable with the portable semantic relationship kinds.
 A binding can support several semantic relationships or none, and a semantic
 relationship may require several physical bindings.
+
+`relationship_binding_paths` registers the latter case explicitly. Every
+profile contains this collection; each path has:
+
+- stable `id` and one portable `semantic_relationship`;
+- an ordered, nonempty `relationship_bindings` list;
+- `description`, `claim_refs`, and `caveats`.
+
+Every step resolves within the containing profile, and the target table of one
+step must equal the source table of the next. Component bindings need not each
+claim the composed semantic relationship. A path describes a supported physical
+route; it is not an executable join and does not erase step-level hazards.
 
 Endpoint tuples must resolve to feature bindings in the same profile, have
 equal arity and compatible physical types, and respect documented key
@@ -484,6 +533,8 @@ Core validation supplements JSON Schema by resolving:
 - coverage subjects;
 - every claim reference and source;
 - every profile, table, column, key, and physical relationship reference; and
+- instance-identity columns and exceptions, occurrence-interpretation claims,
+  and ordered relationship-binding paths; and
 - the exact equality of declared profiles and `profile_bindings` keys.
 
 ## Discovery behavior
@@ -517,12 +568,21 @@ Discovery diagnostics distinguish:
 
 An empty result is therefore not presented as evidence that a clinical state,
 event, or relationship is absent from the dataset. Deterministic token
-matching remains transparent and dependency-free; results are sorted
-deterministically.
+matching remains transparent and dependency-free. A deterministic query-intent
+layer recognizes longitudinal, fallback, calibration, identity, laterality,
+and represented-endpoint language. Intent boosts appear in `match_reasons`.
+Constraint-aware result composition may reserve slots for applicable
+high-priority guardrails and unresolved coverage, but it always respects
+explicit `kinds` filters. Results remain deterministically sorted.
 
 Exact semantic getters return `kind`, `identifier`, the kind-specific entity,
-and two computed sections:
+and three computed sections:
 
+- `constraints` contains compact resolved entries under
+  `supported_facts`, `unresolved_claims`, `unsupported_substitutions`,
+  `analyst_choices_required`, `high_priority_guardrails`, and
+  `relevant_contexts`; each entry retains its stable identifier and applicable
+  status, category, priority, and summary;
 - `related` contains stable IDs for adjacent objects, features,
   relationships, time semantics, aggregations, guardrails, and coverage as
   applicable, plus relevant object or relationship bindings;
@@ -530,7 +590,9 @@ and two computed sections:
   review status, context titles and scope/profiles, and complete source
   records.
 
-These sections are derived from the validated graph on every lookup. They are
+These sections are derived from the validated graph on every lookup. Contexts
+linked through `related_concepts` are included in reverse navigation so a
+feature lookup surfaces relevant reviewed context. These sections are
 not additional author-maintained adjacency or evidence copies.
 
 The exact surfaces are:
@@ -570,7 +632,7 @@ When extending the portable model:
 6. Record supplied, analyst-defined, unsupported, and unresolved aggregation
    transitions explicitly.
 7. Add reusable guardrails only when they constrain interpretation across
-   questions.
+   questions; classify their category and priority.
 8. Add coverage entries for important unsupported, unresolved, or uncataloged
    topics so discovery can explain gaps.
 9. Add no physical names until the portable assertion is independently clear.
@@ -583,13 +645,15 @@ To bind another EMBED representation:
 2. Reuse the portable semantic collections without copying them.
 3. Add feature bindings for physical columns.
 4. Add object bindings, including partial, co-located, projected, and reference
-   representations.
+   representations, plus bounded `instance_identity` where supported.
 5. Declare every bound table, its binding grain, and assessed key candidates.
-6. Add physical relationship bindings and link them to semantic relationships
-   only where the representation supports that claim.
+6. Add physical relationship bindings and ordered relationship-binding paths;
+   link direct or composed semantic relationships only where the representation
+   supports that claim.
 7. Preserve dangling references, row multiplication, nullable components,
    attribution gaps, and temporal leakage as caveats or join hazards.
-8. Add profile-scoped claims and coverage only with applicable evidence.
+8. Add occurrence interpretations and profile-scoped claims or coverage only
+   with applicable evidence.
 9. Validate the footer surface and separately substantiate semantic capture,
    keys, joins, attribution, and availability.
 
@@ -598,7 +662,7 @@ Profile-specific statistics remain outside the portable catalog.
 ## Schema evolution
 
 Content additions that preserve the documented contract can retain schema
-version 5. Changes to required fields, field meaning, identifier resolution,
+version 6. Changes to required fields, field meaning, identifier resolution,
 controlled facets, or query semantics require an explicit schema-version
 decision and synchronized format, architecture, interface, and usage
 documentation. Readers must reject unsupported versions rather than ignore

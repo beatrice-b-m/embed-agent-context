@@ -1,5 +1,8 @@
 # Clinical-semantic architecture
 
+> Historical record: this page documents schema version 5 and software 0.6.0.
+> See [architecture v6](architecture-v6.md) for the current design.
+
 ## Decision
 
 Schema version 5 makes portable clinical semantics the primary catalog model.

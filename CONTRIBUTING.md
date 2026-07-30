@@ -48,12 +48,16 @@ Suppose a review establishes a new timestamp meaning.
    uses a different column.
 3. Add or reuse a `temporal_semantic` record that states whether the value is
    event, documentation, or availability time. Do not designate a universal
-   diagnosis date or substitute an unsupported proxy.
+   diagnosis date, coalesce different time meanings, or substitute an
+   unsupported proxy. Use a separately named endpoint or sensitivity analysis
+   when another time is genuinely part of the question.
 4. Add the narrowest reviewed `context-id#claim-id` and applicable source.
    Preserve unresolved or contradicted status instead of smoothing it away.
 5. Add profile feature/object/relationship bindings only when verified
-   physical metadata supports them. Record join hazards and unsupported
-   coverage explicitly.
+   physical metadata supports them. Use occurrence interpretations for
+   binding-specific value or null meaning, instance identity for bounded
+   clinical identity, and relationship-binding paths for supported multi-edge
+   routes. Record join hazards and unsupported coverage explicitly.
 6. Change `catalog.schema.json` only when the serialized shape or invariant
    expressible in JSON Schema changes. Keep runtime and schema validators in
    parity.
@@ -120,6 +124,11 @@ be committed.
 - Claims have the narrowest correct scope, evidence, and review status.
 - Missing states, attribution, temporal meaning, aggregation, guardrails, and
   coverage stay explicit.
+- Instance identity, occurrence-specific interpretations, and composed binding
+  paths have applicable evidence and do not promote row keys into clinical
+  identity.
+- Guardrails have the correct category and priority; exact-result constraints
+  and discovery intent boosts preserve stable IDs and explain their basis.
 - Physical metadata remains under `profile_bindings`.
 - JSON Schema and strict runtime validation agree where their responsibilities
   overlap.

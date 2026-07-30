@@ -99,12 +99,13 @@ class SourceProfileVerifierTests(unittest.TestCase):
                     )
                 ],
                 "relationship_bindings": [],
+                "relationship_binding_paths": [],
             }
         self.catalog_path.write_text(
             json.dumps(
                 {
                     "$schema": "./catalog.schema.json",
-                    "schema_version": 5,
+                    "schema_version": 6,
                     "profiles": selected_profiles,
                     "binding_grains": list(BINDING_GRAINS),
                     "feature_kinds": list(FEATURE_KINDS),

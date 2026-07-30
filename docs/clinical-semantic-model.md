@@ -10,6 +10,8 @@ portable concepts needed for the analysis.
 A semantic relationship describes clinical meaning and attribution. A profile
 relationship binding describes how one release can approximate that
 relationship with tables and columns. Neither is executable join logic.
+When a semantic relationship needs several physical hops, an ordered binding
+path retains that composition and every step's hazards.
 
 `open-v2` below is the stable profile ID for the registered open EMBED V2
 physical layout; it is not catalog schema version 2. See the README
@@ -37,6 +39,18 @@ observation, diagnosis, and report-date fields can be co-located on a
 pathology-finding row without acquiring a proven one-to-one clinical identity.
 Likewise, assessment and recommendation are co-located on an imaging-finding
 row without an independent interpretation identifier or timestamp.
+
+Open-v2 finding number identifies a clinical finding only within its accession
+after the documented reserved synthetic value is excluded. It does not persist
+across accessions, episodes, or modalities, and multiple physical rows may
+represent one finding. This instance identity is separate from row keys and
+technical export indices.
+
+Laterality meaning is occurrence-specific. A null finding-side occurrence can
+represent bilateral where reviewed evidence supports that meaning, while a
+null biopsy or procedure side means unknown rather than bilateral. Side-level
+records and wide projections retain their own reviewed or unresolved
+interpretations.
 
 ## Pathology outcome states
 
@@ -76,6 +90,12 @@ paths have different physical evidence and limitations. A table row that
 contains all of these fields is not proof of a unique clinical event shared by
 all of them.
 
+Longitudinal candidate search begins at the patient and traverses the patient's
+exam timeline even when the final output grain is exam side or finding. The
+accession on a pathology observation belongs to its candidate
+pathology-associated exam; requiring it to equal the index exam accession would
+collapse longitudinal search into same-exam attachment.
+
 ## Time
 
 The catalog distinguishes:
@@ -94,7 +114,10 @@ obscuring absolute calendar values.
 
 No time is labeled as a universal diagnosis date. An analysis must choose an
 anchor according to the question and must exclude information unavailable at
-that anchor when leakage matters.
+that anchor when leakage matters. Procedure, report, and other date semantics
+must not be coalesced or fallback-substituted when the selected endpoint is
+missing. A separately named endpoint or sensitivity analysis may use another
+time without pretending it has the same meaning.
 
 ## Aggregation
 
@@ -105,8 +128,8 @@ two supplied rollups is recorded through profile-specific coverage and result
 feature bindings; `provided` does not imply that every future profile contains
 the same fields.
 
-No supplied finding-level severity is established because attribution is
-optional and many-to-many. No canonical patient-level outcome rollup is
+Finding-level severity requires an analyst-declared policy because attribution
+is optional and many-to-many. No canonical patient-level outcome rollup is
 provided. Patient-level questions must address multiple sides, exams,
 procedures, diagnoses, changing states, and time explicitly.
 
@@ -121,8 +144,21 @@ Restricting observations to attached pathology also conditions on a
 represented tissue-sampling procedure. Because not every patient, exam, side,
 or finding proceeds to sampling, pathology-observed groups may differ
 systematically from unsampled groups. The catalog exposes this selection
-mechanism but does not choose an inclusion, exclusion, weighting, or causal
-analysis policy.
+mechanism but does not declare the resulting estimand invalid and does not
+choose an inclusion, exclusion, weighting, or causal analysis policy. The
+conditioning and generalizability boundary must be named.
+
+A binary endpoint can mean “no represented event under the declared extraction
+policy.” It cannot, without additional evidence, be strengthened to “never
+biopsied,” “cancer-free,” or complete negative follow-up. Same-day boundaries,
+episode definitions, tie-breaking, follow-up opportunity, and observation
+proxies are analyst choices that must remain explicit.
+
+Open-v2 risk outputs can support association or ranking questions while their
+scale, horizon, model version, exceptional values, or probability semantics
+remain unresolved. Probability calibration, Brier scores, and similar
+probability-based interpretations require those semantics to be validated
+first.
 
 Coverage records distinguish a documented unsupported or unresolved surface
 from a failed search. A `no_catalog_coverage` diagnostic means only that the

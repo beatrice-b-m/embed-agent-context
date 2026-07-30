@@ -9,11 +9,11 @@ Read these in order before changing behavior or catalog meaning:
 3. `docs/project-scope.md` for normative clinical, evidence, portability, and
    safety boundaries.
 4. `CONTRIBUTING.md` for the worked change flow and validation matrix.
-5. `docs/catalog-format.md` and `docs/architecture-v5.md` when changing the
+5. `docs/catalog-format.md` and `docs/architecture-v6.md` when changing the
    serialized model or query behavior.
 
-The current version axes are independent: software `0.6.0`, catalog schema
-version `5`, registered physical profile `open-v2`, and optional MCP SDK
+The current version axes are independent: software `0.7.0`, catalog schema
+version `6`, registered physical profile `open-v2`, and optional MCP SDK
 dependency `2.0.0`.
 
 ## Canonical-source hierarchy

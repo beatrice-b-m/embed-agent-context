@@ -196,8 +196,11 @@ prints uv's executable directory. Use the absolute path to
 `embed-context-mcp` in that client's configuration.
 
 Agents should begin with the MCP `discover` tool, follow returned identifiers
-with exact semantic getters, and inspect profile bindings only when they need
-release-specific implementation detail.
+with exact semantic getters, review the returned `constraints`, and inspect
+profile bindings only when they need release-specific implementation detail.
+For longitudinal pathology questions, candidate search follows the patient's
+timeline; the candidate pathology accession is not forced to equal the index
+exam accession.
 
 ## Use the Python API
 
@@ -236,8 +239,16 @@ the analysis itself. In particular, it does not:
 One important example is time. EMBED represents imaging exam dates, procedure
 dates, and pathology report dates with different meanings. The registered
 profile does not supply a supported specimen-collection time, and no candidate
-is designated as a universal diagnosis date. Downstream pathology can also
-leak future information into an earlier prediction target.
+is designated as a universal diagnosis date. A missing selected endpoint stays
+missing: procedure and report dates must not be coalesced or fallback-substituted
+for one another. Separately named endpoints or sensitivity analyses can compare
+their implications. Downstream pathology can also leak future information into
+an earlier prediction target.
+
+Risk outputs may support association or ranking questions while their scale,
+horizon, model version, exceptional values, or probability meaning remains
+unresolved. Probability calibration and Brier-score interpretation require
+those semantics to be validated first.
 
 See the [clinical-semantic model](docs/clinical-semantic-model.md) for the
 outcome, attribution, time, aggregation, and uncertainty details that should
@@ -249,7 +260,16 @@ inform study design.
 - A **feature** is a portable meaning owned by one or more clinical objects.
 - A **semantic relationship** describes clinical adjacency or attribution.
 - A **profile binding** describes how a physical release represents a meaning.
+- **Clinical instance identity** states how bound columns identify one
+  represented object instance and where that identity stops.
+- An **occurrence interpretation** qualifies the meaning of a value or null at
+  one physical feature occurrence.
+- A **binding path** composes ordered physical relationships that together
+  implement one portable semantic relationship.
 - A **guardrail** records a reusable interpretation constraint, not a policy.
+- **Resolved constraints** summarize supported facts, unresolved claims,
+  prohibited substitutions, required analyst choices, high-priority
+  guardrails, and relevant contexts for an exact result.
 - **Coverage** says what the catalog represents, not how complete the dataset
   is empirically.
 
@@ -257,8 +277,8 @@ The version numbers describe different things:
 
 | Axis | Current value |
 | --- | --- |
-| Software package and commands | `0.6.0` |
-| Serialized catalog schema | `5` |
+| Software package and commands | `0.7.0` |
+| Serialized catalog schema | `6` |
 | Registered EMBED V2 physical profile | `open-v2` |
 | Optional MCP SDK dependency | `2.0.0` |
 
@@ -269,8 +289,8 @@ The version numbers describe different things:
   clinical graph and interpretation limits.
 - [Catalog format](docs/catalog-format.md) — integrate with the serialized
   model or Python, CLI, and MCP interfaces.
-- [Architecture v5](docs/architecture-v5.md) — understand the separation
-  between portable meaning and physical bindings.
+- [Architecture v6](docs/architecture-v6.md) — understand portable meaning,
+  occurrence-aware bindings, composed paths, and query-time constraints.
 - [Contributing](CONTRIBUTING.md) — set up a development environment and make
   catalog or code changes safely.
 

@@ -1,4 +1,4 @@
-"""Acceptance contracts for the checked-in schema-v5 semantic catalog."""
+"""Acceptance contracts for the checked-in clinical-semantic catalog."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         cls.raw = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
         cls.catalog = load_catalog(CATALOG_PATH)
 
-    def test_v5_models_the_clinical_graph_without_analysis_patterns(self) -> None:
-        self.assertEqual(self.catalog.schema_version, 5)
+    def test_v6_models_the_clinical_graph_without_analysis_patterns(self) -> None:
+        self.assertEqual(self.catalog.schema_version, 6)
         self.assertNotIn("analysis_pattern_statuses", self.raw)
         self.assertNotIn("analysis_patterns", self.raw)
         self.assertFalse(hasattr(self.catalog, "analysis_patterns"))
@@ -249,7 +249,12 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         timestamp_guardrail = self.catalog.get_guardrail(
             "guardrail.timestamps-answer-different-questions"
         )["guardrail"]
-        self.assertIn("rather than treated as interchangeable", timestamp_guardrail["statement"])
+        self.assertEqual(timestamp_guardrail["category"], "prohibition")
+        self.assertEqual(timestamp_guardrail["priority"], "critical")
+        self.assertIn("Do not coalesce", timestamp_guardrail["statement"])
+        self.assertIn(
+            "remains missing", timestamp_guardrail["rationale"]
+        )
 
         for feature_id, absent_event in (
             ("pathology.procedure_date", "procedure did not occur"),
@@ -261,6 +266,11 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
                 ][0]
                 self.assertEqual(state["representation"], "null")
                 self.assertIn(absent_event, state["meaning"])
+                feature_text = json.dumps(
+                    self.catalog.get_feature(feature_id)["feature"]
+                )
+                self.assertIn("Do not coalesce", feature_text)
+                self.assertIn("separately named endpoint", feature_text)
 
         for coverage_id in (
             "coverage.open-v2.specimen-time",
@@ -270,6 +280,13 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
                 coverage = self.catalog.get_coverage(coverage_id)["coverage"]
                 self.assertEqual(coverage["status"], "unsupported")
                 self.assertEqual(coverage["profiles"], ["open-v2"])
+        downstream = self.catalog.get_coverage(
+            "coverage.open-v2.downstream-availability-time"
+        )["coverage"]
+        self.assertNotIn(
+            "analysis-specific justification", json.dumps(downstream)
+        )
+        self.assertIn("Do not coalesce", json.dumps(downstream))
 
     def test_aggregation_and_profile_support_are_explicit(self) -> None:
         for suffix, target, result_feature in (
@@ -297,12 +314,14 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         finding = self.catalog.get_aggregation(
             "aggregation.pathology-severity-to-finding"
         )["aggregation"]
-        self.assertEqual(finding["status"], "unresolved")
+        self.assertEqual(finding["status"], "analyst_defined")
         self.assertIsNone(finding["result_concept"])
         self.assertIn(
             "clinical.finding-pathology-observation",
             finding["semantic_relationships"],
         )
+        self.assertIn("earliest linked outcome", finding["method"])
+        self.assertIn("estimand dependence", finding["ordering"])
 
         patient = self.catalog.get_aggregation(
             "aggregation.pathology-severity-to-patient"
@@ -313,6 +332,273 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "coverage.open-v2.patient-pathology-aggregate"
         )["coverage"]
         self.assertEqual(patient_coverage["status"], "unsupported")
+
+    def test_longitudinal_search_traverses_candidate_exam_to_patient(
+        self,
+    ) -> None:
+        patient_exam = self.catalog.get_semantic_relationship(
+            "clinical.patient-exam"
+        )["semantic_relationship"]
+        patient_pathology = self.catalog.get_semantic_relationship(
+            "clinical.patient-pathology-observation"
+        )["semantic_relationship"]
+        self.assertIn("patient timeline", json.dumps(patient_exam))
+        self.assertIn(
+            "pathology accession to candidate exam to patient",
+            json.dumps(patient_pathology),
+        )
+        self.assertIn(
+            "not necessarily the index exam accession",
+            json.dumps(patient_pathology),
+        )
+
+        guardrail = self.catalog.get_guardrail(
+            "guardrail.longitudinal-search-is-patient-scoped"
+        )["guardrail"]
+        self.assertEqual(guardrail["category"], "prohibition")
+        self.assertEqual(guardrail["priority"], "critical")
+        self.assertIn("do not restrict", guardrail["statement"])
+        self.assertLessEqual(
+            {
+                "clinical.patient-exam",
+                "clinical.patient-pathology-observation",
+            },
+            set(guardrail["semantic_relationships"]),
+        )
+
+        binding = next(
+            item
+            for item in self.raw["profile_bindings"]["open-v2"][
+                "relationship_bindings"
+            ]
+            if item["id"] == "open-v2.pathology_findings_anon.exam"
+        )
+        binding_text = json.dumps(binding)
+        self.assertIn("candidate exam", binding_text)
+        self.assertIn("Do not equate pathology acc_anon", binding_text)
+        self.assertNotIn(
+            "clinical.patient-pathology-observation",
+            binding["semantic_relationships"],
+        )
+        path = self.raw["profile_bindings"]["open-v2"][
+            "relationship_binding_paths"
+        ][0]
+        self.assertEqual(
+            path["semantic_relationship"],
+            "clinical.patient-pathology-observation",
+        )
+        self.assertEqual(
+            path["relationship_bindings"],
+            [
+                "open-v2.pathology_findings_anon.exam",
+                "open-v2.exam_level_anon.patient",
+            ],
+        )
+
+    def test_finding_number_distinguishes_clinical_identity_from_rows(
+        self,
+    ) -> None:
+        finding_number = self.catalog.get_feature("imaging.finding_number")[
+            "feature"
+        ]
+        finding_text = json.dumps(finding_number)
+        self.assertIn("(acc_anon, numfind)", finding_text)
+        self.assertIn("-9", finding_text)
+        self.assertIn("multiple physical rows", finding_text)
+        self.assertIn("not a persistent lesion identifier", finding_text)
+        self.assertNotIn(
+            "other nonpositive values remain unresolved", finding_text
+        )
+        finding_bindings = [
+            item
+            for item in self.raw["profile_bindings"]["open-v2"][
+                "object_bindings"
+            ]
+            if item["object"] == "imaging_finding"
+        ]
+        self.assertEqual(len(finding_bindings), 2)
+        for binding in finding_bindings:
+            with self.subTest(table=binding["table"]):
+                identity = binding["instance_identity"]
+                self.assertEqual(
+                    identity["columns"], ["acc_anon", "numfind"]
+                )
+                self.assertEqual(identity["rows_per_instance"], "one_or_more")
+                self.assertFalse(identity["longitudinal_identity"])
+                self.assertEqual(
+                    identity["reserved_exceptions"][0]["representation"],
+                    "-9",
+                )
+
+    def test_laterality_null_meaning_is_binding_specific(self) -> None:
+        bindings = {
+            (item["table"], item["column"]): item
+            for item in self.raw["profile_bindings"]["open-v2"][
+                "feature_bindings"
+            ]
+            if item["column"] in {"side", "bside"}
+        }
+        finding = bindings[("imaging_findings_anon", "side")][
+            "occurrence_interpretations"
+        ][0]
+        pathology_finding = bindings[("pathology_findings_anon", "side")][
+            "occurrence_interpretations"
+        ][0]
+        biopsy = bindings[("pathology_findings_anon", "bside")][
+            "occurrence_interpretations"
+        ][0]
+        side_record = bindings[("side_level_anon", "side")][
+            "occurrence_interpretations"
+        ][0]
+        wide_side = bindings[("combined_anon", "side")][
+            "occurrence_interpretations"
+        ][0]
+        wide_biopsy = bindings[("combined_anon", "bside")][
+            "occurrence_interpretations"
+        ][0]
+
+        self.assertIn("bilateral", finding["meaning"])
+        self.assertIn("bilateral", pathology_finding["meaning"])
+        self.assertIn("not bilateral", biopsy["meaning"])
+        self.assertIn("breast-side record", side_record["meaning"])
+        self.assertEqual(wide_side["status"], "unresolved")
+        self.assertEqual(wide_biopsy["status"], "unresolved")
+        biopsy_concept = self.catalog.get_feature("pathology.biopsy_side")[
+            "feature"
+        ]
+        self.assertIn(
+            "occurrence- and profile-specific",
+            " ".join(biopsy_concept["caveats"]),
+        )
+        self.assertNotIn(
+            "not documented",
+            " ".join(biopsy_concept["caveats"]),
+        )
+
+    def test_risk_probability_metrics_remain_unresolved(self) -> None:
+        guardrail = self.catalog.get_guardrail(
+            "guardrail.risk-probability-readiness"
+        )["guardrail"]
+        guardrail_text = json.dumps(guardrail)
+        self.assertEqual(guardrail["priority"], "critical")
+        self.assertIn("Brier score", guardrail_text)
+        self.assertIn("-35", guardrail_text)
+        self.assertIn("model version", guardrail_text)
+        self.assertIn("Association or ranking", guardrail_text)
+
+        coverage = self.catalog.get_coverage(
+            "coverage.open-v2.risk-probability-calibration-readiness"
+        )["coverage"]
+        self.assertEqual(coverage["status"], "unresolved")
+        self.assertEqual(coverage["profiles"], ["open-v2"])
+        self.assertIn("physically represented", coverage["summary"])
+        self.assertIn("not mark", json.dumps(coverage))
+
+        nci = self.catalog.get_feature("risk.nci_five_year")
+        self.assertIn(
+            "guardrail.risk-probability-readiness",
+            nci["related"]["guardrails"],
+        )
+        self.assertIn(
+            "coverage.open-v2.risk-probability-calibration-readiness",
+            guardrail["coverage"],
+        )
+        nci_binding = next(
+            item
+            for item in self.raw["profile_bindings"]["open-v2"][
+                "feature_bindings"
+            ]
+            if item["concept"] == "risk.nci_five_year"
+        )
+        self.assertEqual(
+            {
+                item["representation"]
+                for item in nci_binding["occurrence_interpretations"]
+            },
+            {"-35", "-2", "100"},
+        )
+        self.assertTrue(
+            all(
+                item["status"] == "unresolved"
+                for item in nci_binding["occurrence_interpretations"]
+            )
+        )
+
+        risk_outputs = {
+            identifier
+            for identifier, concept in self.raw["concepts"].items()
+            if concept["feature_kind"] == "model_output"
+            and "risk" in concept["domains"]
+        }
+        self.assertEqual(
+            set(guardrail["concepts"]),
+            risk_outputs,
+        )
+        risk_context = self.catalog.get_context("open-v2.risk-context")[
+            "context"
+        ]
+        self.assertEqual(
+            set(risk_context["related_concepts"]),
+            risk_outputs,
+        )
+        bindings_by_concept = {
+            item["concept"]: item
+            for item in self.raw["profile_bindings"]["open-v2"][
+                "feature_bindings"
+            ]
+            if item["concept"] in risk_outputs
+        }
+        self.assertEqual(set(bindings_by_concept), risk_outputs)
+        for identifier in sorted(risk_outputs):
+            with self.subTest(risk_output=identifier):
+                feature = self.catalog.get_feature(identifier)
+                self.assertIn(
+                    "guardrail.risk-probability-readiness",
+                    feature["related"]["guardrails"],
+                )
+                self.assertIn(
+                    "open-v2.risk-context",
+                    feature["related"]["contexts"],
+                )
+                interpretations = bindings_by_concept[identifier][
+                    "occurrence_interpretations"
+                ]
+                self.assertTrue(interpretations)
+                self.assertTrue(
+                    all(
+                        item["status"] == "unresolved"
+                        and "open-v2.risk-context#risk-semantics"
+                        in item["claim_refs"]
+                        and "not validated as a probability-like prediction"
+                        in item["meaning"]
+                        for item in interpretations
+                    )
+                )
+
+    def test_represented_endpoints_and_policy_choices_are_not_failures(
+        self,
+    ) -> None:
+        endpoint = self.catalog.get_guardrail(
+            "guardrail.incomplete-outcome-capture"
+        )["guardrail"]
+        endpoint_text = json.dumps(endpoint)
+        self.assertIn("no represented biopsy or cancer event", endpoint_text)
+        self.assertIn("never biopsied", endpoint_text)
+        self.assertIn("observation proxies", endpoint_text)
+
+        selection = self.catalog.get_guardrail(
+            "guardrail.attached-pathology-selection"
+        )["guardrail"]
+        self.assertIn("not inherently invalid", selection["rationale"])
+        self.assertIn("pathology-observed estimand", selection["statement"])
+
+        choices = self.catalog.get_guardrail(
+            "guardrail.longitudinal-boundaries-are-analyst-choices"
+        )["guardrail"]
+        self.assertEqual(choices["category"], "analyst_choice")
+        self.assertIn("same-day", choices["statement"])
+        self.assertIn("episodes", choices["statement"])
+        self.assertIn("equally near", choices["statement"])
 
     def test_reusable_guardrails_replace_task_specific_recipes(self) -> None:
         expected = {
@@ -327,6 +613,9 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "guardrail.non-breast-cancer-not-no-malignancy",
             "guardrail.colocation-not-coavailability",
             "guardrail.incomplete-outcome-capture",
+            "guardrail.longitudinal-search-is-patient-scoped",
+            "guardrail.longitudinal-boundaries-are-analyst-choices",
+            "guardrail.risk-probability-readiness",
         }
         self.assertLessEqual(expected, set(self.catalog.guardrails))
 
@@ -338,6 +627,14 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         for identifier, guardrail in self.raw["guardrails"].items():
             with self.subTest(guardrail=identifier):
                 self.assertTrue(workflow_fields.isdisjoint(guardrail))
+                self.assertIn(
+                    guardrail["category"],
+                    {"prohibition", "analyst_choice", "interpretation_limit"},
+                )
+                self.assertIn(
+                    guardrail["priority"],
+                    {"critical", "high", "standard"},
+                )
 
     def test_clinical_discovery_finds_outcomes_attribution_and_profile_gaps(
         self,
@@ -385,6 +682,37 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             {item["category"] for item in specimen["diagnostics"]},
         )
 
+    def test_review_prompts_discover_the_applicable_constraints(self) -> None:
+        cases = (
+            (
+                "most recent prior cancer",
+                "guardrail.longitudinal-search-is-patient-scoped",
+            ),
+            (
+                "procedure report exam fallback coalesce",
+                "guardrail.timestamps-answer-different-questions",
+            ),
+            (
+                "risk probability calibration Brier score",
+                "guardrail.risk-probability-readiness",
+            ),
+            (
+                "represented binary cancer endpoint",
+                "guardrail.incomplete-outcome-capture",
+            ),
+        )
+        for query, expected in cases:
+            with self.subTest(query=query):
+                result = self.catalog.discover(
+                    query,
+                    profile="open-v2",
+                    limit=20,
+                )
+                self.assertIn(
+                    expected,
+                    {item["identifier"] for item in result["matches"]},
+                )
+
     def test_discovery_diagnostics_distinguish_failure_modes(self) -> None:
         filtered = self.catalog.discover(
             "missing specimen timestamp", kinds=["aggregation"]
@@ -430,6 +758,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
                 "object_bindings",
                 "tables",
                 "relationship_bindings",
+                "relationship_binding_paths",
             },
         )
 
