@@ -1,4 +1,4 @@
-"""Focused contract tests for the schema-v5 MCP adapter."""
+"""Focused contract and real-catalog tests for the schema-v6 MCP adapter."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 from unittest.mock import Mock, patch
 
-from embed_context import __version__
+from embed_context import __version__, load_catalog
 from embed_context.mcp_server import MCP_INSTALL_HINT, build_server, main
 
 
@@ -615,6 +615,295 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(getter.is_error)
         self.assertTrue(binding.is_error)
         self.assertEqual(self.catalog.calls, [])
+
+
+@unittest.skipUnless(MCP_AVAILABLE, "optional MCP SDK is not installed")
+class MCPServerRealCatalogRegressionTests(unittest.IsolatedAsyncioTestCase):
+    """Exercise reviewed discovery and exact-getter flows through MCP."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = load_catalog()
+        cls.server = build_server(cls.catalog)
+
+    @staticmethod
+    def constraint_ids(
+        result: dict[str, Any],
+        category: str,
+    ) -> set[str]:
+        return {
+            str(entry.get("id", entry.get("identifier")))
+            for entry in result["constraints"][category]
+            if entry.get("id") or entry.get("identifier")
+        }
+
+    async def test_canonical_review_prompts_preserve_core_discovery(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "nearest subsequent ipsilateral cancer",
+                {
+                    "guardrail.longitudinal-search-is-patient-scoped": 5,
+                    "clinical.patient-pathology-observation": 8,
+                },
+            ),
+            (
+                "most recent prior cancer",
+                {
+                    "guardrail.longitudinal-search-is-patient-scoped": 5,
+                    "clinical.patient-pathology-observation": 8,
+                },
+            ),
+            (
+                "procedure report exam fallback coalesce",
+                {
+                    "guardrail.timestamps-answer-different-questions": 4,
+                    "coverage.open-v2.downstream-availability-time": 8,
+                },
+            ),
+            (
+                "risk probability calibration Brier score",
+                {
+                    "guardrail.risk-probability-readiness": 4,
+                    (
+                        "coverage.open-v2."
+                        "risk-probability-calibration-readiness"
+                    ): 6,
+                },
+            ),
+            (
+                "one row per finding finding key",
+                {"imaging.finding_number": 4},
+            ),
+            (
+                "laterality null side bside",
+                {
+                    "breast.side": 6,
+                    "pathology.biopsy_side": 6,
+                    "clinical.side-finding": 8,
+                },
+            ),
+            (
+                "finding pathology severity aggregate",
+                {
+                    "aggregation.pathology-severity-to-finding": 4,
+                    "guardrail.explicit-attribution-policy": 8,
+                },
+            ),
+            (
+                "represented binary cancer endpoint",
+                {
+                    "guardrail.incomplete-outcome-capture": 4,
+                    "coverage.open-v2.outcome-capture": 8,
+                },
+            ),
+        )
+        async with Client(self.server) as client:
+            for query, expected_windows in cases:
+                with self.subTest(query=query):
+                    arguments = {
+                        "query": query,
+                        "profile": "open-v2",
+                        "limit": 8,
+                    }
+                    result = await client.call_tool("discover", arguments)
+                    direct = self.catalog.discover(
+                        query,
+                        profile="open-v2",
+                        limit=8,
+                    )
+
+                    self.assertFalse(result.is_error)
+                    self.assertEqual(result.structured_content, direct)
+                    identifiers = [
+                        match["identifier"]
+                        for match in result.structured_content["matches"]
+                    ]
+                    for identifier, window in expected_windows.items():
+                        self.assertIn(
+                            identifier,
+                            identifiers[:window],
+                            f"{identifier!r} was not in the top {window}: "
+                            f"{identifiers}",
+                        )
+
+        longitudinal = self.catalog.discover(
+            "most recent prior cancer",
+            profile="open-v2",
+            limit=8,
+        )
+        longitudinal_ids = [
+            match["identifier"] for match in longitudinal["matches"]
+        ]
+        self.assertLess(
+            longitudinal_ids.index(
+                "guardrail.longitudinal-search-is-patient-scoped"
+            ),
+            longitudinal_ids.index(
+                "clinical.patient-pathology-observation"
+            ),
+        )
+        fallback = self.catalog.discover(
+            "procedure report exam fallback coalesce",
+            profile="open-v2",
+            limit=8,
+        )
+        fallback_ids = [match["identifier"] for match in fallback["matches"]]
+        for temporal_identifier in (
+            "time.procedure-event",
+            "time.pathology-report-documentation",
+        ):
+            self.assertLess(
+                fallback_ids.index(
+                    "guardrail.timestamps-answer-different-questions"
+                ),
+                fallback_ids.index(temporal_identifier),
+            )
+
+    async def test_real_exact_getters_preserve_structured_constraints(
+        self,
+    ) -> None:
+        exact_cases = (
+            (
+                "get_semantic_relationship",
+                "clinical.patient-pathology-observation",
+                self.catalog.get_semantic_relationship,
+            ),
+            (
+                "get_clinical_object",
+                "imaging_finding",
+                self.catalog.get_clinical_object,
+            ),
+            (
+                "get_feature",
+                "risk.ibis_ten_year",
+                self.catalog.get_feature,
+            ),
+            (
+                "get_feature",
+                "open-v2:imaging_findings_anon.side",
+                self.catalog.get_feature,
+            ),
+            (
+                "get_feature",
+                "open-v2:pathology_findings_anon.bside",
+                self.catalog.get_feature,
+            ),
+            (
+                "get_aggregation",
+                "aggregation.pathology-severity-to-finding",
+                self.catalog.get_aggregation,
+            ),
+            (
+                "get_guardrail",
+                "guardrail.incomplete-outcome-capture",
+                self.catalog.get_guardrail,
+            ),
+        )
+        responses: dict[str, dict[str, Any]] = {}
+        async with Client(self.server) as client:
+            for tool_name, identifier, getter in exact_cases:
+                with self.subTest(tool=tool_name, identifier=identifier):
+                    result = await client.call_tool(
+                        tool_name,
+                        {"identifier": identifier},
+                    )
+                    direct = getter(identifier)
+                    self.assertFalse(result.is_error)
+                    self.assertEqual(result.structured_content, direct)
+                    responses[identifier] = result.structured_content
+
+        relationship = responses["clinical.patient-pathology-observation"]
+        paths = relationship["related"]["relationship_binding_paths"]
+        self.assertTrue(
+            any(
+                path["relationship_bindings"]
+                == [
+                    "open-v2.pathology_findings_anon.exam",
+                    "open-v2.exam_level_anon.patient",
+                ]
+                for path in paths
+            )
+        )
+        self.assertIn(
+            "guardrail.longitudinal-search-is-patient-scoped",
+            self.constraint_ids(
+                relationship,
+                "high_priority_guardrails",
+            ),
+        )
+
+        finding = responses["imaging_finding"]
+        identities = [
+            binding["instance_identity"]
+            for binding in finding["related"]["object_bindings"]
+            if binding.get("instance_identity")
+        ]
+        self.assertTrue(
+            any(
+                identity["columns"] == ["acc_anon", "numfind"]
+                and identity["rows_per_instance"] == "one_or_more"
+                and identity["longitudinal_identity"] is False
+                and any(
+                    exception["representation"] == "-9"
+                    for exception in identity["reserved_exceptions"]
+                )
+                for identity in identities
+            )
+        )
+
+        risk = responses["risk.ibis_ten_year"]
+        self.assertIn(
+            "coverage.open-v2.risk-probability-calibration-readiness",
+            self.constraint_ids(risk, "unresolved_claims"),
+        )
+        self.assertIn(
+            "guardrail.risk-probability-readiness",
+            self.constraint_ids(risk, "high_priority_guardrails"),
+        )
+
+        finding_side = responses[
+            "open-v2:imaging_findings_anon.side"
+        ]["binding"]["occurrence_interpretations"]
+        biopsy_side = responses[
+            "open-v2:pathology_findings_anon.bside"
+        ]["binding"]["occurrence_interpretations"]
+        self.assertTrue(
+            any(
+                item["representation"] == "null"
+                and "bilateral" in item["meaning"].lower()
+                for item in finding_side
+            )
+        )
+        self.assertTrue(
+            any(
+                item["representation"] == "null"
+                and "unknown" in item["meaning"].lower()
+                and "not bilateral" in item["meaning"].lower()
+                for item in biopsy_side
+            )
+        )
+
+        aggregation = responses[
+            "aggregation.pathology-severity-to-finding"
+        ]
+        self.assertEqual(
+            aggregation["aggregation"]["status"],
+            "analyst_defined",
+        )
+        self.assertIn(
+            "aggregation.pathology-severity-to-finding",
+            self.constraint_ids(
+                aggregation,
+                "analyst_choices_required",
+            ),
+        )
+
+        endpoint = responses["guardrail.incomplete-outcome-capture"]
+        statement = endpoint["guardrail"]["statement"]
+        self.assertIn("no represented biopsy or cancer event", statement)
+        self.assertIn("must not be interpreted as never biopsied", statement)
 
 
 if __name__ == "__main__":
