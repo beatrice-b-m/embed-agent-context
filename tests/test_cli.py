@@ -1,4 +1,4 @@
-"""Contract tests for the schema-v5 clinical-semantic CLI."""
+"""Contract tests for the schema-v6 clinical-semantic CLI."""
 
 from __future__ import annotations
 
@@ -453,6 +453,29 @@ class CatalogCLITests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, 0)
         self.assertEqual(stdout.getvalue().strip(), f"embed-context {__version__}")
+
+    def test_root_help_teaches_the_clinical_first_workflow(self) -> None:
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as raised:
+            main(("--help",))
+
+        self.assertEqual(raised.exception.code, 0)
+        help_text = stdout.getvalue()
+        self.assertIn("Begin with discover using a clinical question", help_text)
+        self.assertIn(
+            'embed-context discover "What does absent pathology mean?"',
+            help_text,
+        )
+        self.assertIn(
+            "embed-context guardrail "
+            "guardrail.null-pathology-not-negative",
+            help_text,
+        )
+        self.assertIn("embed-context --format json feature", help_text)
+        self.assertIn(
+            "https://github.com/beatrice-b-m/embedv2-agent-context",
+            help_text,
+        )
 
     def test_validate_json_uses_stable_envelope_and_v6_inventory(self) -> None:
         status, stdout, stderr = self.run_cli(

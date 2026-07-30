@@ -37,8 +37,12 @@ RelationshipBindingKindFilter = Literal[*_RELATIONSHIP_BINDING_KIND_VALUES]
 
 MCP_INSTALL_HINT = (
     "MCP support requires the optional MCP dependency. "
-    "From the project checkout, run "
-    "`uv tool install --reinstall '.[mcp]'`, or install `mcp==2.0.0` "
+    "Install the complete tool from GitHub with "
+    "`uv tool install --reinstall "
+    "'embedv2-agent-context[mcp] @ "
+    "git+https://github.com/beatrice-b-m/embedv2-agent-context.git'`; "
+    "from a project checkout, run "
+    "`uv tool install --reinstall '.[mcp]'`; or install `mcp==2.0.0` "
     "in the current environment."
 )
 

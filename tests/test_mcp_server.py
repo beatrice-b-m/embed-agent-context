@@ -260,6 +260,11 @@ class MissingMCPDependencyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "optional MCP dependency"):
             build_server(FakeCatalog())
         self.assertIn("mcp==2.0.0", MCP_INSTALL_HINT)
+        self.assertIn(
+            "git+https://github.com/beatrice-b-m/"
+            "embedv2-agent-context.git",
+            MCP_INSTALL_HINT,
+        )
 
 
 class ModuleEntryPointTests(unittest.TestCase):

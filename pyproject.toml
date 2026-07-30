@@ -5,10 +5,23 @@ description = "Count-free clinical-semantic context for EMBED data"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = []
+keywords = ["EMBED", "breast imaging", "clinical semantics", "MCP"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
 
 [project.urls]
 Repository = "https://github.com/beatrice-b-m/embedv2-agent-context"
 Issues = "https://github.com/beatrice-b-m/embedv2-agent-context/issues"
+Documentation = "https://github.com/beatrice-b-m/embedv2-agent-context#readme"
+"EMBED Documentation" = "https://docs.hitilab.com/datasets/embed"
 
 [project.scripts]
 embed-context = "embed_context.cli:main"

@@ -588,7 +588,7 @@ class CatalogLoadError(CatalogError):
 
 
 class CatalogValidationError(CatalogError):
-    """The decoded catalog violates schema-v5 semantics."""
+    """The decoded catalog violates schema-v6 semantics."""
 
 
 class CatalogNotFoundError(CatalogError):

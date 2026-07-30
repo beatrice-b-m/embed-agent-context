@@ -38,7 +38,23 @@ def build_parser(
 ) -> argparse.ArgumentParser:
     parser = _CatalogArgumentParser(
         prog="embed-context",
-        description=__doc__,
+        description=(
+            "Query the EMBED clinical-semantic catalog. Begin with discover "
+            "using a clinical question, then follow a returned stable "
+            "identifier with an exact getter."
+        ),
+        epilog=(
+            "examples:\n"
+            '  embed-context discover "What does absent pathology mean?" '
+            "--profile open-v2 --limit 5\n"
+            "  embed-context guardrail "
+            "guardrail.null-pathology-not-negative\n"
+            "  embed-context --format json feature pathology.severity\n"
+            "\n"
+            "documentation: "
+            "https://github.com/beatrice-b-m/embedv2-agent-context"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version",

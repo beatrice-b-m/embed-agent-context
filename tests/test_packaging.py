@@ -36,6 +36,26 @@ class PackagingContractTests(unittest.TestCase):
             },
         )
 
+    def test_public_metadata_points_to_project_and_dataset_documentation(
+        self,
+    ) -> None:
+        project = self.configuration["project"]
+
+        self.assertEqual(
+            project["urls"]["Documentation"],
+            "https://github.com/beatrice-b-m/"
+            "embedv2-agent-context#readme",
+        )
+        self.assertEqual(
+            project["urls"]["EMBED Documentation"],
+            "https://docs.hitilab.com/datasets/embed",
+        )
+        self.assertIn("EMBED", project["keywords"])
+        self.assertIn(
+            "Intended Audience :: Science/Research",
+            project["classifiers"],
+        )
+
     def test_wheel_configuration_bundles_catalog_and_schema(self) -> None:
         force_include = self.configuration["tool"]["hatch"]["build"][
             "targets"
