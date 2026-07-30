@@ -187,7 +187,6 @@
     },
     "semantic_relationships": {
       "type": "object",
-      "minProperties": 1,
       "patternProperties": {
         "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
           "$ref": "#/$defs/semantic_relationship"
@@ -197,7 +196,6 @@
     },
     "temporal_semantics": {
       "type": "object",
-      "minProperties": 1,
       "patternProperties": {
         "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
           "$ref": "#/$defs/temporal_semantic"
@@ -207,7 +205,6 @@
     },
     "aggregations": {
       "type": "object",
-      "minProperties": 1,
       "patternProperties": {
         "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
           "$ref": "#/$defs/aggregation"
@@ -217,7 +214,6 @@
     },
     "guardrails": {
       "type": "object",
-      "minProperties": 1,
       "patternProperties": {
         "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
           "$ref": "#/$defs/guardrail"
@@ -227,7 +223,6 @@
     },
     "coverage": {
       "type": "object",
-      "minProperties": 1,
       "patternProperties": {
         "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
           "$ref": "#/$defs/coverage"
@@ -281,7 +276,7 @@
     "nonblank_string": {
       "type": "string",
       "minLength": 1,
-      "pattern": "\\S"
+      "pattern": "^(?!\\s)[\\s\\S]*\\S(?![\\s\\S])"
     },
     "physical_name": {
       "type": "string",
@@ -1357,6 +1352,9 @@
       "type": "object",
       "minProperties": 1,
       "additionalProperties": false,
+      "required": [
+        "slot"
+      ],
       "properties": {
         "slot": {
           "type": "integer",
@@ -1367,6 +1365,32 @@
     "feature_binding": {
       "type": "object",
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "concept": {
+                "const": "pathology.diagnosis_code_slot"
+              }
+            },
+            "required": [
+              "concept"
+            ]
+          },
+          "then": {
+            "required": [
+              "parameters"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "parameters"
+              ]
+            }
+          }
+        }
+      ],
       "required": [
         "table",
         "column",
@@ -1661,6 +1685,7 @@
       "properties": {
         "feature_bindings": {
           "type": "array",
+          "minItems": 1,
           "items": {
             "$ref": "#/$defs/feature_binding"
           }

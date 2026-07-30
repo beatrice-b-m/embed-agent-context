@@ -12,6 +12,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 from unittest.mock import Mock, patch
 
+from embed_context import __version__
 from embed_context.mcp_server import MCP_INSTALL_HINT, build_server, main
 
 
@@ -134,6 +135,9 @@ class FakeCatalog:
 
     def get_coverage(self, identifier: str) -> dict[str, Any]:
         return self._exact("get_coverage", identifier, "coverage")
+
+    def get_context(self, identifier: str) -> dict[str, Any]:
+        return self._exact("get_context", identifier, "context")
 
     def lookup_code(
         self,
@@ -259,6 +263,17 @@ class MissingMCPDependencyTests(unittest.TestCase):
 
 
 class ModuleEntryPointTests(unittest.TestCase):
+    def test_version_uses_package_version(self) -> None:
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as raised:
+            main(("--version",))
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertEqual(
+            stdout.getvalue().strip(),
+            f"embed-context-mcp {__version__}",
+        )
+
     def test_main_runs_the_built_server_over_stdio(self) -> None:
         catalog = FakeCatalog()
         server = Mock()
@@ -291,14 +306,15 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         self.server = build_server(self.catalog)
 
     def test_server_metadata_is_clinical_semantic_first(self) -> None:
-        self.assertEqual(self.server.version, "0.5.0")
+        self.assertEqual(self.server.version, __version__)
         self.assertIn("clinical-semantic context", self.server.description)
         self.assertIn("Begin with discover", self.server.instructions)
+        self.assertIn("Use get_context", self.server.instructions)
         self.assertIn("No date is a universal diagnosis date", self.server.instructions)
         self.assertIn("secondary", self.server.instructions)
         self.assertNotIn("analysis patterns", self.server.instructions.lower())
 
-    async def test_lists_only_read_only_closed_schema_v5_tools(self) -> None:
+    async def test_lists_only_read_only_closed_input_schema_tools(self) -> None:
         async with Client(self.server) as client:
             result = await client.list_tools()
 
@@ -311,6 +327,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             "get_aggregation": {"identifier"},
             "get_guardrail": {"identifier"},
             "get_coverage": {"identifier"},
+            "get_context": {"identifier"},
             "lookup_code": {"feature_or_vocabulary", "code"},
             "get_profile_table": {"profile", "table"},
             "get_relationship_binding": {"identifier"},
@@ -397,6 +414,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
             ("get_aggregation", "pathology.exam_severity"),
             ("get_guardrail", "pathology.null-not-negative"),
             ("get_coverage", "pathology.specimen_time"),
+            ("get_context", "open-v2.pathology-workflow"),
         )
         async with Client(self.server) as client:
             for tool_name, identifier in cases:

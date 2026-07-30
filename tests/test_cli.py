@@ -9,6 +9,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 from unittest.mock import patch
 
+from embed_context import __version__
 from embed_context.cli import _format_text, build_parser, main
 
 
@@ -251,6 +252,53 @@ class FakeCatalog:
             },
         )
 
+    def get_context(self, identifier: str) -> dict[str, Any]:
+        self.calls.append(("get_context", {"identifier": identifier}))
+        return {
+            "kind": "context",
+            "identifier": identifier,
+            "context": {
+                "id": identifier,
+                "title": "Pathology workflow",
+                "kind": "clinical_workflow",
+                "scope": "profile_specific",
+                "profiles": ["open-v2"],
+                "summary": "Pathology follows tissue sampling.",
+                "claims": [
+                    {
+                        "id": "report-time",
+                        "statement": "Report date is documentation time.",
+                        "status": "verified",
+                        "sources": ["open-v2.release-schema"],
+                        "caveats": ["It is not a universal diagnosis date."],
+                    }
+                ],
+                "workflow_steps": [
+                    {
+                        "id": "sample",
+                        "label": "Collect specimen",
+                        "claims": ["report-time"],
+                    }
+                ],
+                "caveats": [],
+            },
+            "related": {
+                "features": ["pathology.report_date"],
+            },
+            "provenance": {
+                "claims": [
+                    {
+                        "id": f"{identifier}#report-time",
+                    }
+                ],
+                "sources": {
+                    "open-v2.release-schema": {
+                        "id": "open-v2.release-schema",
+                    }
+                },
+            },
+        }
+
     def lookup_code(
         self,
         feature_or_vocabulary: str,
@@ -398,6 +446,14 @@ class CatalogCLITests(unittest.TestCase):
             status = main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
 
+    def test_version_uses_package_version(self) -> None:
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as raised:
+            main(("--version",))
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertEqual(stdout.getvalue().strip(), f"embed-context {__version__}")
+
     def test_validate_json_uses_stable_envelope_and_v5_inventory(self) -> None:
         status, stdout, stderr = self.run_cli(
             "--format",
@@ -519,6 +575,7 @@ class CatalogCLITests(unittest.TestCase):
             ("aggregation", "pathology.exam_severity", "get_aggregation"),
             ("guardrail", "pathology.null-not-negative", "get_guardrail"),
             ("coverage", "pathology.specimen_time", "get_coverage"),
+            ("context", "open-v2.pathology-workflow", "get_context"),
         )
         for command, identifier, expected_method in cases:
             with self.subTest(command=command):
@@ -531,6 +588,23 @@ class CatalogCLITests(unittest.TestCase):
                     [(expected_method, {"identifier": identifier})],
                 )
                 self.assertIn(identifier, stdout)
+
+    def test_context_text_exposes_claims_workflow_and_sources(self) -> None:
+        status, stdout, stderr = self.run_cli(
+            "context",
+            "open-v2.pathology-workflow",
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("scope: profile_specific · profiles: open-v2", stdout)
+        self.assertIn("report-time [verified]", stdout)
+        self.assertIn("sources: open-v2.release-schema", stdout)
+        self.assertIn("1. Collect specimen", stdout)
+        self.assertIn(
+            "open-v2.pathology-workflow#report-time",
+            stdout,
+        )
 
     def test_feature_includes_codes_only_when_requested(self) -> None:
         status, stdout, stderr = self.run_cli(
@@ -708,7 +782,6 @@ class CatalogCLITests(unittest.TestCase):
             "table",
             "relationship",
             "relationships",
-            "context",
             "contexts",
             "pattern",
             "patterns",
@@ -733,6 +806,45 @@ class CatalogCLITests(unittest.TestCase):
         self.assertEqual(envelope["command"], "guardrail")
         self.assertEqual(envelope["error"]["type"], "value")
         self.assertIn("was not found", envelope["error"]["message"])
+
+    def test_json_usage_errors_use_the_stable_envelope(self) -> None:
+        cases = (
+            (
+                ("--format", "json", "discover", "test", "--domain", "bad"),
+                "discover",
+            ),
+            (
+                ("--format=json", "discover", "--limit", "not-an-integer"),
+                "discover",
+            ),
+            (("--format", "json"), None),
+        )
+        for arguments, command in cases:
+            with self.subTest(arguments=arguments):
+                status, stdout, stderr = self.run_cli(*arguments)
+                envelope = json.loads(stdout)
+
+                self.assertEqual(status, 2)
+                self.assertEqual(stderr, "")
+                self.assertIs(envelope["ok"], False)
+                self.assertEqual(envelope["command"], command)
+                self.assertEqual(envelope["error"]["type"], "usage")
+
+    def test_text_usage_errors_remain_argparse_errors(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            patch("embed_context.cli.load_catalog") as load_catalog,
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            main(("discover", "test", "--domain", "bad"))
+
+        self.assertEqual(raised.exception.code, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("invalid choice", stderr.getvalue())
+        load_catalog.assert_not_called()
 
     def test_text_formatters_tolerate_minimal_documented_envelopes(self) -> None:
         self.assertEqual(

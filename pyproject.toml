@@ -1,9 +1,18 @@
 [project]
 name = "embedv2-agent-context"
-version = "0.2.0"
+version = "0.6.0"
 description = "Count-free clinical-semantic context for EMBED data"
+readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/beatrice-b-m/embedv2-agent-context"
+Issues = "https://github.com/beatrice-b-m/embedv2-agent-context/issues"
+
+[project.scripts]
+embed-context = "embed_context.cli:main"
+embed-context-mcp = "embed_context.mcp_server:main"
 
 [project.optional-dependencies]
 mcp = [
@@ -12,8 +21,20 @@ mcp = [
 
 [dependency-groups]
 dev = [
+    "jsonschema==4.26.0",
     "pyarrow==20.0.0",
 ]
 
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["embed_context"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"catalog/catalog.json" = "embed_context/_data/catalog.json"
+"catalog/catalog.schema.json" = "embed_context/_data/catalog.schema.json"
+
 [tool.uv]
-package = false
+package = true

@@ -1,5 +1,7 @@
 """Dependency-free access to the EMBED clinical-semantic catalog."""
 
+__version__ = "0.6.0"
+
 from .catalog import (
     AGGREGATION_STATUSES,
     BINDING_GRAINS,
@@ -47,6 +49,7 @@ from .catalog import (
 )
 
 __all__ = [
+    "__version__",
     "AGGREGATION_STATUSES",
     "BINDING_GRAINS",
     "CLAIM_STATUSES",

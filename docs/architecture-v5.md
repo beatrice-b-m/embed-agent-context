@@ -22,7 +22,8 @@ The portable semantic layer contains:
 - `temporal_semantics` for event, documentation, and availability meanings;
 - `aggregations` for supplied rollups and explicitly unsupported transitions;
 - `guardrails` for reusable interpretation constraints;
-- `coverage` for supported, unsupported, and unresolved catalog coverage;
+- `coverage` for supported, unsupported, unresolved, and `not_cataloged`
+  catalog coverage;
 - `vocabularies`, `sources`, and `contexts` for values and sourced claim
   provenance.
 
@@ -93,3 +94,20 @@ Exact semantic getters compute `related` navigation from the graph and
 scope/profiles, and source records. They also expose relevant profile bindings
 without duplicating those links in portable records. Profile binding queries
 remain explicitly secondary and are never presented as the conceptual model.
+Context matches have their own exact `context` / `get_context` lookup, which
+returns every reviewed claim and resolves its source records.
+
+## Delivery surfaces and versions
+
+The source tree keeps the canonical JSON and JSON Schema under `catalog/`.
+Built wheels bundle both resources beside the Python package so
+`load_catalog()`, `embed-context`, and `embed-context-mcp` work outside a
+checkout. The dependency-free core powers the Python API and CLI. The optional
+stdio MCP adapter delegates to that same core and exposes only read-only tools.
+
+Four version axes must not be conflated:
+
+- software `0.6.0` versions the package, CLI, and MCP server;
+- catalog schema version `5` versions serialized catalog shape and semantics;
+- `open-v2` identifies one physical dataset profile, not a schema version; and
+- MCP SDK `2.0.0` is the pinned optional protocol dependency.

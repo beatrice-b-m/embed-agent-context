@@ -40,7 +40,9 @@ pipelines, and analyses. It does not prescribe those designs.
 
 Markdown documents explain the format and decisions but are not parsed as
 catalog data. Human-readable references must be derived from the structured
-catalog rather than maintained as competing sources of truth.
+catalog rather than maintained as competing sources of truth. Synchronization
+is a reviewed, manual authoring responsibility; no generated-document pipeline
+currently exists.
 
 ## Clinical-semantic model
 
@@ -189,10 +191,10 @@ agent-facing feature documentation. Prohibited examples include:
   semantics.
 
 The policy does not prohibit semantic numbers. Documented code values, units,
-time horizons, physical types, positive slot parameters, qualitative
-cardinality, and genuinely defined sentinel meanings belong when they explain
-representation. Schema nullability is physical metadata; how often null occurs
-is not.
+time horizons, physical types, the positive `parameters.slot` required only by
+`pathology.diagnosis_code_slot` bindings, qualitative cardinality, and
+genuinely defined sentinel meanings belong when they explain representation.
+Schema nullability is physical metadata; how often null occurs is not.
 
 Unresolved missing-value or sentinel behavior may be stated without a
 frequency. Prefer “null semantics are not documented” over a release
@@ -285,9 +287,10 @@ release-schema, or release-legend evidence.
 
 The ignored `reference_files/` directory contains local release artifacts used
 to construct and verify profile bindings. Source-profile validation may read
-Parquet footer schemas and the release legend. It must not copy clinical rows,
-identifiers, anonymized dates, report text, or empirical summaries into the
-catalog.
+Parquet footer schemas through the dedicated verifier and may consult the
+release legend. It must not inspect or copy clinical rows, identifiers,
+anonymized dates, report text, values, statistics, counts, or empirical
+summaries. The directory is optional for a clone and must never be committed.
 
 The incomplete alpha context system and Cortex knowledge-base notes are design
 and hazard-discovery inputs, not runtime dependencies or unreviewed clinical
@@ -303,6 +306,12 @@ remain outside the core.
 
 The optional stdio MCP adapter calls the same core API as the CLI, writes
 protocol messages only to stdout, and exposes read-only tools.
+
+Source distributions retain canonical resources under `catalog/`; built
+wheels bundle the JSON and JSON Schema so the default loader and installed
+commands do not depend on the checkout working directory. Draft 2020-12 JSON
+Schema validates closed shapes and local conditions. The core validator
+separately enforces graph, provenance, clinical, and profile invariants.
 
 ## Non-goals
 

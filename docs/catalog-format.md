@@ -92,6 +92,119 @@ The authoritative field constraints are in
 shape is closed with `additionalProperties: false`; extensions require an
 explicit schema decision rather than an ad hoc field.
 
+Every listed top-level collection is required. `clinical_objects`, `concepts`,
+and `profile_bindings` must be nonempty, and every profile must contain at
+least one feature binding. A focused catalog may validly use empty
+`semantic_relationships`, `temporal_semantics`, `aggregations`, `guardrails`,
+or `coverage` collections. `vocabularies`, `sources`, and `contexts` may also
+be empty when no retained record references them.
+
+All nonblank strings are trimmed by contract: leading or trailing whitespace,
+including a final newline, is invalid. Vocabulary code keys follow the same
+rule, and each vocabulary contains at least one code.
+
+### Two validation layers
+
+Draft 2020-12 JSON Schema validates closed record shapes, types, required
+fields, controlled constants, and local conditions. The dependency-free core
+validator then resolves IDs and enforces graph, provenance-scope,
+clinical-ownership, aggregation, temporal, and profile-binding invariants.
+Neither layer substitutes for the other:
+
+```bash
+uv run --locked python -m unittest tests.test_catalog_schema -v
+embed-context validate
+```
+
+The first command is a contributor check against both validators. The second
+is the installed user's strict core validation and inventory summary.
+
+### Compact record examples
+
+A portable object and feature keep clinical meaning independent of storage:
+
+```json
+{
+  "patient": {
+    "label": "Patient",
+    "definition": "A person represented in EMBED clinical data.",
+    "grain": "One represented person.",
+    "domains": ["identity"],
+    "search_terms": ["person", "patient"],
+    "claim_refs": ["embed.semantic#patient-meaning"],
+    "caveats": ["Representation does not establish complete care."]
+  }
+}
+```
+
+```json
+{
+  "identity.patient_identifier": {
+    "label": "Patient identifier",
+    "definition": "Opaque patient identifier.",
+    "feature_kind": "identifier",
+    "domains": ["identity"],
+    "objects": ["patient"],
+    "search_terms": ["patient id"],
+    "caveats": ["Do not interpret the identifier clinically."],
+    "evidence": ["release_schema"],
+    "claim_refs": ["embed.semantic#patient-meaning"],
+    "missing_states": [],
+    "temporal_semantics": [],
+    "aggregations": []
+  }
+}
+```
+
+A context claim points to a source; portable entities point to the exact claim
+with `context-id#claim-id`:
+
+```json
+{
+  "embed.semantic": {
+    "title": "Reviewed EMBED semantics",
+    "kind": "data_representation",
+    "scope": "embed_general",
+    "profiles": [],
+    "summary": "Reviewed portable meanings.",
+    "domains": ["identity"],
+    "search_terms": ["clinical semantics"],
+    "related_concepts": ["identity.patient_identifier"],
+    "related_tables": [],
+    "related_relationships": [],
+    "claims": [
+      {
+        "id": "patient-meaning",
+        "statement": "A patient object represents one person.",
+        "status": "verified",
+        "sources": ["embed.semantic-source"],
+        "caveats": []
+      }
+    ],
+    "workflow_steps": [],
+    "caveats": []
+  }
+}
+```
+
+The secondary profile layer binds that feature to a physical column:
+
+```json
+{
+  "table": "clinical_data_anon",
+  "column": "empi_anon",
+  "concept": "identity.patient_identifier",
+  "grain": "wide_row",
+  "role": "wide_projection",
+  "physical_type": "int64",
+  "nullable": false
+}
+```
+
+These are individual map entries or nested records, not a complete top-level
+catalog. Use the checked-in catalog and JSON Schema for complete surrounding
+shapes.
+
 ## Portable clinical-semantic entities
 
 ### Clinical objects
@@ -288,10 +401,13 @@ the moved profile:
 - physical type and schema nullability; and
 - optional closed parameters and notes.
 
-The only defined parameter remains a positive pathology slot. Binding notes may
-record representation qualifications, but no empirical counts or frequencies.
-The profile-qualified physical identity is derived as
-`profile:table.column`.
+The only defined parameter is `parameters.slot`, and it is reserved for
+`pathology.diagnosis_code_slot`. Every binding for that exact concept must
+provide a positive, non-boolean integer slot; every other concept must omit
+`parameters`. Slot values are not globally constrained to the current
+profile's 1–10 range. When `notes` is present, it contains at least one
+nonblank qualification. No note may record empirical counts or frequencies.
+The profile-qualified physical identity is derived as `profile:table.column`.
 
 ### Object bindings
 
@@ -417,6 +533,28 @@ and two computed sections:
 
 These sections are derived from the validated graph on every lookup. They are
 not additional author-maintained adjacency or evidence copies.
+
+The exact surfaces are:
+
+- CLI: `object`, `feature`, `semantic-relationship`, `temporal`,
+  `aggregation`, `guardrail`, `coverage`, and `context`;
+- Python: `get_clinical_object`, `get_feature`,
+  `get_semantic_relationship`, `get_temporal_semantic`, `get_aggregation`,
+  `get_guardrail`, `get_coverage`, and `get_context`; and
+- MCP: the corresponding `get_*` tools.
+
+`get_context` follows the same envelope. Its `context` entity contains the
+complete claims and optional workflow order; `related` lists referenced
+features, profile tables, and physical relationship bindings; `provenance`
+qualifies every local claim as `context-id#claim-id` and resolves its complete
+source records.
+
+CLI JSON responses wrap these core results in
+`{"ok": true, "command": "...", "data": ...}`. Runtime and usage errors use
+`{"ok": false, "command": "...", "error": {"type": "...", "message": "..."}}`
+and exit with status 2. MCP inputs are closed against undeclared arguments.
+Results are structured JSON objects, but MCP output schemas remain generic so
+new explanatory fields do not require a tool-shape migration.
 
 ## Adding semantic content
 

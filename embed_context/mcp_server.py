@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from . import catalog as _catalog
+from . import __version__, catalog as _catalog
 
 
 BINDING_GRAINS = tuple(_catalog.BINDING_GRAINS)
@@ -37,7 +37,9 @@ RelationshipBindingKindFilter = Literal[*_RELATIONSHIP_BINDING_KIND_VALUES]
 
 MCP_INSTALL_HINT = (
     "MCP support requires the optional MCP dependency. "
-    "Install the project's MCP extra (or install `mcp==2.0.0`)."
+    "From the project checkout, run "
+    "`uv tool install --reinstall '.[mcp]'`, or install `mcp==2.0.0` "
+    "in the current environment."
 )
 
 
@@ -72,6 +74,8 @@ class CatalogProtocol(Protocol):
     def get_guardrail(self, identifier: str) -> dict[str, Any]: ...
 
     def get_coverage(self, identifier: str) -> dict[str, Any]: ...
+
+    def get_context(self, identifier: str) -> dict[str, Any]: ...
 
     def lookup_code(
         self,
@@ -191,12 +195,14 @@ def build_server(catalog: CatalogProtocol) -> Any:
             "Read-only clinical-semantic context for the Emory Breast Imaging "
             "Dataset, with secondary release-specific implementation bindings"
         ),
-        version="0.5.0",
+        version=__version__,
         instructions=(
             "Begin with discover using a clinical question. Follow exact "
             "semantic references to understand clinical objects, features, "
             "relationships, competing time meanings, aggregation behavior, "
             "guardrails, coverage, provenance, and unresolved limitations. "
+            "Use get_context when discovery returns a context or when the "
+            "underlying reviewed claims and sources matter. "
             "Do not infer that absent pathology is negative, treat an imaging "
             "assessment as pathology truth, or move between finding, side, "
             "exam, and patient grain without an explicit policy. No date is a "
@@ -290,6 +296,12 @@ def build_server(catalog: CatalogProtocol) -> Any:
         return catalog.get_coverage(identifier)
 
     @server.tool(annotations=read_only, structured_output=True)
+    def get_context(identifier: str) -> dict[str, Any]:
+        """Get one provenance context, its claims, and resolved sources."""
+
+        return catalog.get_context(identifier)
+
+    @server.tool(annotations=read_only, structured_output=True)
     def lookup_code(feature_or_vocabulary: str, code: str) -> dict[str, Any]:
         """Look up one exact code without interpreting missing values as negative."""
 
@@ -347,6 +359,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
         "get_aggregation",
         "get_guardrail",
         "get_coverage",
+        "get_context",
         "lookup_code",
         "get_profile_table",
         "get_relationship_binding",
@@ -366,11 +379,19 @@ def _load_catalog(path: Path | None) -> CatalogProtocol:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the read-only MCP server over stdio."""
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="embed-context-mcp",
+        description=__doc__,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     parser.add_argument(
         "--catalog",
         type=Path,
-        help="catalog JSON path; defaults to the project's bundled catalog",
+        help="catalog JSON path; defaults to the bundled catalog",
     )
     args = parser.parse_args(argv)
     try:

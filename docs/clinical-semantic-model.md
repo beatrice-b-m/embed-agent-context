@@ -11,6 +11,11 @@ A semantic relationship describes clinical meaning and attribution. A profile
 relationship binding describes how one release can approximate that
 relationship with tables and columns. Neither is executable join logic.
 
+`open-v2` below is the stable profile ID for the registered open EMBED V2
+physical layout; it is not catalog schema version 2. See the README
+[glossary and version axes](../README.md#terms-and-version-axes) for the core
+terminology.
+
 ## Breast-imaging objects
 
 The initial graph distinguishes:

@@ -578,6 +578,35 @@ class CatalogQueryTests(unittest.TestCase):
             "specimen.collection_time",
         )
 
+    def test_context_getter_resolves_claim_sources_and_navigation(self) -> None:
+        result = self.catalog.get_context("profiles.synthetic")
+
+        self.assertEqual(result["kind"], "context")
+        self.assertEqual(
+            result["context"]["claims"][0]["id"],
+            "severity-binding",
+        )
+        self.assertIn(
+            "pathology.severity",
+            result["related"]["features"],
+        )
+        self.assertIn(
+            "profile-b:exams_b",
+            result["related"]["profile_tables"],
+        )
+        self.assertIn(
+            "profile-b.exams.patient",
+            result["related"]["relationship_bindings"],
+        )
+        self.assertEqual(
+            result["provenance"]["claims"][0]["id"],
+            "profiles.synthetic#severity-binding",
+        )
+        self.assertIn(
+            "profiles.synthetic-schema",
+            result["provenance"]["sources"],
+        )
+
     def test_unknown_exact_entities_raise_not_found(self) -> None:
         methods = (
             self.catalog.get_clinical_object,
@@ -587,6 +616,7 @@ class CatalogQueryTests(unittest.TestCase):
             self.catalog.get_aggregation,
             self.catalog.get_guardrail,
             self.catalog.get_coverage,
+            self.catalog.get_context,
             self.catalog.get_relationship_binding,
         )
         for method in methods:

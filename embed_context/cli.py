@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from . import __version__
 from .catalog import (
     DISCOVERY_KINDS,
     DOMAINS,
@@ -18,12 +19,36 @@ from .catalog import (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+class UsageError(Exception):
+    """An argparse usage error requested in machine-readable form."""
+
+
+class _CatalogArgumentParser(argparse.ArgumentParser):
+    _raise_usage_error = False
+
+    def error(self, message: str) -> None:
+        if self._raise_usage_error:
+            raise UsageError(message)
+        super().error(message)
+
+
+def build_parser(
+    *,
+    json_errors: bool = False,
+) -> argparse.ArgumentParser:
+    parser = _CatalogArgumentParser(
+        prog="embed-context",
+        description=__doc__,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     parser.add_argument(
         "--catalog",
         type=Path,
-        help="catalog JSON path; defaults to repository catalog/catalog.json",
+        help="catalog JSON path; defaults to the bundled catalog",
     )
     parser.add_argument(
         "--format",
@@ -39,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
         "discover",
         help=(
             "discover clinical objects, features, relationships, time "
-            "semantics, aggregations, guardrails, and coverage"
+            "semantics, aggregations, guardrails, coverage, and contexts"
         ),
     )
     discover_parser.add_argument(
@@ -90,7 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_identifier_command(
         subparsers,
         "aggregation",
-        "get one supplied or explicitly unresolved aggregation meaning",
+        "get one aggregation meaning and its support status",
     )
     _add_identifier_command(
         subparsers,
@@ -100,7 +125,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_identifier_command(
         subparsers,
         "coverage",
-        "get one supported, unsupported, or unresolved coverage statement",
+        (
+            "get one supported, unsupported, unresolved, or not-cataloged "
+            "coverage statement"
+        ),
+    )
+    _add_identifier_command(
+        subparsers,
+        "context",
+        "get one provenance context, its claims, and resolved sources",
     )
 
     code_parser = subparsers.add_parser("code", help="look up an exact code")
@@ -139,6 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="match bindings linked to this portable semantic relationship ID",
     )
     relationships_parser.add_argument("--limit", type=int, default=50)
+    _set_usage_error_mode(parser, json_errors)
     return parser
 
 
@@ -152,9 +186,31 @@ def _add_identifier_command(
     return command
 
 
+def _set_usage_error_mode(
+    parser: argparse.ArgumentParser,
+    enabled: bool,
+) -> None:
+    if isinstance(parser, _CatalogArgumentParser):
+        parser._raise_usage_error = enabled
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for child in action.choices.values():
+                _set_usage_error_mode(child, enabled)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_arguments = tuple(sys.argv[1:] if argv is None else argv)
+    json_errors = _requested_output_format(raw_arguments) == "json"
+    parser = build_parser(json_errors=json_errors)
+    try:
+        args = parser.parse_args(raw_arguments)
+    except UsageError as exc:
+        _emit_error(
+            "json",
+            _command_hint(raw_arguments),
+            exc,
+        )
+        return 2
     try:
         catalog = load_catalog(args.catalog)
         data = _run_command(catalog, args)
@@ -203,6 +259,8 @@ def _run_command(catalog: Any, args: argparse.Namespace) -> dict[str, Any]:
         return catalog.get_guardrail(args.identifier)
     if args.command == "coverage":
         return catalog.get_coverage(args.identifier)
+    if args.command == "context":
+        return catalog.get_context(args.identifier)
     if args.command == "code":
         return catalog.lookup_code(args.feature_or_vocabulary, args.code)
     if args.command == "profile-table":
@@ -226,7 +284,11 @@ def _emit_json(value: dict[str, Any]) -> None:
     print(json.dumps(value, ensure_ascii=False, sort_keys=True))
 
 
-def _emit_error(output_format: str, command: str, exc: Exception) -> None:
+def _emit_error(
+    output_format: str,
+    command: str | None,
+    exc: Exception,
+) -> None:
     if output_format == "json":
         _emit_json(
             {
@@ -261,6 +323,48 @@ def _error_type(exc: Exception) -> str:
     return "_".join(words) or "error"
 
 
+def _requested_output_format(arguments: Sequence[str]) -> str:
+    requested = "text"
+    for index, argument in enumerate(arguments):
+        if argument == "--format" and index + 1 < len(arguments):
+            requested = arguments[index + 1]
+        elif argument.startswith("--format="):
+            requested = argument.partition("=")[2]
+    return requested
+
+
+def _command_hint(arguments: Sequence[str]) -> str | None:
+    commands = {
+        "validate",
+        "discover",
+        "object",
+        "feature",
+        "semantic-relationship",
+        "temporal",
+        "aggregation",
+        "guardrail",
+        "coverage",
+        "context",
+        "code",
+        "profile-table",
+        "relationship-binding",
+        "relationship-bindings",
+    }
+    skip_next = False
+    for argument in arguments:
+        if skip_next:
+            skip_next = False
+            continue
+        if argument in {"--catalog", "--format"}:
+            skip_next = True
+            continue
+        if argument.startswith("-"):
+            continue
+        if argument in commands:
+            return argument
+    return None
+
+
 def _format_text(command: str, data: dict[str, Any]) -> str:
     if command == "validate":
         return _format_summary(data)
@@ -280,6 +384,8 @@ def _format_text(command: str, data: dict[str, Any]) -> str:
         return _format_guardrail(data)
     if command == "coverage":
         return _format_entity_result(data, "coverage")
+    if command == "context":
+        return _format_context(data)
     if command == "code":
         vocabulary = data.get("vocabulary", data.get("feature_or_vocabulary", ""))
         return f"{vocabulary} {data['code']} — {data['meaning']}"
@@ -539,6 +645,53 @@ def _format_guardrail(data: Mapping[str, Any]) -> str:
     lines = _entity_lines(data, guardrail)
     if guardrail.get("rationale"):
         lines.append(f"rationale: {guardrail['rationale']}")
+    _append_navigation_and_provenance(lines, data)
+    return "\n".join(lines)
+
+
+def _format_context(data: Mapping[str, Any]) -> str:
+    context = _entity_from_result(data, "context")
+    lines = _entity_lines(data, context)
+    scope = context.get("scope")
+    profiles = context.get("profiles", ())
+    scope_text = str(scope) if scope else ""
+    if profiles:
+        scope_text += f" · profiles: {', '.join(map(str, profiles))}"
+    if scope_text:
+        lines.append(f"scope: {scope_text}")
+    claims = context.get("claims", ())
+    if claims:
+        lines.append("claims:")
+        for claim in claims:
+            if not isinstance(claim, Mapping):
+                lines.append(f"  {claim}")
+                continue
+            claim_id = claim.get("id", "unnamed")
+            status = claim.get("status", "unknown")
+            lines.append(
+                f"  {claim_id} [{status}] — "
+                f"{claim.get('statement', '')}"
+            )
+            sources = claim.get("sources", ())
+            if sources:
+                lines.append(
+                    "    sources: " + ", ".join(map(str, sources))
+                )
+            caveats = claim.get("caveats", ())
+            if caveats:
+                lines.append(
+                    "    caveats: " + "; ".join(map(str, caveats))
+                )
+    workflow = context.get("workflow_steps", ())
+    if workflow:
+        lines.append("workflow:")
+        for index, step in enumerate(workflow, start=1):
+            if isinstance(step, Mapping):
+                lines.append(
+                    f"  {index}. {step.get('label', step.get('id', 'step'))}"
+                )
+            else:
+                lines.append(f"  {index}. {step}")
     _append_navigation_and_provenance(lines, data)
     return "\n".join(lines)
 

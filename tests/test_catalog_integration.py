@@ -32,7 +32,6 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "get_table",
             "get_relationship",
             "search_relationships",
-            "get_context",
         ):
             with self.subTest(legacy_api=legacy_name):
                 self.assertFalse(hasattr(self.catalog, legacy_name))
@@ -121,6 +120,13 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertEqual(
             result["provenance"]["contexts"][0]["profiles"], ["open-v2"]
         )
+
+        context = self.catalog.get_context(
+            "open-v2.pathology-procedure-context"
+        )
+        self.assertEqual(context["kind"], "context")
+        self.assertTrue(context["context"]["claims"])
+        self.assertTrue(context["provenance"]["sources"])
 
     def test_pathology_states_and_nulls_remain_clinically_distinct(self) -> None:
         result = self.catalog.get_feature(

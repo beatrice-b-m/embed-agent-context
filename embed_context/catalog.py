@@ -153,6 +153,7 @@ COVERAGE_SUBJECT_KINDS = frozenset(
 )
 
 BINDING_PARAMETER_KEYS = frozenset({"slot"})
+_SLOT_PARAMETER_CONCEPT = "pathology.diagnosis_code_slot"
 
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]*$")
 _TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
@@ -1646,6 +1647,28 @@ class Catalog:
             identifier, "coverage", self.coverage
         )
 
+    def get_context(self, identifier: str) -> dict[str, Any]:
+        """Get one provenance context and resolve every claim source."""
+
+        normalized = _lookup_identifier(identifier, "identifier")
+        context = self.contexts.get(normalized)
+        if context is None:
+            raise CatalogNotFoundError(
+                f"context {normalized!r} was not found"
+            )
+        claim_refs = tuple(
+            f"{context.id}#{claim.id}" for claim in context.claims
+        )
+        return {
+            "kind": "context",
+            "identifier": normalized,
+            "context": context.to_dict(),
+            "related": self._related_entities(
+                "context", normalized, context
+            ),
+            "provenance": self._provenance(claim_refs),
+        }
+
     def _exact_semantic_result(
         self, identifier: str, kind: str, entities: Mapping[str, Any]
     ) -> dict[str, Any]:
@@ -1842,6 +1865,16 @@ class Catalog:
                     item.id
                     for item in self.guardrails.values()
                     if identifier in item.coverage
+                ),
+            }
+        if kind == "context":
+            return {
+                "features": list(entity.related_concepts),
+                "profile_tables": [
+                    item.identifier for item in entity.related_tables
+                ],
+                "relationship_bindings": list(
+                    entity.related_relationships
                 ),
             }
         return {}
@@ -3140,11 +3173,18 @@ def _parse_vocabulary(identifier: str, value: object) -> Vocabulary:
         data, _VOCABULARY_REQUIRED_KEYS, _VOCABULARY_KEYS, path
     )
     raw_codes = _expect_mapping(data["codes"], f"{path}.codes")
+    if not raw_codes:
+        raise CatalogValidationError(f"{path}.codes must not be empty")
     codes: list[tuple[str, str]] = []
     for code, meaning in raw_codes.items():
-        if not isinstance(code, str) or code == "":
+        if (
+            not isinstance(code, str)
+            or not code.strip()
+            or code != code.strip()
+        ):
             raise CatalogValidationError(
-                f"{path}.codes keys must be non-empty strings"
+                f"{path}.codes keys must be non-empty strings without "
+                "surrounding whitespace"
             )
         codes.append(
             (code, _nonempty_string(meaning, f"{path}.codes[{code!r}]"))
@@ -3435,6 +3475,18 @@ def _parse_profile_binding(
 def _parse_binding(profile: str, value: object, path: str) -> Binding:
     data = _expect_mapping(value, path)
     _require_exact_keys(data, _BINDING_REQUIRED_KEYS, _BINDING_KEYS, path)
+    concept = _identifier(data["concept"], f"{path}.concept")
+    has_parameters = "parameters" in data
+    if concept == _SLOT_PARAMETER_CONCEPT and not has_parameters:
+        raise CatalogValidationError(
+            f"{path}.parameters.slot is required for concept "
+            f"{_SLOT_PARAMETER_CONCEPT!r}"
+        )
+    if concept != _SLOT_PARAMETER_CONCEPT and has_parameters:
+        raise CatalogValidationError(
+            f"{path}.parameters is only allowed for concept "
+            f"{_SLOT_PARAMETER_CONCEPT!r}"
+        )
     raw_parameters = data.get("parameters", {})
     parameters_data = _expect_mapping(
         raw_parameters, f"{path}.parameters"
@@ -3455,11 +3507,16 @@ def _parse_binding(profile: str, value: object, path: str) -> Binding:
     nullable = data["nullable"]
     if not isinstance(nullable, bool):
         raise CatalogValidationError(f"{path}.nullable must be a boolean")
+    notes = (
+        _string_array(data["notes"], f"{path}.notes", minimum=1)
+        if "notes" in data
+        else ()
+    )
     return Binding(
         profile=profile,
         table=_physical_component(data["table"], f"{path}.table"),
         column=_physical_component(data["column"], f"{path}.column"),
-        concept=_identifier(data["concept"], f"{path}.concept"),
+        concept=concept,
         grain=_controlled_string(
             data["grain"], f"{path}.grain", BINDING_GRAINS
         ),
@@ -3469,7 +3526,7 @@ def _parse_binding(profile: str, value: object, path: str) -> Binding:
         ),
         nullable=nullable,
         parameters=tuple(sorted(parameters)),
-        notes=_string_array(data.get("notes", []), f"{path}.notes"),
+        notes=notes,
     )
 
 
@@ -4394,9 +4451,13 @@ def _validate_acyclic(
 
 
 def default_catalog_path() -> Path:
-    """Return the repository-relative default catalog path."""
+    """Return the source-tree or installed-package catalog path."""
 
-    return Path(__file__).resolve().parents[1] / "catalog" / "catalog.json"
+    package_directory = Path(__file__).resolve().parent
+    source_catalog = package_directory.parent / "catalog" / "catalog.json"
+    if source_catalog.is_file():
+        return source_catalog
+    return package_directory / "_data" / "catalog.json"
 
 
 def load_catalog(path: str | Path | None = None) -> Catalog:

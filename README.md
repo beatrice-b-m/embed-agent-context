@@ -22,7 +22,8 @@ hierarchy:
 
 ```text
 patient
-  → breast-imaging episode / exam
+  → breast-imaging episode
+  → imaging exam
   → breast side and imaging finding
   → assessment / recommendation
   → linked procedure
@@ -53,6 +54,67 @@ relationship bindings.
 
 See [the v5 architecture](docs/architecture-v5.md) and
 [catalog format](docs/catalog-format.md) for the complete contract.
+
+### Terms and version axes
+
+- A **clinical object** is an independently meaningful entity or observation;
+  its **clinical grain** says what one instance means.
+- A **concept** is a portable feature meaning. The CLI and MCP call it a
+  feature so queries read naturally.
+- A **profile** is one physical representation of those meanings.
+  `open-v2` is the profile ID for the registered open EMBED V2 layout; it is
+  not a schema version.
+- A **binding grain** describes one physical row. It need not equal a clinical
+  object's grain.
+- A **semantic relationship** describes clinical adjacency or attribution. A
+  **relationship binding** describes a profile-specific physical association,
+  not an executable join.
+- A **context** contains reviewed claims and sources. A **guardrail** is a
+  reusable interpretation constraint, not an executable policy.
+- **Coverage** records what the catalog represents; it is not a measurement of
+  empirical dataset completeness.
+
+| Axis | Current value | Meaning |
+| --- | --- | --- |
+| Software | `0.6.0` | Python package, CLI, and MCP server release |
+| Catalog contract | schema `5` | Serialized `catalog.json` format |
+| Registered dataset layout | `open-v2` | Profile-specific physical bindings |
+| MCP dependency | SDK `2.0.0` | Optional pinned protocol implementation |
+
+## Start in two minutes
+
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and
+Python 3.12 or 3.13. Clone the repository, then install the command-line
+interface and optional Model Context Protocol (MCP) server as a persistent uv
+tool:
+
+```bash
+git clone https://github.com/beatrice-b-m/embedv2-agent-context.git
+cd embedv2-agent-context
+uv tool install '.[mcp]'
+```
+
+The install creates an isolated environment and places `embed-context` and
+`embed-context-mcp` in uv's executable directory. It does not need EMBED data
+and remains usable if your working directory changes. Verify both executables:
+
+```bash
+command -v embed-context
+command -v embed-context-mcp
+embed-context validate
+embed-context discover "What does absent pathology mean?" \
+  --profile open-v2 --limit 5
+```
+
+If uv reports that its executable directory is not on `PATH`, run
+`uv tool update-shell`, start a new shell, and try again. `uv tool dir --bin`
+prints the directory when you need to inspect or add it manually. See uv's
+[tool installation guide](https://docs.astral.sh/uv/guides/tools/) for the
+underlying install and `PATH` behavior.
+
+For repository development without a persistent tool install, replace
+`embed-context` with `uv run --locked embed-context` after following
+[Contributing](CONTRIBUTING.md).
 
 ## Breast-cancer outcome and time semantics
 
@@ -86,13 +148,13 @@ for an earlier prediction target may cause temporal leakage.
 Start with a clinical question; table names and stable IDs are not required:
 
 ```bash
-uv run --locked --no-dev python -m embed_context discover \
-  "How is breast cancer represented and when is it known?"
-uv run --locked --no-dev python -m embed_context discover \
-  "What does absent pathology mean?" --profile open-v2
-uv run --locked --no-dev python -m embed_context discover \
+embed-context discover \
+  "How is breast cancer represented and when is it known?" --limit 5
+embed-context discover \
+  "What does absent pathology mean?" --profile open-v2 --limit 5
+embed-context discover \
   "pathology attribution to imaging findings" \
-  --kind semantic_relationship --kind guardrail --domain pathology
+  --kind semantic_relationship --kind guardrail --domain pathology --limit 5
 ```
 
 Discovery searches clinical objects, features, semantic relationships,
@@ -112,33 +174,39 @@ absent from EMBED or clinical reality.
 Use exact getters to navigate a discovery result:
 
 ```bash
-uv run --locked --no-dev python -m embed_context object imaging_finding
-uv run --locked --no-dev python -m embed_context feature pathology.severity
-uv run --locked --no-dev python -m embed_context feature \
-  pathology.severity --include-codes
-uv run --locked --no-dev python -m embed_context semantic-relationship \
+embed-context object imaging_finding
+embed-context feature pathology.severity
+embed-context feature pathology.severity --include-codes
+embed-context semantic-relationship \
   clinical.finding-pathology-observation
-uv run --locked --no-dev python -m embed_context temporal \
+embed-context temporal \
   time.pathology-report-documentation
-uv run --locked --no-dev python -m embed_context aggregation \
+embed-context aggregation \
   aggregation.pathology-severity-to-exam
-uv run --locked --no-dev python -m embed_context guardrail \
+embed-context guardrail \
   guardrail.null-pathology-not-negative
-uv run --locked --no-dev python -m embed_context coverage \
+embed-context coverage \
   coverage.open-v2.specimen-time
-uv run --locked --no-dev python -m embed_context code \
-  pathology.severity 0
+embed-context context open-v2.pathology-procedure-context
+embed-context code pathology.severity 0
 ```
+
+For a first walkthrough, run the absent-pathology discovery query, note that
+its highest-ranked match is the `guardrail.null-pathology-not-negative`
+guardrail, then open that exact ID. The result explains why missing attachment
+is not a negative diagnosis and exposes adjacent stable IDs plus provenance.
+Open `open-v2.pathology-procedure-context` when you need the underlying
+reviewed claims, source records, and profile scope. Discovery ranks candidates;
+an exact getter supplies the contract you should reason from.
 
 After selecting semantic concepts, inspect a release implementation through the
 explicitly secondary binding commands:
 
 ```bash
-uv run --locked --no-dev python -m embed_context profile-table \
-  open-v2 exam_level_anon
-uv run --locked --no-dev python -m embed_context relationship-binding \
+embed-context profile-table open-v2 exam_level_anon
+embed-context relationship-binding \
   open-v2.pathology_findings_anon.imaging_finding
-uv run --locked --no-dev python -m embed_context relationship-bindings \
+embed-context relationship-bindings \
   --profile open-v2 \
   --semantic-relationship clinical.finding-pathology-observation
 ```
@@ -155,8 +223,9 @@ Place `--format json` before the subcommand for a stable machine-readable
 envelope:
 
 ```bash
-uv run --locked --no-dev python -m embed_context --format json discover \
-  "Which timestamps could anchor pathology?"
+embed-context --format json discover \
+  "Which timestamps could anchor pathology?" \
+  --kind temporal_semantic --limit 5
 ```
 
 Successful responses use:
@@ -165,40 +234,161 @@ Successful responses use:
 {"ok": true, "command": "discover", "data": {}}
 ```
 
-Errors use the same envelope with `ok: false` and a structured error type and
-message. `validate` summarizes schema-v5 semantic inventories, binding
-inventories, and controlled facets.
+Errors—including invalid options and missing required arguments—use the same
+envelope with `ok: false`, a structured error type, and a message. A usage
+error has type `usage`; its `command` is `null` when no subcommand can be
+identified. All errors exit with status 2. `validate` runs the strict core
+validator, including cross-reference and clinical-semantic invariants, then
+summarizes schema-v5 inventories and controlled facets.
+
+## Python API
+
+The dependency-free core exposes the same validated catalog operations:
+
+```python
+from embed_context import load_catalog
+
+catalog = load_catalog()
+matches = catalog.discover(
+    "absent pathology",
+    profile="open-v2",
+    limit=5,
+)
+guardrail = catalog.get_guardrail(
+    "guardrail.null-pathology-not-negative"
+)
+context = catalog.get_context(
+    "open-v2.pathology-procedure-context"
+)
+```
+
+Exact getter results consistently contain `kind`, `identifier`, the requested
+entity, `related`, and `provenance`. Discovery results contain `matches`,
+`diagnostics`, `count`, and `total`. `uv tool install` deliberately isolates
+command-line tools; it does not add `embed_context` to arbitrary Python
+environments. Contributors can import it through `uv run` in the checkout, and
+another Python project can install the checkout as a normal local dependency.
 
 ## Stdio MCP server
 
-MCP support is optional so the core catalog and CLI remain dependency-free.
-Start the read-only server with the pinned SDK extra:
+The `uv tool install '.[mcp]'` command above puts the read-only stdio server on
+`PATH` as `embed-context-mcp`. The client starts this command and communicates
+with it over standard input/output; do not start it in a separate terminal.
+The server writes only MCP protocol messages to stdout and sends startup errors
+to stderr.
+
+Before configuring a client, confirm that the executable is visible in the
+same environment from which that client launches:
 
 ```bash
-uv run --locked --no-dev --extra mcp python -m embed_context.mcp_server
+command -v embed-context-mcp
+embed-context-mcp --version
 ```
 
-An MCP client can invoke it from any working directory:
+If a desktop or GUI client does not inherit your updated shell `PATH`, run
+`uv tool dir --bin` and replace `embed-context-mcp` in that client's
+configuration with the absolute path to the executable in that directory.
+
+### Codex
+
+Codex stores user configuration in `~/.codex/config.toml`. A trusted project
+can instead use `.codex/config.toml` in its repository. Add the user-scoped
+server with the CLI:
+
+```bash
+codex mcp add embed_context -- embed-context-mcp
+codex mcp list
+codex mcp get embed_context --json
+```
+
+The equivalent TOML entry is:
+
+```toml
+[mcp_servers.embed_context]
+command = "embed-context-mcp"
+```
+
+Restart an already-running Codex session after changing the configuration. In
+the terminal UI, `/mcp` shows the connected server and tools. Codex CLI, the
+Codex IDE extension, and the Codex app use the same configuration on the same
+host. See the official [Codex MCP guide](https://learn.chatgpt.com/docs/extend/mcp)
+and [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
+
+### Claude Code
+
+Claude Code recommends its configuration command for private user scope:
+
+```bash
+claude mcp add --transport stdio --scope user \
+  embed-context -- embed-context-mcp
+claude mcp get embed-context
+claude mcp list
+```
+
+User- and local-scoped entries are stored in `~/.claude.json`; use
+`claude mcp add` rather than editing that application-state file by hand. For
+a reviewable configuration shared by one repository, run:
+
+```bash
+claude mcp add --transport stdio --scope project \
+  embed-context -- embed-context-mcp
+```
+
+That creates or updates `.mcp.json` at the repository root with this shape:
 
 ```json
 {
-  "command": "uv",
-  "args": [
-    "--directory",
-    "/absolute/path/to/embedv2-agent-context",
-    "run",
-    "--locked",
-    "--no-dev",
-    "--extra",
-    "mcp",
-    "python",
-    "-m",
-    "embed_context.mcp_server"
-  ]
+  "mcpServers": {
+    "embed-context": {
+      "type": "stdio",
+      "command": "embed-context-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
 }
 ```
 
-The server exposes twelve read-only, closed-schema, structured-output tools:
+Restart Claude Code, approve a project-scoped server the first time it is
+used, and run `/mcp` to inspect or reconnect it. If startup fails,
+`claude --debug mcp` provides diagnostics. See Anthropic's official
+[MCP configuration guide](https://code.claude.com/docs/en/mcp) and
+[settings locations](https://code.claude.com/docs/en/settings#settings-files).
+
+### OpenCode
+
+OpenCode reads user configuration from
+`~/.config/opencode/opencode.json` or `.jsonc`. Put a project configuration in
+`opencode.json` or `opencode.jsonc` at the repository root:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "embed_context": {
+      "type": "local",
+      "command": ["embed-context-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+For local stdio servers, OpenCode puts the executable and all arguments in one
+`command` array. Restart OpenCode after changing configuration, then verify the
+connection:
+
+```bash
+opencode mcp list
+```
+
+See OpenCode's official
+[configuration guide](https://opencode.ai/docs/config/),
+[MCP server reference](https://opencode.ai/docs/mcp-servers/), and
+[MCP CLI reference](https://opencode.ai/docs/cli/#mcp).
+
+The server exposes thirteen read-only tools with closed input schemas and
+structured JSON results:
 
 1. `discover`
 2. `get_clinical_object`
@@ -208,21 +398,23 @@ The server exposes twelve read-only, closed-schema, structured-output tools:
 6. `get_aggregation`
 7. `get_guardrail`
 8. `get_coverage`
-9. `lookup_code`
-10. `get_profile_table`
-11. `get_relationship_binding`
-12. `search_relationship_bindings`
+9. `get_context`
+10. `lookup_code`
+11. `get_profile_table`
+12. `get_relationship_binding`
+13. `search_relationship_bindings`
 
 Agents should begin with `discover`, follow exact semantic references, and use
 the final three profile/binding operations only to implement chosen semantics
-in a release. Tool schemas reject undeclared arguments. All tools are
-read-only, idempotent, and closed-world with respect to catalog metadata.
-
-The server writes MCP protocol messages only to stdout. Startup errors and
-diagnostics go to stderr.
+in a release. All tools are read-only, idempotent, and closed-world with
+respect to catalog metadata. Input schemas reject undeclared arguments.
+Outputs are structured JSON objects, while their MCP output schemas
+intentionally remain generic so explanatory fields can evolve without
+breaking clients.
 
 ## Repository layout
 
+- [docs/README.md](docs/README.md) — role-based documentation index.
 - [catalog/catalog.json](catalog/catalog.json) — canonical portable semantics,
   provenance, and profile bindings.
 - [catalog/catalog.schema.json](catalog/catalog.schema.json) — versioned JSON
@@ -231,6 +423,10 @@ diagnostics go to stderr.
   adapter.
 - `tests/` — synthetic contracts, validation, discovery, interface, and
   source-profile checks.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — setup, change workflow, and validation
+  matrix.
+- [docs/clinical-semantic-model.md](docs/clinical-semantic-model.md) —
+  human-readable tour of the clinical graph and its limitations.
 - [docs/architecture-v5.md](docs/architecture-v5.md) — semantic/binding layer
   decision and discovery contract.
 - [docs/catalog-format.md](docs/catalog-format.md) — authoring and query
@@ -239,8 +435,18 @@ diagnostics go to stderr.
   guidance.
 - [docs/project-scope.md](docs/project-scope.md) — boundaries and authoring
   requirements.
-- `reference_files/` — ignored local EMBED V2 source artifacts used only to
-  verify profile bindings.
+- [docs/manual-review-batches.md](docs/manual-review-batches.md) and
+  [docs/open-v2-linkage-review.md](docs/open-v2-linkage-review.md) —
+  historical evidence records behind reviewed claims.
+- `reference_files/` — ignored, optional local EMBED V2 source artifacts used
+  only for footer-level profile verification; never commit its contents.
+
+Questions and defects belong in
+[GitHub Issues](https://github.com/beatrice-b-m/embedv2-agent-context/issues).
+Until a formal citation file is added, cite the
+[repository](https://github.com/beatrice-b-m/embedv2-agent-context) together
+with the commit SHA used. The repository currently declares no software
+license; obtain the owner's terms before reuse or redistribution.
 
 ## Breaking migration from schema v4
 
@@ -249,14 +455,16 @@ conversion because physical metadata cannot reliably invent clinical objects,
 attribution, time roles, coverage, or guardrails.
 
 The CLI commands `search`, `get`, `table`, `relationship`, `relationships`,
-`context`, `contexts`, `pattern`, and `patterns` are removed. Replace them with
+`contexts`, `pattern`, and `patterns` are removed. Replace them with
 `discover`, an exact semantic getter, and—when needed—an explicitly named
-profile-binding command.
+profile-binding command. The exact `context ID` command remains available with
+a schema-v5 result envelope; context search moves to
+`discover --kind context`.
 
 The MCP tools `search_features`, `get_table`, `get_relationship`,
-`search_relationships`, `get_context`, `search_contexts`,
+`search_relationships`, `search_contexts`,
 `get_analysis_pattern`, and `search_analysis_patterns` are removed. Use the
-twelve tools listed above.
+thirteen tools listed above; `get_context` is the exact context lookup.
 
 Task-specific analysis patterns are not migrated as cohort recipes. Their
 supported clinical facts move into outcome, temporal, aggregation, coverage,
@@ -283,21 +491,22 @@ analysis design.
 
 ## Verification
 
-Run the complete suite and the footer-only source-profile check:
+The clone-safe baseline needs no EMBED data or ignored local artifacts:
 
 ```bash
 uv run --locked python -m unittest discover -v
-uv run --locked python scripts/validate_source_profile.py
-```
-
-Exercise the optional MCP adapter against the pinned SDK:
-
-```bash
 uv run --locked --no-dev --extra mcp python -m unittest \
   tests.test_mcp_server -v
 ```
 
-The source-profile verifier derives the expected physical manifest from the
+Maintainers who separately possess the ignored open-v2 reference artifacts may
+also run:
+
+```bash
+uv run --locked python scripts/validate_source_profile.py
+```
+
+That optional verifier derives the expected physical manifest from the
 selected profile and compares table names, columns, physical types, and schema
-nullability. It reads Parquet footers only and does not inspect clinical values
-or statistics.
+nullability. It reads Parquet footers only; it does not inspect rows, clinical
+values, identifiers, dates, report text, counts, or statistics.

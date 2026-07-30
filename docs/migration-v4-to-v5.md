@@ -2,8 +2,10 @@
 
 Schema version 5 is intentionally breaking. Version 4 readers must reject a
 version 5 catalog, and the version 5 reader reports an explicit migration
-error for version 4 input rather than silently reinterpreting it.
-The project package version advances from `0.1.0` to `0.2.0` at this boundary.
+error for version 4 input rather than silently reinterpreting it. Historically,
+the project package advanced from `0.1.0` to `0.2.0` at this boundary. The
+current software release is `0.6.0`; software version and catalog schema version
+are independent.
 
 ## Collection changes
 
@@ -64,13 +66,14 @@ binding queries.
 | `table PROFILE TABLE` | `profile-table PROFILE TABLE` | The name makes the secondary implementation role explicit. |
 | `relationship ID` | `relationship-binding ID` | This gets a physical join binding, not a clinical relationship. Use `semantic-relationship ID` for portable meaning. |
 | `relationships [filters]` | `relationship-bindings [filters]` | Physical filters are retained and clearly separated from clinical discovery. |
-| `context ID` / `contexts QUERY` | `discover QUERY --kind context`, then a relevant semantic getter | Context claims remain evidence, but there is no context-first exact command. Semantic getter provenance resolves supporting claim, scope, and source records. |
+| `context ID` | `context ID` | Exact context lookup remains, but the response is a schema-v5 envelope with complete claims, related navigation, and resolved provenance. |
+| `contexts QUERY` | `discover QUERY --kind context` | Context search joins unified discovery and returns match explanations and diagnostics. |
 | `pattern ID` / `patterns QUERY` | `discover QUERY --kind guardrail --kind temporal_semantic --kind aggregation --kind coverage` | There is deliberately no one-to-one pattern replacement and no cohort recipe. |
 
 The new exact semantic commands are `object`, `feature`,
 `semantic-relationship`, `temporal`, `aggregation`, `guardrail`, and
-`coverage`. `validate` and `code` remain, although their summaries and linked
-entity envelopes reflect schema version 5.
+`coverage`, plus exact provenance `context`. `validate` and `code` remain,
+although their summaries and linked entity envelopes reflect schema version 5.
 
 ### MCP tool mapping
 
@@ -80,12 +83,13 @@ entity envelopes reflect schema version 5.
 | `get_table` | `get_profile_table` |
 | `get_relationship` | `get_relationship_binding` |
 | `search_relationships` | `search_relationship_bindings` |
-| `get_context` / `search_contexts` | `discover` plus an exact semantic getter with resolved provenance |
+| `get_context` | `get_context` with the schema-v5 entity, navigation, and provenance envelope |
+| `search_contexts` | `discover` with `kinds: ["context"]` |
 | `get_analysis_pattern` / `search_analysis_patterns` | `discover` across guardrails, temporal semantics, aggregations, and coverage |
 
 The v5 MCP server additionally exposes `get_clinical_object`,
 `get_semantic_relationship`, `get_temporal_semantic`, `get_aggregation`,
-`get_guardrail`, and `get_coverage`.
+`get_guardrail`, `get_coverage`, and exact `get_context`.
 
 ### Parameters and responses
 
@@ -106,9 +110,10 @@ The v5 MCP server additionally exposes `get_clinical_object`,
 - Physical table and relationship responses are explicitly profile-scoped and
   must not be interpreted as the clinical conceptual model.
 
-Version 4 context claims are retained as provenance, but the discovery API
-returns them through the semantic entities they support rather than requiring a
-caller to choose a context-specific search surface first.
+Version 4 context claims are retained as provenance. Unified discovery can
+return context matches alongside semantic entities, and exact `context` /
+`get_context` lookup exposes a selected context's complete reviewed claims and
+resolved sources.
 
 ### Direct catalog consumers
 
@@ -126,13 +131,13 @@ Object-to-table representation is new at
 
 The Python core removes the ambiguous v4 compatibility properties and methods
 `catalog.bindings`, `catalog.tables`, `catalog.relationships`,
-`catalog.grains`, `get_table`, `get_relationship`, `search_relationships`, and
-`get_context`. Use `binding_grains` for the physical grain vocabulary and
+`catalog.grains`, `get_table`, `get_relationship`, and
+`search_relationships`. Use `binding_grains` for the physical grain vocabulary and
 `profile_bindings` for the authoritative nested layer. Explicit flattened
 secondary views are available as `feature_bindings`, `object_bindings`,
 `profile_tables`, and `relationship_bindings`; exact queries use the v5 method
-names documented above. Context records remain available as provenance through
-discovery and resolved getter results, not a context-first exact method.
+names documented above. Exact context lookup is available as
+`Catalog.get_context()`.
 
 ## Compatibility boundary
 
@@ -141,3 +146,10 @@ physical metadata, but it could not reliably invent clinical objects,
 attribution, time roles, coverage, or guardrails. Catalog authors must migrate
 those assertions explicitly and retain unresolved status when evidence is
 insufficient.
+
+Later schema-v5 validator fixes retain schema version 5 when they make the JSON
+Schema and runtime enforce the already-documented contract consistently.
+Notably, nonblank strings and vocabulary code keys must be trimmed,
+`pathology.diagnosis_code_slot` bindings require a positive
+`parameters.slot`, other concepts must omit `parameters`, and focused catalogs
+may leave optional semantic collections empty.

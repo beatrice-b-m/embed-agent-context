@@ -130,8 +130,8 @@ wheels = [
 
 [[package]]
 name = "embedv2-agent-context"
-version = "0.2.0"
-source = { virtual = "." }
+version = "0.6.0"
+source = { editable = "." }
 
 [package.optional-dependencies]
 mcp = [
@@ -140,6 +140,7 @@ mcp = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "jsonschema" },
     { name = "pyarrow" },
 ]
 
@@ -148,7 +149,10 @@ requires-dist = [{ name = "mcp", marker = "extra == 'mcp'", specifier = "==2.0.0
 provides-extras = ["mcp"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pyarrow", specifier = "==20.0.0" }]
+dev = [
+    { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "pyarrow", specifier = "==20.0.0" },
+]
 
 [[package]]
 name = "h11"
