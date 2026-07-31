@@ -1,7 +1,7 @@
-# EMBED clinical-semantic context
+# EMBED Agent Context
 
-Ask useful questions about the Emory Breast Imaging Dataset (EMBED) before
-turning table names into cohort logic.
+Ask useful questions about the Emory Breast Imaging Dataset (EMBED) through CLI or MCP before
+turning tables into cohorts.
 
 EMBED is a breast-imaging research dataset from Emory Healthcare containing
 screening and diagnostic mammography images, image metadata, and structured
@@ -303,11 +303,6 @@ The version numbers describe different things:
 - [Contributing](CONTRIBUTING.md) — set up a development environment and make
   catalog or code changes safely.
 
-Questions and defects belong in
-[GitHub Issues](https://github.com/beatrice-b-m/embedv2-agent-context/issues).
 Citation metadata is provided in [`CITATION.cff`](CITATION.cff). Cite the
 software version or commit SHA used, and cite EMBED separately according to the
 dataset's documentation.
-
-The repository currently declares no software license. Obtain the owner's
-terms before reuse or redistribution.
