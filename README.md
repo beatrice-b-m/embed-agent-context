@@ -190,10 +190,11 @@ Add this local server to `opencode.json` or `opencode.jsonc`:
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "embed_context": {
-      "type": "local",
-      "command": ["embed-context-mcp"],
-      "enabled": true
+    "servers": {
+      "embed_context": {
+        "type": "local",
+        "command": ["embed-context-mcp"]
+      }
     }
   }
 }
