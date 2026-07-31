@@ -1,7 +1,7 @@
 # EMBED Agent Context
 
 Ask useful questions about the Emory Breast Imaging Dataset (EMBED) through CLI or MCP before
-turning table names into cohort logic.
+turning tables into cohorts.
 
 EMBED is a breast-imaging research dataset from Emory Healthcare containing
 screening and diagnostic mammography images, image metadata, and structured
