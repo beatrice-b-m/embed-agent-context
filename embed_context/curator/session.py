@@ -429,6 +429,7 @@ class CuratorSession:
                     os.fsync(stream.fileno())
                 if path.is_symlink():
                     raise CuratorError("Editable module became a symlink.", error_type="symlink_rejected", http_status=409)
+                self._check_source_digests()
                 os.replace(temporary_path, path)
                 temporary_path = None
                 try:

@@ -612,7 +612,8 @@ Saving follows this sequence:
 5. write the already validated prospective bytes to a sibling temporary file
    with the original mode;
 6. flush and `fsync` the file;
-7. atomically replace the exact editable path with `os.replace`;
+7. recheck all source digests, then atomically replace the exact editable path
+   with `os.replace`;
 8. `fsync` the containing directory where supported;
 9. reload the saved composition from its real path as a consistency assertion;
    and

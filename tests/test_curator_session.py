@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from embed_context.curator.session import CuratorError, CuratorSession
 from tests.test_catalog_composition import representative_extension
@@ -358,6 +360,44 @@ class CuratorSessionTests(unittest.TestCase):
         with self.assertRaises(CuratorError) as caught:
             session.save(expected_revision=1)
         self.assertEqual(caught.exception.error_type, "composition_changed")
+
+    def test_editable_source_change_during_save_prevents_replacement(self) -> None:
+        session = self.session()
+        record = session.get_record("qualification", QUALIFICATION)
+        replacement = dict(record["authored"])
+        replacement["summary"] += " Reviewed."
+        session.replace_record(
+            "qualification",
+            QUALIFICATION,
+            {"revision": 0, "record": replacement},
+        )
+        external_bytes = self.profile.read_bytes() + b" "
+        real_fsync = os.fsync
+        source_edited = False
+
+        def edit_source_after_temporary_file_sync(descriptor: int) -> None:
+            nonlocal source_edited
+            real_fsync(descriptor)
+            if not source_edited:
+                self.profile.write_bytes(external_bytes)
+                source_edited = True
+
+        with patch(
+            "embed_context.curator.session.os.fsync",
+            side_effect=edit_source_after_temporary_file_sync,
+        ):
+            with self.assertRaises(CuratorError) as caught:
+                session.save(expected_revision=1)
+
+        self.assertEqual(caught.exception.error_type, "source_changed")
+        self.assertEqual(caught.exception.http_status, 409)
+        self.assertEqual(self.profile.read_bytes(), external_bytes)
+        self.assertEqual(session.session_info()["revision"], 1)
+        self.assertTrue(session.dirty)
+        self.assertEqual(
+            list(self.profile.parent.glob(f".{self.profile.name}.*.tmp")),
+            [],
+        )
 
 
 if __name__ == "__main__":
