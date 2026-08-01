@@ -1,14 +1,14 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata."
-title: "EMBED clinical-semantic context"
+title: "EMBED Agent Context"
 authors:
   - family-names: "Brown-Mulry"
     given-names: "Beatrice"
 version: 0.7.0
-repository-code: "https://github.com/beatrice-b-m/embedv2-agent-context"
-url: "https://github.com/beatrice-b-m/embedv2-agent-context"
+repository-code: "https://github.com/beatrice-b-m/embed-agent-context"
+url: "https://github.com/beatrice-b-m/embed-agent-context"
 abstract: >-
-  A reviewed, count-free, machine-queryable clinical-semantic catalog for the
+  A machine-queryable clinical-semantic catalog for the
   Emory Breast Imaging Dataset.
 keywords:
   - "EMBED"
