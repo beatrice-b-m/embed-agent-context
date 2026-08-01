@@ -32,7 +32,7 @@ from .documents import (
     record_at,
     replace_record as replace_authored_record,
 )
-from .graph import build_graph
+from .graph import AuthoredGraphRecord, build_graph
 from .query_diff import run_discovery_comparison
 from .forms import build_form_spec
 
@@ -129,7 +129,15 @@ class CuratorSession:
         if limit < 1 or limit > self.INVENTORY_LIMIT:
             raise CuratorError(f"limit must be between 1 and {self.INVENTORY_LIMIT}")
         with self._lock:
-            entries = self._current_index()
+            entries = list(self._current_index())
+            if self._draft is not None:
+                current_keys = {(entry.kind, entry.identifier) for entry in entries}
+                entries.extend(
+                    entry
+                    for entry in self._index
+                    if entry.editable
+                    and (entry.kind, entry.identifier) not in current_keys
+                )
             records = [self._inventory_item(entry) for entry in entries]
             needle = (text or "").casefold().strip()
             def matches(item: Mapping[str, Any]) -> bool:
@@ -148,8 +156,24 @@ class CuratorSession:
 
     def get_record(self, kind: str, identifier: str) -> dict[str, Any]:
         with self._lock:
-            entry = self._find_entry(kind, identifier)
-            document = self._document_for_entry(entry)
+            deleted = False
+            try:
+                entry = self._find_entry(kind, identifier)
+            except CuratorError:
+                authored_kind = "feature" if kind == "concept" else kind
+                matches = [
+                    item
+                    for item in self._index
+                    if item.editable
+                    and item.kind == authored_kind
+                    and item.identifier == identifier
+                    and self._draft_state(item) == "deleted"
+                ]
+                if len(matches) != 1:
+                    raise
+                entry = matches[0]
+                deleted = True
+            document = self._editable_document if deleted else self._document_for_entry(entry)
             raw = record_at(document.mapping, entry)
             origin = self._origin(kind, identifier)
             result = {
@@ -159,11 +183,11 @@ class CuratorSession:
                 "source": self._entry_info(entry),
                 "origin": origin,
                 "effective": self._effective_record(kind, identifier),
-                "draft_state": self._draft_state(entry),
+                "draft_state": "deleted" if deleted else self._draft_state(entry),
                 "revision": self._revision,
-                "editable": entry.editable,
+                "editable": entry.editable and not deleted,
             }
-            result["form_spec"] = self._form_spec(entry, raw)
+            result["form_spec"] = None if deleted else self._form_spec(entry, raw)
             return result
 
     def neighborhood(self, kind: str, identifier: str, *, depth: int = 1) -> dict[str, Any]:
@@ -182,8 +206,62 @@ class CuratorSession:
             }
             graph_kind = "concept" if kind == "feature" else kind
             return build_graph(
-                catalog, editable_keys=editable_keys, draft_states=states
+                catalog,
+                editable_keys=editable_keys,
+                draft_states=states,
+                authored_overlay=self._graph_overlay(),
+                diagnostics=self._diagnostics,
             ).neighborhood(graph_kind, identifier, depth=depth)
+
+    def _graph_overlay(self) -> tuple[AuthoredGraphRecord, ...]:
+        """Return current editable authorship, including invalid draft state."""
+
+        if self._draft is None:
+            return ()
+        before = {
+            (entry.kind, entry.identifier): entry
+            for entry in self._index
+            if entry.editable
+        }
+        after = {
+            (entry.kind, entry.identifier): entry
+            for entry in self._current_index()
+            if entry.editable
+        }
+        overlay = []
+        for key in sorted(set(before) | set(after)):
+            entry = after.get(key) or before[key]
+            current = after.get(key)
+            if current is not None and key in before:
+                baseline_record = record_at(
+                    self._editable_document.mapping, before[key]
+                )
+                current_record = record_at(self._draft_document().mapping, current)
+                if baseline_record == current_record:
+                    continue
+            document = self._document_for_entry(current or entry)
+            origin = self._origin(entry.kind, entry.identifier)
+            if not origin:
+                origin = {
+                    "contribution_class": _class_for(entry.document_kind),
+                    "document_kind": entry.document_kind,
+                    "module_id": entry.module_id,
+                    "target_profile": entry.target_profile,
+                    "lifecycle_status": self._editable_document.lifecycle_status,
+                }
+            overlay.append(
+                AuthoredGraphRecord(
+                    kind=entry.kind,
+                    identifier=entry.identifier,
+                    record=(record_at(document.mapping, current) if current else None),
+                    source_pointer=entry.json_pointer,
+                    origin=origin,
+                    profile=entry.target_profile,
+                    lifecycle=origin.get("lifecycle_status"),
+                    draft_state=self._draft_state(current) if current else "deleted",
+                )
+            )
+        return tuple(overlay)
 
     def discover(self, request: Mapping[str, Any]) -> dict[str, Any]:
         allowed = {"query", "profile", "kinds", "domain", "limit"}
@@ -433,7 +511,12 @@ class CuratorSession:
         return matches[0]
 
     def _inventory_item(self, entry: SourceEntry) -> dict[str, Any]:
-        document = self._document_for_entry(entry)
+        draft_state = self._draft_state(entry)
+        document = (
+            self._editable_document
+            if draft_state == "deleted"
+            else self._document_for_entry(entry)
+        )
         record = record_at(document.mapping, entry)
         origin = self._origin(entry.kind, entry.identifier)
         domains = record.get("domains", [])
@@ -445,7 +528,8 @@ class CuratorSession:
             "target_profile": entry.target_profile,
             "contribution_class": origin.get("contribution_class", _class_for(entry.document_kind)),
             "lifecycle": origin.get("lifecycle_status"),
-            "editable": entry.editable, "draft_state": self._draft_state(entry),
+            "editable": entry.editable and draft_state != "deleted",
+            "draft_state": draft_state,
         }
 
     def _origin(self, kind: str, identifier: str) -> dict[str, Any]:
@@ -519,8 +603,8 @@ class CuratorSession:
             old = record_at(self._editable_document.mapping, baseline)
             new = record_at(self._draft_document().mapping, entry)
             return "baseline" if old == new else "modified"
-        except KeyError:
-            return "modified"
+        except (KeyError, StopIteration):
+            return "deleted"
 
     def _changed_records(self) -> list[dict[str, str]]:
         before = {(item.kind, item.identifier): item for item in self._index if item.editable}

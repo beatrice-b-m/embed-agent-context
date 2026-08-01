@@ -81,6 +81,78 @@ class CuratorSessionTests(unittest.TestCase):
             session.save(expected_revision=1)
         self.assertEqual(caught.exception.error_type, "validation_error")
 
+    def test_invalid_draft_graph_uses_current_broken_reference(self) -> None:
+        session = self.session()
+        record = session.get_record("qualification", QUALIFICATION)
+        replacement = dict(record["authored"])
+        replacement["claim_refs"] = ["missing.context#missing-claim"]
+        result = session.replace_record(
+            "qualification", QUALIFICATION,
+            {"revision": 0, "record": replacement},
+        )
+        self.assertFalse(result["valid"])
+
+        graph = session.neighborhood("qualification", QUALIFICATION)
+        edge = next(
+            edge
+            for edge in graph["outgoing"]
+            if edge["target"] == "claim:missing.context#missing-claim"
+        )
+        missing = next(
+            node
+            for node in graph["nodes"]
+            if node["key"] == "claim:missing.context#missing-claim"
+        )
+        self.assertEqual(edge["draft_state"], "modified")
+        self.assertTrue(edge["error"])
+        self.assertEqual(edge["diagnostics"], result["diagnostics"])
+        self.assertTrue(missing["missing"])
+
+    def test_deleted_table_is_missing_in_current_draft_graph(self) -> None:
+        session = self.session()
+        authored = json.loads(self.profile.read_text(encoding="utf-8"))
+        table = authored["profile_binding"]["tables"][0]
+        table_id = table["id"]
+        before = session.neighborhood("table", table_id)
+        incoming = next(
+            edge
+            for edge in before["incoming"]
+            if edge["source"].startswith(("feature_binding:", "object_binding:"))
+        )
+        source_kind, source_id = incoming["source"].split(":", 1)
+
+        result = session.delete_record(
+            "table", table_id, {"revision": 0, "confirm": True}
+        )
+        self.assertFalse(result["valid"])
+        deleted = session.list_records(status="deleted")
+        self.assertTrue(
+            any(
+                item["kind"] == "table" and item["identifier"] == table_id
+                for item in deleted["records"]
+            )
+        )
+        deleted_record = session.get_record("table", table_id)
+        self.assertEqual(deleted_record["draft_state"], "deleted")
+        self.assertFalse(deleted_record["editable"])
+        deleted_graph = session.neighborhood("table", table_id)
+        deleted_focus = next(
+            node for node in deleted_graph["nodes"] if node["key"] == f"table:{table_id}"
+        )
+        self.assertTrue(deleted_focus["missing"])
+        self.assertEqual(deleted_focus["draft_state"], "deleted")
+        graph = session.neighborhood(source_kind, source_id)
+        edge = next(
+            edge for edge in graph["outgoing"]
+            if edge["target"] == f"table:{table_id}"
+        )
+        target = next(
+            node for node in graph["nodes"]
+            if node["key"] == f"table:{table_id}"
+        )
+        self.assertTrue(edge["error"])
+        self.assertTrue(target["missing"])
+
     def test_context_source_change_prevents_save(self) -> None:
         session = self.session()
         record = session.get_record("qualification", QUALIFICATION)

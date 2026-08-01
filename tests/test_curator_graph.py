@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from embed_context import load_catalog
-from embed_context.curator.graph import GraphIndex, node_key
+from embed_context.curator.graph import AuthoredGraphRecord, GraphIndex, node_key
 
 
 class CuratorGraphTests(unittest.TestCase):
@@ -111,6 +111,81 @@ class CuratorGraphTests(unittest.TestCase):
         self.assertEqual(node.draft_state, "modified")
         self.assertTrue(
             all(edge.draft_state == "modified" for edge in graph.outgoing("concept", "pathology.severity"))
+        )
+
+    def test_authored_overlay_marks_broken_reference_with_diagnostics(self) -> None:
+        identifier = "open-v2.qualification.clinical_object.breast_imaging_episode"
+        diagnostic = {"stage": "composition", "message": "missing draft claim"}
+        graph = GraphIndex(
+            self.catalog,
+            authored_overlay=[
+                AuthoredGraphRecord(
+                    kind="qualification",
+                    identifier=identifier,
+                    record={
+                        "summary": "Draft qualification",
+                        "subject": {
+                            "kind": "clinical_object",
+                            "id": "breast_imaging_episode",
+                        },
+                        "claim_refs": ["missing.context#missing-claim"],
+                    },
+                    source_pointer=f"/qualifications/{identifier}",
+                    origin=None,
+                    profile="open-v2",
+                    lifecycle="released",
+                    draft_state="modified",
+                )
+            ],
+            diagnostics=[diagnostic],
+        )
+
+        edge = next(
+            edge
+            for edge in graph.outgoing("qualification", identifier)
+            if edge.target == "claim:missing.context#missing-claim"
+        )
+        self.assertTrue(edge.error)
+        self.assertEqual(edge.diagnostics, (diagnostic,))
+        self.assertEqual(
+            edge.source_pointer,
+            f"/qualifications/{identifier}/claim_refs/0",
+        )
+        self.assertTrue(
+            graph.get_node("claim", "missing.context#missing-claim").missing
+        )
+
+    def test_authored_coverage_overlay_preserves_subject_edge(self) -> None:
+        identifier = next(iter(self.catalog.coverage))
+        coverage = self.catalog.coverage[identifier]
+        graph = GraphIndex(
+            self.catalog,
+            authored_overlay=[
+                AuthoredGraphRecord(
+                    kind="coverage",
+                    identifier=identifier,
+                    record={
+                        "summary": "Edited coverage",
+                        "subject_kind": coverage.subject_kind,
+                        "subject": coverage.subject,
+                        "claim_refs": list(coverage.claim_refs),
+                    },
+                    source_pointer=f"/coverage/{identifier}",
+                    origin=None,
+                    profile=None,
+                    lifecycle=None,
+                    draft_state="modified",
+                )
+            ],
+        )
+
+        self.assertTrue(
+            any(
+                edge.type == "covers_subject"
+                and edge.target
+                == f"{coverage.subject_kind}:{coverage.subject}"
+                for edge in graph.outgoing("coverage", identifier)
+            )
         )
 
 

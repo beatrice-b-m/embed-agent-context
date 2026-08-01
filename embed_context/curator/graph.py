@@ -9,7 +9,7 @@ accepted as a small overlay keyed by canonical ``kind:id`` node keys.
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any, Iterable, Mapping
 
 from embed_context.catalog import Catalog, ContributionOrigin
@@ -34,6 +34,58 @@ _BINDING_COLLECTIONS = {
     "table": "tables",
     "relationship_binding": "relationship_bindings",
     "relationship_binding_path": "relationship_binding_paths",
+}
+
+_AUTHORED_REFERENCE_FIELDS = {
+    "feature": (
+        ("objects", "clinical_object", "owned_by", True),
+        ("temporal_semantics", "temporal_semantic", "has_time_semantic", True),
+        ("aggregations", "aggregation", "has_aggregation", True),
+        ("vocabulary", "vocabulary", "uses_vocabulary", False),
+    ),
+    "clinical_object": (),
+    "semantic_relationship": (
+        ("source_object", "clinical_object", "source_object", False),
+        ("target_object", "clinical_object", "target_object", False),
+        ("temporal_semantics", "temporal_semantic", "has_time_semantic", True),
+    ),
+    "temporal_semantic": (
+        ("objects", "clinical_object", "applies_to_object", True),
+        ("feature_refs", "concept", "represented_by_concept", True),
+        ("relative_to", "temporal_semantic", "relative_to", True),
+    ),
+    "aggregation": (
+        ("source_object", "clinical_object", "source_object", False),
+        ("target_object", "clinical_object", "target_object", False),
+        ("source_concept", "concept", "source_concept", False),
+        ("result_concept", "concept", "result_concept", False),
+        ("semantic_relationships", "semantic_relationship", "uses_relationship", True),
+    ),
+    "guardrail": (
+        ("objects", "clinical_object", "guards_object", True),
+        ("concepts", "concept", "guards_concept", True),
+        ("semantic_relationships", "semantic_relationship", "guards_relationship", True),
+        ("temporal_semantics", "temporal_semantic", "guards_time_semantic", True),
+        ("aggregations", "aggregation", "guards_aggregation", True),
+        ("coverage", "coverage", "guards_coverage", True),
+    ),
+    "feature_binding": (
+        ("concept", "concept", "binds_concept", False),
+        ("vocabulary", "vocabulary", "uses_vocabulary", False),
+    ),
+    "object_binding": (("object", "clinical_object", "binds_object", False),),
+    "relationship_binding": (
+        ("semantic_relationships", "semantic_relationship", "implements_relationship", True),
+    ),
+    "relationship_binding_path": (
+        ("semantic_relationship", "semantic_relationship", "implements_relationship", False),
+        ("relationship_bindings", "relationship_binding", "path_step", True),
+    ),
+    "feature_lineage": (
+        ("output_concept", "concept", "output_concept", False),
+        ("input_concepts", "concept", "input_concept", True),
+        ("input_bindings", "feature_binding", "input_binding", True),
+    ),
 }
 
 
@@ -74,9 +126,27 @@ class GraphEdge:
     source_contribution: str
     origin: Mapping[str, Any] | None
     draft_state: str
+    error: bool = False
+    diagnostics: tuple[Mapping[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        result["diagnostics"] = list(self.diagnostics)
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class AuthoredGraphRecord:
+    """An editable authored contribution overlaid on the effective graph."""
+
+    kind: str
+    identifier: str
+    record: Mapping[str, Any] | None
+    source_pointer: str
+    origin: Mapping[str, Any] | None
+    profile: str | None
+    lifecycle: str | None
+    draft_state: str
 
 
 class GraphIndex:
@@ -88,6 +158,8 @@ class GraphIndex:
         *,
         editable_keys: Iterable[str] = (),
         draft_states: Mapping[str, str] | None = None,
+        authored_overlay: Iterable[AuthoredGraphRecord] = (),
+        diagnostics: Iterable[Mapping[str, Any]] = (),
     ) -> None:
         self._catalog = catalog
         self._editable = frozenset(editable_keys)
@@ -98,6 +170,9 @@ class GraphIndex:
         self._edges_build = edges
         self._build_nodes()
         self._build_edges()
+        overlay = tuple(authored_overlay)
+        if overlay:
+            self._apply_authored_overlay(overlay, tuple(diagnostics))
         unique_edges = {
             (edge.source, edge.target, edge.type, edge.source_pointer): edge
             for edge in edges
@@ -353,6 +428,235 @@ class GraphIndex:
             )
         )
 
+    @staticmethod
+    def _graph_kind(kind: str) -> str:
+        return "concept" if kind == "feature" else kind
+
+    def _apply_authored_overlay(
+        self,
+        records: tuple[AuthoredGraphRecord, ...],
+        diagnostics: tuple[Mapping[str, Any], ...],
+    ) -> None:
+        """Overlay current authored state without constructing an invalid Catalog."""
+
+        owned = {
+            node_key(self._graph_kind(item.kind), item.identifier)
+            for item in records
+        }
+        for item in records:
+            if item.kind != "context":
+                continue
+            baseline = self._catalog.contexts.get(item.identifier)
+            if baseline is not None:
+                owned.update(
+                    node_key("claim", f"{item.identifier}#{claim.id}")
+                    for claim in baseline.claims
+                )
+            if item.record is not None:
+                owned.update(
+                    node_key("claim", f"{item.identifier}#{claim.get('id')}")
+                    for claim in item.record.get("claims", ())
+                    if isinstance(claim, Mapping) and isinstance(claim.get("id"), str)
+                )
+
+        self._edges_build[:] = [
+            edge for edge in self._edges_build if edge.source not in owned
+        ]
+        for key in owned:
+            self._nodes.pop(key, None)
+
+        table_ids = self._table_ids()
+        for item in records:
+            if item.kind == "table" and item.record is not None:
+                table = item.record.get("table")
+                if item.profile and isinstance(table, str):
+                    table_ids[(item.profile, table)] = item.identifier
+        for item in records:
+            if item.record is not None:
+                self._add_authored_node(item)
+                self._build_authored_edges(item, table_ids)
+            else:
+                kind = self._graph_kind(item.kind)
+                key = node_key(kind, item.identifier)
+                self._nodes[key] = GraphNode(
+                    key=key,
+                    identifier=item.identifier,
+                    label=item.identifier,
+                    kind=kind,
+                    origin=item.origin,
+                    profile=item.profile,
+                    lifecycle=item.lifecycle,
+                    editable=False,
+                    draft_state="deleted",
+                    missing=True,
+                )
+
+        for edge in tuple(self._edges_build):
+            if edge.target not in self._nodes:
+                kind, identifier = edge.target.split(":", 1)
+                self._add_node(kind, identifier, identifier, missing=True)
+        self._edges_build[:] = [
+            replace(edge, error=True, diagnostics=diagnostics)
+            if self._nodes[edge.target].missing
+            else edge
+            for edge in self._edges_build
+        ]
+
+    def _add_authored_node(self, item: AuthoredGraphRecord) -> None:
+        kind = self._graph_kind(item.kind)
+        record = item.record or {}
+        key = node_key(kind, item.identifier)
+        self._nodes[key] = GraphNode(
+            key=key,
+            identifier=item.identifier,
+            label=str(
+                record.get("label")
+                or record.get("title")
+                or record.get("summary")
+                or item.identifier
+            ),
+            kind=kind,
+            origin=item.origin,
+            profile=item.profile,
+            lifecycle=item.lifecycle,
+            editable=True,
+            draft_state=item.draft_state,
+        )
+
+    def _authored_edge(
+        self,
+        item: AuthoredGraphRecord,
+        target_kind: str,
+        target_id: Any,
+        edge_type: str,
+        field: str,
+        index: int | None = None,
+        *,
+        source_kind: str | None = None,
+        source_id: str | None = None,
+        source_pointer: str | None = None,
+    ) -> None:
+        if not isinstance(target_id, str):
+            return
+        source = node_key(
+            source_kind or self._graph_kind(item.kind),
+            source_id or item.identifier,
+        )
+        pointer = f"{source_pointer or item.source_pointer}/{field}"
+        if index is not None:
+            pointer += f"/{index}"
+        self._edges_build.append(
+            GraphEdge(
+                source=source,
+                target=node_key(target_kind, target_id),
+                type=edge_type,
+                direction="outgoing",
+                source_pointer=pointer,
+                source_contribution=source,
+                origin=item.origin,
+                draft_state=item.draft_state,
+            )
+        )
+
+    def _authored_many(
+        self, item: AuthoredGraphRecord, target_kind: str, values: Any,
+        edge_type: str, field: str, **source: Any,
+    ) -> None:
+        if isinstance(values, (list, tuple)):
+            for index, value in enumerate(values):
+                self._authored_edge(
+                    item, target_kind, value, edge_type, field, index, **source
+                )
+
+    def _build_authored_edges(
+        self,
+        item: AuthoredGraphRecord,
+        table_ids: Mapping[tuple[str, str], str],
+    ) -> None:
+        record = item.record or {}
+        for field, target_kind, edge_type, is_many in _AUTHORED_REFERENCE_FIELDS.get(item.kind, ()):
+            if is_many:
+                self._authored_many(item, target_kind, record.get(field), edge_type, field)
+            else:
+                self._authored_edge(item, target_kind, record.get(field), edge_type, field)
+        if item.kind not in {"source", "vocabulary", "table", "context"}:
+            self._authored_many(
+                item, "claim", record.get("claim_refs"),
+                "supported_by_claim", "claim_refs",
+            )
+        if item.kind == "coverage":
+            target_kind = record.get("subject_kind")
+            if target_kind == "feature":
+                target_kind = "concept"
+            if isinstance(target_kind, str):
+                self._authored_edge(
+                    item,
+                    target_kind,
+                    record.get("subject"),
+                    "covers_subject",
+                    "subject",
+                )
+        if item.kind == "qualification":
+            subject = record.get("subject")
+            if isinstance(subject, Mapping):
+                target_kind = "concept" if subject.get("kind") == "feature" else subject.get("kind")
+                if isinstance(target_kind, str):
+                    self._authored_edge(
+                        item, target_kind, subject.get("id"),
+                        "qualifies_subject",
+                        "subject/id",
+                    )
+        if item.kind in {"feature_binding", "object_binding"}:
+            table = record.get("table")
+            self._authored_edge(
+                item, "table", table_ids.get((item.profile, table), table),
+                "binds_table", "table",
+            )
+        if item.kind == "relationship_binding":
+            for field, edge_type in (("source", "source_table"), ("target", "target_table")):
+                endpoint = record.get(field)
+                table = endpoint.get("table") if isinstance(endpoint, Mapping) else None
+                self._authored_edge(
+                    item, "table", table_ids.get((item.profile, table), table),
+                    edge_type, f"{field}/table",
+                )
+        if item.kind == "revision":
+            concept_revision = record.get("kind") == "reinterprets_concept"
+            target_kind = "concept" if concept_revision else "feature_binding"
+            original = "original_concept" if concept_revision else "original_binding"
+            replacement_field = "replacement_concept" if concept_revision else "replacement_binding"
+            self._authored_edge(item, target_kind, record.get(original), "revises_original", original)
+            self._authored_edge(item, target_kind, record.get(replacement_field), "selects_replacement", replacement_field)
+        if item.kind == "context":
+            self._authored_many(item, "concept", record.get("related_concepts"), "related_concept", "related_concepts")
+            self._authored_many(item, "semantic_relationship", record.get("related_relationships"), "related_relationship", "related_relationships")
+            for index, table_ref in enumerate(record.get("related_tables", ())):
+                if not isinstance(table_ref, Mapping):
+                    continue
+                profile = table_ref.get("profile")
+                table = table_ref.get("table")
+                target = table_ids.get((profile, table), table_ref.get("id") or table)
+                self._authored_edge(
+                    item, "table", target, "related_table", "related_tables", index
+                )
+            for index, claim in enumerate(record.get("claims", ())):
+                if not isinstance(claim, Mapping) or not isinstance(claim.get("id"), str):
+                    continue
+                claim_id = f"{item.identifier}#{claim['id']}"
+                claim_item = AuthoredGraphRecord(
+                    kind="claim", identifier=claim_id, record=claim,
+                    source_pointer=f"{item.source_pointer}/claims/{index}",
+                    origin=item.origin, profile=item.profile,
+                    lifecycle=item.lifecycle, draft_state=item.draft_state,
+                )
+                self._add_authored_node(claim_item)
+                self._authored_edge(item, "claim", claim_id, "contains_claim", "claims", index)
+                self._authored_many(
+                    item, "source", claim.get("sources"), "supported_by_source", "sources",
+                    source_kind="claim", source_id=claim_id,
+                    source_pointer=claim_item.source_pointer,
+                )
+
     def _many(
         self,
         source_kind: str,
@@ -495,9 +799,15 @@ def build_graph(
     *,
     editable_keys: Iterable[str] = (),
     draft_states: Mapping[str, str] | None = None,
+    authored_overlay: Iterable[AuthoredGraphRecord] = (),
+    diagnostics: Iterable[Mapping[str, Any]] = (),
 ) -> GraphIndex:
     """Convenience factory used by the curator session."""
 
     return GraphIndex(
-        catalog, editable_keys=editable_keys, draft_states=draft_states
+        catalog,
+        editable_keys=editable_keys,
+        draft_states=draft_states,
+        authored_overlay=authored_overlay,
+        diagnostics=diagnostics,
     )
