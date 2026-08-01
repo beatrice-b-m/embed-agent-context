@@ -594,6 +594,21 @@ _RELATIONSHIP_BINDING_PATH_KEYS = frozenset(
 class CatalogError(Exception):
     """Base class for catalog failures safe to present to callers."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        stage: str | None = None,
+        document: str | Path | None = None,
+        json_pointer: str | None = None,
+        contribution_key: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.document = str(document) if document is not None else None
+        self.json_pointer = json_pointer
+        self.contribution_key = contribution_key
+
 
 class CatalogLoadError(CatalogError):
     """The catalog could not be read or decoded."""
@@ -6057,6 +6072,53 @@ def default_catalog_path() -> Path:
     return installed_manifest if installed_manifest.is_file() else package_directory / "_data" / "catalog.json"
 
 
+@dataclass(frozen=True, slots=True)
+class _ResolvedDocument:
+    """Immutable authored input retained by the canonical catalog resolver."""
+
+    kind: str
+    locator_kind: str
+    source_path: Path
+    source_bytes: bytes
+    source_digest: str
+    mapping: Mapping[str, Any]
+    schema_resource: str
+    module_id: str | None = None
+    version: str | None = None
+    lifecycle_status: str | None = None
+    target_profile: str | None = None
+    dependency_order: int | None = None
+
+    def mutable_mapping(self) -> dict[str, Any]:
+        """Return an isolated JSON-compatible copy for draft editing."""
+
+        return _mutable_json(self.mapping)
+
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedComposition:
+    """Validated authored snapshots and their effective query catalog."""
+
+    documents: tuple[_ResolvedDocument, ...]
+    catalog: Catalog
+    configuration_fingerprint: str | None
+
+    def document_for_path(self, path: str | Path) -> _ResolvedDocument:
+        candidate = Path(path).resolve()
+        matches = tuple(
+            document
+            for document in self.documents
+            if document.source_path.resolve() == candidate
+        )
+        if len(matches) != 1:
+            raise CatalogValidationError(
+                f"resolved path {path} identifies {len(matches)} loaded documents",
+                stage="composition",
+                document=path,
+            )
+        return matches[0]
+
+
 def load_catalog(
     catalog_set: str | Path | None = None,
     *,
@@ -6072,15 +6134,50 @@ def load_catalog(
     deterministic interpretation.
     """
 
+    return _resolve_catalog(
+        catalog_set,
+        profile_paths=profile_paths,
+        extension_paths=extension_paths,
+        include_default_profiles=include_default_profiles,
+        include_default_extensions=include_default_extensions,
+    ).catalog
+
+
+def _resolve_catalog(
+    catalog_set: str | Path | None = None,
+    *,
+    profile_paths: Sequence[str | Path] | None = None,
+    extension_paths: Sequence[str | Path] | None = None,
+    include_default_profiles: bool = True,
+    include_default_extensions: bool = False,
+) -> _ResolvedComposition:
+    """Resolve authored inputs once and retain immutable validated snapshots."""
+
     catalog_path = default_catalog_path() if catalog_set is None else Path(catalog_set)
-    value = _read_json_document(catalog_path)
+    root_locator_kind = "bundled" if catalog_set is None else "explicit"
+    value, source_bytes = _read_json_document_with_bytes(catalog_path)
+    documents: list[_ResolvedDocument] = []
     if "schema_version" in value:
         if profile_paths or extension_paths:
             raise CatalogValidationError(
-                "legacy schema-v6 catalogs cannot be composed with module files"
+                "legacy schema-v6 catalogs cannot be composed with module files",
+                stage="composition",
+                document=catalog_path,
             )
         _validate_json_schema(value, catalog_path, _schema_path_for("catalog.schema.json"))
-        return Catalog.from_mapping(value)
+        document = _resolved_document(
+            "legacy", root_locator_kind, catalog_path, source_bytes, value,
+            "catalog.schema.json",
+        )
+        try:
+            catalog = Catalog.from_mapping(value)
+        except CatalogValidationError as exc:
+            if exc.stage is None:
+                exc.stage = "domain"
+            if exc.document is None:
+                exc.document = str(catalog_path)
+            raise
+        return _ResolvedComposition((document,), catalog, None)
     if "semantic_schema_version" in value:
         _validate_json_schema(
             value,
@@ -6088,47 +6185,219 @@ def load_catalog(
             _schema_path_for("semantic/catalog.schema.json"),
         )
         semantic = value
+        documents.append(
+            _resolved_document(
+                "semantic", root_locator_kind, catalog_path, source_bytes, value,
+                "semantic/catalog.schema.json",
+            )
+        )
         manifest = None
-        manifest_path = catalog_path
-        default_profiles: list[Path] = []
-        default_extensions: list[Path] = []
+        default_profiles: list[tuple[Path, str]] = []
+        default_extensions: list[tuple[Path, str]] = []
     elif "catalog_set_schema_version" in value:
         manifest = value
         manifest_path = catalog_path
         _validate_json_schema(manifest, manifest_path, _schema_path_for("catalog-set.schema.json"))
-        semantic_path = _resolve_locator(manifest["semantic_catalog"], manifest_path, "semantic_catalog")
-        semantic = _read_and_validate_module(semantic_path, "semantic/catalog.schema.json")
-        default_profiles = [_resolve_locator(item, manifest_path, f"profiles[{index}]") for index, item in enumerate(manifest["profiles"])] if include_default_profiles else []
-        default_extensions = [_resolve_locator(item, manifest_path, f"extensions[{index}]") for index, item in enumerate(manifest["extensions"])] if include_default_extensions else []
+        documents.append(
+            _resolved_document(
+                "manifest", root_locator_kind, catalog_path, source_bytes, value,
+                "catalog-set.schema.json",
+            )
+        )
+        semantic_path, semantic_locator = _resolve_locator_details(
+            manifest["semantic_catalog"], manifest_path, "semantic_catalog"
+        )
+        semantic, semantic_bytes = _read_and_validate_module_with_bytes(
+            semantic_path, "semantic/catalog.schema.json"
+        )
+        documents.append(
+            _resolved_document(
+                "semantic", semantic_locator, semantic_path, semantic_bytes,
+                semantic, "semantic/catalog.schema.json",
+            )
+        )
+        default_profiles = [
+            _resolve_locator_details(item, manifest_path, f"profiles[{index}]")
+            for index, item in enumerate(manifest["profiles"])
+        ] if include_default_profiles else []
+        default_extensions = [
+            _resolve_locator_details(item, manifest_path, f"extensions[{index}]")
+            for index, item in enumerate(manifest["extensions"])
+        ] if include_default_extensions else []
     else:
-        raise CatalogValidationError(f"{catalog_path}: unknown catalog document discriminator")
-    profiles = [_read_and_validate_module(path, "profiles/profile.schema.json") for path in (*default_profiles, *(Path(p) for p in profile_paths or ()))]
-    extensions = [_read_and_validate_module(path, "extensions/extension.schema.json") for path in (*default_extensions, *(Path(p) for p in extension_paths or ()))]
-    return _compose_catalog(semantic, profiles, extensions, manifest)
+        raise CatalogValidationError(
+            f"{catalog_path}: unknown catalog document discriminator",
+            stage="composition",
+            document=catalog_path,
+            json_pointer="$",
+        )
+    profile_inputs = (*default_profiles, *((Path(p), "explicit") for p in profile_paths or ()))
+    extension_inputs = (*default_extensions, *((Path(p), "explicit") for p in extension_paths or ()))
+    profiles: list[Mapping[str, Any]] = []
+    for path, locator_kind in profile_inputs:
+        mapping, module_bytes = _read_and_validate_module_with_bytes(
+            path, "profiles/profile.schema.json"
+        )
+        profiles.append(mapping)
+        documents.append(
+            _resolved_document(
+                "profile", locator_kind, path, module_bytes, mapping,
+                "profiles/profile.schema.json",
+            )
+        )
+    extensions: list[Mapping[str, Any]] = []
+    for path, locator_kind in extension_inputs:
+        mapping, module_bytes = _read_and_validate_module_with_bytes(
+            path, "extensions/extension.schema.json"
+        )
+        extensions.append(mapping)
+        documents.append(
+            _resolved_document(
+                "extension", locator_kind, path, module_bytes, mapping,
+                "extensions/extension.schema.json",
+            )
+        )
+    catalog = _compose_resolved_inputs(semantic, profiles, extensions, manifest)
+    extension_order = {
+        identifier: index
+        for index, identifier in enumerate(
+            _extension_order({str(doc["extension"]["id"]): doc for doc in extensions})
+        )
+    }
+    documents = [
+        _with_dependency_order(document, extension_order)
+        for document in documents
+    ]
+    fingerprint = catalog.configuration.get("configuration_fingerprint")
+    return _ResolvedComposition(
+        tuple(documents), catalog, str(fingerprint) if fingerprint else None
+    )
+
+
+def _replace_resolved_document(
+    composition: _ResolvedComposition,
+    document: _ResolvedDocument,
+    replacement: Mapping[str, Any],
+    *,
+    source_bytes: bytes | None = None,
+) -> _ResolvedComposition:
+    """Validate and compose one in-memory authored-document replacement."""
+
+    if document not in composition.documents:
+        raise CatalogValidationError(
+            "replacement target is not part of the resolved composition",
+            stage="local",
+            document=document.source_path,
+        )
+    if document.kind not in {"semantic", "profile", "extension"}:
+        raise CatalogValidationError(
+            f"{document.kind} documents cannot be replaced in memory",
+            stage="local",
+            document=document.source_path,
+        )
+    replacement_copy = _mutable_json(replacement)
+    _validate_json_schema(
+        replacement_copy,
+        document.source_path,
+        _schema_path_for(document.schema_resource),
+    )
+    replacement_bytes = source_bytes
+    if replacement_bytes is None:
+        replacement_bytes = (
+            json.dumps(replacement_copy, indent=2, ensure_ascii=False) + "\n"
+        ).encode("utf-8")
+    replacement_document = _resolved_document(
+        document.kind,
+        document.locator_kind,
+        document.source_path,
+        replacement_bytes,
+        replacement_copy,
+        document.schema_resource,
+    )
+    documents = tuple(
+        replacement_document if item is document else item
+        for item in composition.documents
+    )
+    semantic = next(
+        _mutable_json(item.mapping) for item in documents if item.kind == "semantic"
+    )
+    profiles = [
+        _mutable_json(item.mapping) for item in documents if item.kind == "profile"
+    ]
+    extensions = [
+        _mutable_json(item.mapping) for item in documents if item.kind == "extension"
+    ]
+    manifest_document = next(
+        (item for item in documents if item.kind == "manifest"), None
+    )
+    manifest = (
+        _mutable_json(manifest_document.mapping)
+        if manifest_document is not None else None
+    )
+    try:
+        catalog = _compose_catalog(semantic, profiles, extensions, manifest)
+    except CatalogValidationError as exc:
+        if exc.stage is None:
+            exc.stage = "composition"
+        if exc.document is None:
+            exc.document = str(document.source_path)
+        raise
+    order = {
+        identifier: index
+        for index, identifier in enumerate(
+            _extension_order({str(doc["extension"]["id"]): doc for doc in extensions})
+        )
+    }
+    documents = tuple(_with_dependency_order(item, order) for item in documents)
+    fingerprint = catalog.configuration.get("configuration_fingerprint")
+    return _ResolvedComposition(
+        documents, catalog, str(fingerprint) if fingerprint else None
+    )
 
 
 def _read_json_document(catalog_path: Path) -> Mapping[str, Any]:
+    value, _ = _read_json_document_with_bytes(catalog_path)
+    return value
+
+
+def _read_json_document_with_bytes(
+    catalog_path: Path,
+) -> tuple[Mapping[str, Any], bytes]:
     try:
-        text = catalog_path.read_text(encoding="utf-8")
+        source_bytes = catalog_path.read_bytes()
     except OSError as exc:
         raise CatalogLoadError(
-            f"could not read catalog {catalog_path}: {exc}"
+            f"could not read catalog {catalog_path}: {exc}",
+            stage="json_decode",
+            document=catalog_path,
         ) from exc
     try:
+        text = source_bytes.decode("utf-8")
         value = json.loads(
             text,
             object_pairs_hook=_object_without_duplicate_keys,
             parse_constant=_reject_json_constant,
         )
-    except CatalogValidationError:
+    except CatalogValidationError as exc:
+        if exc.stage is None:
+            exc.stage = "json_decode"
+        if exc.document is None:
+            exc.document = str(catalog_path)
         raise
     except (json.JSONDecodeError, UnicodeError) as exc:
         raise CatalogLoadError(
-            f"could not decode catalog {catalog_path}: {exc}"
+            f"could not decode catalog {catalog_path}: {exc}",
+            stage="json_decode",
+            document=catalog_path,
         ) from exc
     if not isinstance(value, Mapping):
-        raise CatalogValidationError(f"{catalog_path}: $ must be a JSON object")
-    return value
+        raise CatalogValidationError(
+            f"{catalog_path}: $ must be a JSON object",
+            stage="json_decode",
+            document=catalog_path,
+            json_pointer="$",
+        )
+    return value, source_bytes
 
 
 def _schema_path_for(resource: str) -> Path:
@@ -6146,9 +6415,16 @@ def _schema_path_for(resource: str) -> Path:
 
 
 def _read_and_validate_module(path: Path, schema_resource: str) -> Mapping[str, Any]:
-    value = _read_json_document(path)
-    _validate_json_schema(value, path, _schema_path_for(schema_resource))
+    value, _ = _read_and_validate_module_with_bytes(path, schema_resource)
     return value
+
+
+def _read_and_validate_module_with_bytes(
+    path: Path, schema_resource: str
+) -> tuple[Mapping[str, Any], bytes]:
+    value, source_bytes = _read_json_document_with_bytes(path)
+    _validate_json_schema(value, path, _schema_path_for(schema_resource))
+    return value, source_bytes
 
 
 def _validate_json_schema(value: Mapping[str, Any], document_path: Path, schema_path: Path) -> None:
@@ -6159,10 +6435,85 @@ def _validate_json_schema(value: Mapping[str, Any], document_path: Path, schema_
         raise CatalogLoadError(f"could not load schema {schema_path}: {exc}") from exc
     except jsonschema.ValidationError as exc:
         pointer = "$" + "".join(f"[{part}]" if isinstance(part, int) else f".{part}" for part in exc.absolute_path)
-        raise CatalogValidationError(f"{document_path}: {pointer}: {exc.message}") from exc
+        raise CatalogValidationError(
+            f"{document_path}: {pointer}: {exc.message}",
+            stage="json_schema",
+            document=document_path,
+            json_pointer=pointer,
+            contribution_key=_schema_contribution_key(value, exc.absolute_path),
+        ) from exc
+
+
+def _schema_contribution_key(
+    document: Mapping[str, Any], path: Sequence[object]
+) -> str | None:
+    """Identify the authored record containing a schema error when possible."""
+
+    parts = tuple(path)
+    registry_kinds = {
+        "clinical_objects": "clinical_object",
+        "concepts": "concept",
+        "semantic_relationships": "semantic_relationship",
+        "temporal_semantics": "temporal_semantic",
+        "aggregations": "aggregation",
+        "guardrails": "guardrail",
+        "coverage": "coverage",
+        "vocabularies": "vocabulary",
+        "sources": "source",
+        "contexts": "context",
+        "qualifications": "qualification",
+        "feature_lineage": "feature_lineage",
+    }
+    offset = 0
+    if len(parts) >= 1 and parts[0] == "semantic_additions":
+        offset = 1
+    if len(parts) >= offset + 2:
+        collection = parts[offset]
+        identifier = parts[offset + 1]
+        if collection in registry_kinds and isinstance(identifier, str):
+            return f"{registry_kinds[str(collection)]}:{identifier}"
+    binding_offset = 0
+    if parts[:1] in (("profile_binding",), ("binding_additions",)):
+        binding_offset = 1
+    if len(parts) >= binding_offset + 2:
+        collection = parts[binding_offset]
+        index = parts[binding_offset + 1]
+        if (
+            collection in {
+                "feature_bindings",
+                "object_bindings",
+                "tables",
+                "relationship_bindings",
+                "relationship_binding_paths",
+            }
+            and isinstance(index, int)
+        ):
+            try:
+                container = document
+                if binding_offset:
+                    container = container[str(parts[0])]
+                record = container[str(collection)][index]
+                identifier = record.get("id")
+            except (KeyError, IndexError, TypeError, AttributeError):
+                return None
+            return f"binding:{identifier}" if identifier else None
+    if len(parts) >= 2 and parts[0] == "revisions" and isinstance(parts[1], int):
+        try:
+            identifier = document["revisions"][parts[1]].get("id")
+        except (KeyError, IndexError, TypeError, AttributeError):
+            return None
+        return f"revision:{identifier}" if identifier else None
+    return None
 
 
 def _resolve_locator(locator: object, manifest_path: Path, field: str) -> Path:
+    path, _ = _resolve_locator_details(locator, manifest_path, field)
+    return path
+
+
+def _resolve_locator_details(
+    locator: object, manifest_path: Path, field: str
+) -> tuple[Path, str]:
     data = _expect_mapping(locator, f"$.{field}")
     if data.get("kind") == "file":
         path = Path(str(data["path"]))
@@ -6170,7 +6521,7 @@ def _resolve_locator(locator: object, manifest_path: Path, field: str) -> Path:
             raise CatalogValidationError(
                 f"{manifest_path}: $.{field}.path must be relative to its manifest"
             )
-        return manifest_path.parent / path
+        return manifest_path.parent / path, "file"
     if data.get("kind") == "bundled":
         root = Path(__file__).resolve().parent.parent / "catalog"
         installed = Path(__file__).resolve().parent / "_data"
@@ -6181,8 +6532,103 @@ def _resolve_locator(locator: object, manifest_path: Path, field: str) -> Path:
                 "package-relative path"
             )
         candidate = root / resource
-        return candidate if candidate.is_file() else installed / resource
+        return (candidate if candidate.is_file() else installed / resource), "bundled"
     raise CatalogValidationError(f"{manifest_path}: $.{field}.kind is not a supported locator")
+
+
+def _resolved_document(
+    kind: str,
+    locator_kind: str,
+    source_path: Path,
+    source_bytes: bytes,
+    mapping: Mapping[str, Any],
+    schema_resource: str,
+) -> _ResolvedDocument:
+    module_id: str | None = None
+    version: str | None = None
+    lifecycle_status: str | None = None
+    target_profile: str | None = None
+    if kind == "semantic":
+        module_id = "semantic"
+    elif kind == "profile":
+        profile = mapping["profile"]
+        module_id = str(profile["id"])
+        version = str(profile["version"]) if profile.get("version") is not None else None
+        lifecycle_status = (
+            str(profile["lifecycle_status"])
+            if profile.get("lifecycle_status") is not None else None
+        )
+        target_profile = module_id
+    elif kind == "extension":
+        extension = mapping["extension"]
+        module_id = str(extension["id"])
+        version = str(extension["version"])
+        lifecycle_status = str(extension["lifecycle_status"])
+        target_profile = str(mapping["applies_to"]["profile"])
+    return _ResolvedDocument(
+        kind=kind,
+        locator_kind=locator_kind,
+        source_path=source_path,
+        source_bytes=source_bytes,
+        source_digest="sha256:" + hashlib.sha256(source_bytes).hexdigest(),
+        mapping=_freeze_json(mapping),
+        schema_resource=schema_resource,
+        module_id=module_id,
+        version=version,
+        lifecycle_status=lifecycle_status,
+        target_profile=target_profile,
+    )
+
+
+def _with_dependency_order(
+    document: _ResolvedDocument, order: Mapping[str, int]
+) -> _ResolvedDocument:
+    if document.kind != "extension" or document.module_id not in order:
+        return document
+    return _ResolvedDocument(
+        kind=document.kind,
+        locator_kind=document.locator_kind,
+        source_path=document.source_path,
+        source_bytes=document.source_bytes,
+        source_digest=document.source_digest,
+        mapping=document.mapping,
+        schema_resource=document.schema_resource,
+        module_id=document.module_id,
+        version=document.version,
+        lifecycle_status=document.lifecycle_status,
+        target_profile=document.target_profile,
+        dependency_order=order[document.module_id],
+    )
+
+
+def _freeze_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): _freeze_json(item) for key, item in value.items()})
+    if isinstance(value, list | tuple):
+        return tuple(_freeze_json(item) for item in value)
+    return value
+
+
+def _mutable_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _mutable_json(item) for key, item in value.items()}
+    if isinstance(value, tuple | list):
+        return [_mutable_json(item) for item in value]
+    return value
+
+
+def _compose_resolved_inputs(
+    semantic: Mapping[str, Any],
+    profiles: Sequence[Mapping[str, Any]],
+    extensions: Sequence[Mapping[str, Any]],
+    manifest: Mapping[str, Any] | None,
+) -> Catalog:
+    try:
+        return _compose_catalog(semantic, profiles, extensions, manifest)
+    except CatalogValidationError as exc:
+        if exc.stage is None:
+            exc.stage = "composition"
+        raise
 
 
 def _compose_catalog(semantic: Mapping[str, Any], profile_docs: Sequence[Mapping[str, Any]], extension_docs: Sequence[Mapping[str, Any]], manifest: Mapping[str, Any] | None) -> Catalog:
@@ -6273,7 +6719,12 @@ def _compose_catalog(semantic: Mapping[str, Any], profile_docs: Sequence[Mapping
         _collect_revisions(doc, origin, revisions, merged, binding_owner, set(doc["requires"]["extensions"]) | {"profile"})
     _validate_revision_graph(revisions)
     _prepare_binding_revisions(merged, revisions)
-    catalog = Catalog.from_mapping(merged, _allow_empty_profiles=True)
+    try:
+        catalog = Catalog.from_mapping(merged, _allow_empty_profiles=True)
+    except CatalogValidationError as exc:
+        if exc.stage is None:
+            exc.stage = "domain"
+        raise
     fingerprint_content = {"semantic": semantic, "profiles": [profile_by_id[key] for key in sorted(profile_by_id)], "extensions": [extension_by_id[key] for key in sorted(extension_by_id)]}
     fingerprint = hashlib.sha256(json.dumps(fingerprint_content, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
     return Catalog(clinical_objects=catalog.clinical_objects, concepts=catalog.concepts, semantic_relationships=catalog.semantic_relationships, temporal_semantics=catalog.temporal_semantics, aggregations=catalog.aggregations, guardrails=catalog.guardrails, coverage=catalog.coverage, vocabularies=catalog.vocabularies, sources=catalog.sources, contexts=catalog.contexts, profile_bindings=catalog.profile_bindings, schema_version=7, origins=origins, qualifications=qualifications, revisions=revisions, feature_lineage=feature_lineage, configuration={"semantic_schema_version": 7, "profiles": sorted(profile_by_id), "profile_schema_versions": {key: profile_by_id[key]["profile_schema_version"] for key in sorted(profile_by_id)}, "extension_schema_versions": {key: extension_by_id[key]["extension_schema_version"] for key in order}, "extensions": [{"id": key, "version": extension_by_id[key]["extension"]["version"]} for key in order], "configuration_fingerprint": f"sha256:{fingerprint}", "manifest": "catalog-set" if manifest is not None else None})

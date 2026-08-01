@@ -14,6 +14,7 @@ from embed_context import (
     CatalogValidationError,
     load_catalog,
 )
+from embed_context.catalog import _replace_resolved_document, _resolve_catalog
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -191,6 +192,146 @@ class CatalogCompositionTests(unittest.TestCase):
         legacy = load_catalog(LEGACY_PATH)
         self.assertEqual(legacy.schema_version, 6)
         self.assertEqual(legacy.profiles, ("open-v2",))
+
+    def test_resolver_retains_immutable_authored_snapshots(self) -> None:
+        resolved = _resolve_catalog()
+        loaded = load_catalog()
+
+        self.assertEqual(
+            resolved.catalog.configuration,
+            loaded.configuration,
+        )
+        self.assertEqual(
+            resolved.catalog.discover("absent pathology", limit=3),
+            loaded.discover("absent pathology", limit=3),
+        )
+        self.assertEqual(
+            [document.kind for document in resolved.documents],
+            ["manifest", "semantic", "profile"],
+        )
+        self.assertTrue(
+            all(document.locator_kind == "bundled" for document in resolved.documents)
+        )
+        for document in resolved.documents:
+            self.assertEqual(
+                document.source_bytes,
+                document.source_path.read_bytes(),
+            )
+            self.assertRegex(document.source_digest, r"^sha256:[0-9a-f]{64}$")
+            with self.assertRaises(TypeError):
+                document.mapping["new"] = "not mutable"
+
+    def test_manifest_file_and_explicit_module_locator_kinds_are_retained(self) -> None:
+        semantic_path = write_json(
+            self.directory / "modules/semantic.json", read_json(SEMANTIC_PATH)
+        )
+        profile_path = write_json(
+            self.directory / "modules/profile.json", read_json(OPEN_PROFILE_PATH)
+        )
+        manifest_path = write_json(
+            self.directory / "catalog-set.json",
+            {
+                "$schema": "./catalog-set.schema.json",
+                "catalog_set_schema_version": 1,
+                "semantic_catalog": {
+                    "kind": "file",
+                    "path": "modules/semantic.json",
+                },
+                "profiles": [
+                    {"kind": "file", "path": "modules/profile.json"}
+                ],
+                "extensions": [],
+            },
+        )
+        explicit_profile = write_json(
+            self.directory / "explicit.json", renamed_profile("second-v2")
+        )
+
+        resolved = _resolve_catalog(
+            manifest_path,
+            profile_paths=[explicit_profile],
+        )
+
+        self.assertEqual(
+            [(item.kind, item.locator_kind) for item in resolved.documents],
+            [
+                ("manifest", "explicit"),
+                ("semantic", "file"),
+                ("profile", "file"),
+                ("profile", "explicit"),
+            ],
+        )
+        self.assertIs(
+            resolved.document_for_path(profile_path), resolved.documents[2]
+        )
+
+    def test_in_memory_replacement_reuses_resolved_inputs_without_duplicates(self) -> None:
+        extension_path = write_json(
+            self.directory / "extension.json", empty_extension("project.draft")
+        )
+        resolved = _resolve_catalog(
+            SEMANTIC_PATH,
+            profile_paths=[OPEN_PROFILE_PATH],
+            extension_paths=[extension_path],
+        )
+        extension_document = resolved.document_for_path(extension_path)
+        replacement = read_json(extension_path)
+        replacement["extension"]["label"] = "Updated in memory"
+
+        updated = _replace_resolved_document(
+            resolved, extension_document, replacement
+        )
+
+        self.assertEqual(len(updated.documents), len(resolved.documents))
+        self.assertEqual(updated.catalog.profiles, ("open-v2",))
+        self.assertNotEqual(
+            updated.configuration_fingerprint,
+            resolved.configuration_fingerprint,
+        )
+        self.assertEqual(
+            resolved.document_for_path(extension_path).mapping["extension"]["label"],
+            "Synthetic extension project.draft",
+        )
+        self.assertEqual(
+            updated.document_for_path(extension_path).mapping["extension"]["label"],
+            "Updated in memory",
+        )
+
+    def test_loader_diagnostics_add_structure_without_changing_messages(self) -> None:
+        invalid = empty_extension("project.invalid")
+        invalid["unexpected"] = True
+        invalid_path = write_json(self.directory / "invalid.json", invalid)
+
+        with self.assertRaises(CatalogValidationError) as caught:
+            _resolve_catalog(
+                SEMANTIC_PATH,
+                profile_paths=[OPEN_PROFILE_PATH],
+                extension_paths=[invalid_path],
+            )
+        error = caught.exception
+        self.assertIn("was unexpected", str(error))
+        self.assertEqual(error.stage, "json_schema")
+        self.assertEqual(error.document, str(invalid_path))
+        self.assertEqual(error.json_pointer, "$")
+        self.assertIsNone(error.contribution_key)
+
+        valid_path = write_json(
+            self.directory / "valid.json", empty_extension("project.valid")
+        )
+        resolved = _resolve_catalog(
+            SEMANTIC_PATH,
+            profile_paths=[OPEN_PROFILE_PATH],
+            extension_paths=[valid_path],
+        )
+        document = resolved.document_for_path(valid_path)
+        replacement = read_json(valid_path)
+        replacement["applies_to"]["profile"] = "missing-profile"
+        with self.assertRaises(CatalogValidationError) as caught:
+            _replace_resolved_document(resolved, document, replacement)
+        error = caught.exception
+        self.assertIn("targets unloaded profile", str(error))
+        self.assertEqual(error.stage, "composition")
+        self.assertEqual(error.document, str(valid_path))
 
     def test_default_open_v2_is_normalized_against_frozen_v6_fixture(self) -> None:
         split = load_catalog()
