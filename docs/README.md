@@ -34,6 +34,10 @@ ask a clinical question with `embed-context discover`
 - [Architecture v6](architecture-v6.md) explains why portable clinical meaning
   is separate from occurrence-aware release bindings and how query results
   surface applicable constraints.
+- [Profile-module migration](profile-module-migration.md) assesses the current
+  Open V2 coupling and defines the proposed schema-v7 catalog-set migration for
+  independently loadable public and internal profiles. Schema v6 remains the
+  active contract until that staged migration lands.
 - [Architecture v5](architecture-v5.md) preserves the preceding schema-v5
   design as history.
 - The README's [AI client section](../README.md#connect-an-ai-client) shows
