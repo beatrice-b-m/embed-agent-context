@@ -213,7 +213,7 @@ exam accession.
 
 ## Use the Python API
 
-The dependency-free Python package exposes the same validated catalog:
+The Python package exposes the same validated, composable catalog set:
 
 ```python
 from embed_context import load_catalog
@@ -228,6 +228,31 @@ guardrail = catalog.get_guardrail(
     "guardrail.null-pathology-not-negative"
 )
 ```
+
+The no-argument loader selects the bundled portable semantic catalog and the
+public `open-v2` profile, with no project extensions. External profile and
+extension modules are explicit and are never searched for automatically:
+
+```python
+catalog = load_catalog(
+    profile_paths=["profiles/internal-working.json"],
+    extension_paths=["project-configs/derived-features.json"],
+    include_default_profiles=False,
+)
+```
+
+The CLI and MCP entry points expose the same composition controls with
+repeatable `--profile-file` and `--extension-file` options. Use
+`--no-default-profiles` to omit manifest-selected profiles and
+`--include-default-extensions` to opt into extensions selected by a custom
+manifest. Feature and code lookup accept `--profile` when several loaded
+profiles make vocabulary resolution ambiguous.
+
+Query results retain contribution origins, so portable meaning, released
+profile representation, and project-owned content remain distinguishable.
+Profile and extension qualifications add applicable evidence and caveats
+without mutating portable records; typed extension revisions keep original and
+replacement records directly addressable.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal
@@ -286,8 +311,10 @@ The version numbers describe different things:
 
 | Axis | Current value |
 | --- | --- |
-| Software package and commands | `0.7.0` |
-| Serialized catalog schema | `6` |
+| Software package and commands | `0.8.0` |
+| Semantic catalog schema | `7` |
+| Profile-module schema | `1` |
+| Extension-module schema | `1` |
 | Registered EMBED V2 physical profile | `open-v2` |
 | Optional MCP SDK dependency | `2.0.0` |
 
@@ -298,8 +325,12 @@ The version numbers describe different things:
   clinical graph and interpretation limits.
 - [Catalog format](docs/catalog-format.md) — integrate with the serialized
   model or Python, CLI, and MCP interfaces.
-- [Architecture v6](docs/architecture-v6.md) — understand portable meaning,
-  occurrence-aware bindings, composed paths, and query-time constraints.
+- [Architecture v7](docs/architecture-v7.md) — understand the current
+  composable catalog-set architecture and effective query view.
+- [Profile-module migration](docs/profile-module-migration.md) — review the
+  full design and migration record for profiles and project extensions.
+- [Architecture v6](docs/architecture-v6.md) — review the preceding monolithic
+  schema-v6 architecture.
 - [Contributing](CONTRIBUTING.md) — set up a development environment and make
   catalog or code changes safely.
 

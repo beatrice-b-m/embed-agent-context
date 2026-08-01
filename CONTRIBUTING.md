@@ -21,9 +21,11 @@ This setup and the baseline test suite need no EMBED data. Read
 
 ## Canonical sources
 
-- `catalog/catalog.json` is the canonical semantic content and physical
-  binding inventory.
-- `catalog/catalog.schema.json` is the standalone JSON Schema shape contract.
+- `catalog/semantic/catalog.json` is the canonical portable semantic content.
+- `catalog/profiles/open-v2.json` is the canonical Open V2 evidence, coverage,
+  vocabulary, qualification, and physical-binding inventory.
+- `catalog/catalog-set.json` selects bundled defaults; each document type has
+  a standalone version-matched JSON Schema shape contract.
 - `embed_context/catalog.py` adds strict semantic, cross-reference, scope, and
   profile invariants that JSON Schema cannot express.
 - Human-facing Markdown is manually synchronized explanatory material. It is
@@ -58,9 +60,9 @@ Suppose a review establishes a new timestamp meaning.
    binding-specific value or null meaning, instance identity for bounded
    clinical identity, and relationship-binding paths for supported multi-edge
    routes. Record join hazards and unsupported coverage explicitly.
-6. Change `catalog.schema.json` only when the serialized shape or invariant
-   expressible in JSON Schema changes. Keep runtime and schema validators in
-   parity.
+6. Change the applicable semantic, profile, extension, or manifest schema only
+   when its serialized shape or an expressible invariant changes. Keep runtime
+   and schema validators in parity.
 7. Add focused synthetic unit tests, checked-in catalog acceptance assertions,
    and interface tests for every changed CLI, Python, or MCP surface.
 8. Synchronize README, format, architecture, and agent instructions affected

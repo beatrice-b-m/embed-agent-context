@@ -31,14 +31,15 @@ ask a clinical question with `embed-context discover`
 
 - [Catalog format](catalog-format.md) documents the serialized records,
   validation rules, result envelopes, and Python, CLI, and MCP interfaces.
-- [Architecture v6](architecture-v6.md) explains why portable clinical meaning
-  is separate from occurrence-aware release bindings and how query results
-  surface applicable constraints.
-- [Profile-module migration](profile-module-migration.md) assesses the current
-  Open V2 coupling and defines the proposed schema-v7 catalog-set migration for
-  independently loadable public and internal profiles plus layered project
-  extensions for work-in-progress features. Schema v6 remains the active
-  contract until that staged migration lands.
+- [Architecture v7](architecture-v7.md) explains the current catalog-set
+  composition, module boundaries, deterministic loading, and effective query
+  view.
+- [Architecture v6](architecture-v6.md) preserves the preceding monolithic
+  schema-v6 architecture as history.
+- [Profile-module migration](profile-module-migration.md) records the design and
+  implementation contract for the schema-v7 catalog set: independently
+  loadable public and internal profiles plus layered project extensions for
+  work-in-progress features.
 - [Architecture v5](architecture-v5.md) preserves the preceding schema-v5
   design as history.
 - The README's [AI client section](../README.md#connect-an-ai-client) shows
@@ -52,9 +53,11 @@ that guide are intentionally development-only; installed users invoke
 `embed-context` directly.
 
 [Project scope and authoring requirements](project-scope.md) is the normative
-content and safety policy. `catalog/catalog.json` is the canonical content
-source and `catalog/catalog.schema.json` is its structural contract. Markdown
-explains those sources but does not override them.
+content and safety policy. `catalog/semantic/catalog.json` is the portable
+semantic source, `catalog/profiles/open-v2.json` owns the released Open V2
+representation, and `catalog/catalog-set.json` selects bundled defaults. Their
+version-matched JSON Schemas are structural contracts. Markdown explains those
+sources but does not override them.
 
 ## Review evidence
 
