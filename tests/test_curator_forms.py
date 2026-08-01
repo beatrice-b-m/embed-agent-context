@@ -178,18 +178,38 @@ class CuratorStaticContractTests(unittest.TestCase):
             with self.subTest(contract=contract):
                 self.assertIn(contract, javascript)
 
+    def test_javascript_buffers_unapplied_editor_text_per_record(self):
+        javascript = (ROOT / "embed_context/curator/static/app.js").read_text()
+        self.assertIn("const buffered = bufferedRecordValue(", javascript)
+        self.assertIn("recordBufferKey(identity)", javascript)
+        self.assertIn(
+            'byId("record-editor").addEventListener("input", () => {\n'
+            "    bufferCurrentEditor();",
+            javascript,
+        )
+        self.assertIn(
+            "state.buffer = discardBufferedRecord(state.buffer, "
+            "recordBufferKey(state.selection));",
+            javascript,
+        )
+
     @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
     def test_dom_independent_javascript_draft_helpers(self):
         app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
         script = f"""
           import {{createDraftBuffer, bufferRecord, discardBufferedRecord,
+                   bufferedRecordValue, recordBufferKey,
                    localShapeChecks, mergeRecordValues, parseKinds,
                    encodeEnhancedValue, decodeEnhancedValue,
                    recordOwnershipFacts, applyEnhancedValues,
                    nextRenderBatch}} from {json.dumps(app_uri)};
           let state = createDraftBuffer(4);
-          state = bufferRecord(state, 'concept:project.x', {{id: 'project.x'}});
+          const conceptKey = recordBufferKey({{kind: 'concept', id: 'project.x'}});
+          state = bufferRecord(state, conceptKey, '{{"id":');
           if (!state.dirty || state.revision !== 4) process.exit(1);
+          state = bufferRecord(state, 'concept:project.y', '{{"id":"project.y"}}');
+          if (bufferedRecordValue(state, conceptKey, 'fallback') !== '{{"id":') process.exit(13);
+          if (bufferedRecordValue(state, 'concept:missing', 'fallback') !== 'fallback') process.exit(14);
           const merged = mergeRecordValues({{nested: {{keep: true}}}}, {{label: 'X'}});
           if (!merged.nested.keep || merged.label !== 'X') process.exit(2);
           const errors = localShapeChecks({{fields: [
@@ -197,8 +217,10 @@ class CuratorStaticContractTests(unittest.TestCase):
             {{name: 'domains', type: 'array', list_behavior: 'set'}}
           ]}}, {{domains: ['x', 'x']}});
           if (errors.length !== 2) process.exit(3);
-          state = discardBufferedRecord(state, 'concept:project.x');
-          if (state.dirty) process.exit(4);
+          state = discardBufferedRecord(state, conceptKey);
+          if (!state.dirty || bufferedRecordValue(state, 'concept:project.y', '') !== '{{"id":"project.y"}}') process.exit(4);
+          state = discardBufferedRecord(state, 'concept:project.y');
+          if (state.dirty) process.exit(15);
           const kinds = parseKinds('feature, guardrail, feature');
           if (JSON.stringify(kinds) !== JSON.stringify(['feature', 'guardrail'])) process.exit(5);
           const arrayField = {{name: 'claim_refs', type: 'array', control: 'reference'}};

@@ -14,6 +14,14 @@ export function discardBufferedRecord(buffer, key) {
   return { revision: buffer.revision, records, dirty: Object.keys(records).length > 0 };
 }
 
+export function bufferedRecordValue(buffer, key, fallback) {
+  return Object.hasOwn(buffer.records, key) ? structuredClone(buffer.records[key]) : structuredClone(fallback);
+}
+
+export function recordBufferKey(identity) {
+  return `${identity.kind}:${identity.id}`;
+}
+
 export function mergeRecordValues(original, replacement) {
   return Object.assign({}, structuredClone(original), structuredClone(replacement));
 }
@@ -226,6 +234,15 @@ function editableAuthored(data) {
   return data.authored || data.record || data.contribution || null;
 }
 
+function bufferCurrentEditor() {
+  if (!state.selection) return;
+  state.buffer = bufferRecord(
+    state.buffer,
+    recordBufferKey(state.selection),
+    byId("record-editor").value,
+  );
+}
+
 function renderRecord(data) {
   const identity = state.selection;
   const authored = editableAuthored(data);
@@ -244,8 +261,18 @@ function renderRecord(data) {
   const canEdit = Boolean(data.editable && state.session?.editable && authored);
   byId("editor-section").hidden = !canEdit;
   if (canEdit) {
-    byId("record-editor").value = jsonText(authored);
-    renderEnhancedFields(state.formSpec, authored);
+    const buffered = bufferedRecordValue(
+      state.buffer,
+      recordBufferKey(identity),
+      jsonText(authored),
+    );
+    byId("record-editor").value = buffered;
+    let enhancedRecord = authored;
+    try {
+      const parsed = JSON.parse(buffered);
+      if (parsed && !Array.isArray(parsed) && typeof parsed === "object") enhancedRecord = parsed;
+    } catch { /* Preserve invalid JSON text while rendering controls from the server draft. */ }
+    renderEnhancedFields(state.formSpec, enhancedRecord);
   }
 }
 
@@ -277,6 +304,7 @@ function renderEnhancedFields(spec, authored) {
       }
       renderDiagnostics([]);
       byId("record-editor").value = jsonText(record);
+      bufferCurrentEditor();
     };
     input.addEventListener("input", updateRecord);
     input.addEventListener("change", updateRecord);
@@ -401,7 +429,10 @@ async function applyRecord() {
       method: "PUT", body: { revision: state.session.revision, record: replacement },
     });
     state.session = { ...state.session, ...data, dirty: true };
-    state.buffer = bufferRecord({ ...state.buffer, revision: state.session.revision }, `${kind}:${id}`, replacement);
+    state.buffer = discardBufferedRecord(
+      { ...state.buffer, revision: state.session.revision },
+      recordBufferKey({ kind, id }),
+    );
     renderSession();
     await selectRecord(kind, id, { history: "none" });
   } catch (error) { renderDiagnostics(error.details?.length ? error.details : [{ pointer: "/", message: error.message }]); }
@@ -418,6 +449,7 @@ async function deleteRecord() {
       method: "DELETE", body: { revision: state.session.revision, confirm: true },
     });
     state.session = { ...state.session, ...data, dirty: true };
+    state.buffer = discardBufferedRecord(state.buffer, recordBufferKey({ kind, id }));
     renderSession(); await loadRecords();
     showNotice("record-notice", data.valid ? "Record deleted from the draft." : "Record deleted; resolve validation diagnostics before saving.", "info");
   } catch (error) { showData("Delete record", { message: error.message, details: error.details }); }
@@ -444,6 +476,7 @@ async function createRecord(event) {
     if (checks.length) return;
     const data = await api("/api/draft/records", { method: "POST", body: { revision: state.session.revision, kind, identifier: id, record } });
     state.session = { ...state.session, ...data, dirty: true };
+    state.buffer = discardBufferedRecord(state.buffer, recordBufferKey({ kind, id }));
     renderSession(); byId("create-dialog").close(); await loadRecords(); await selectRecord(kind, id);
   } catch (error) { renderDiagnosticsAt("create-errors", error.details?.length ? error.details : [{ pointer: "/", message: error.message }]); }
 }
@@ -572,13 +605,19 @@ async function boot() {
   });
   byId("apply-record").addEventListener("click", applyRecord);
   byId("record-editor").addEventListener("input", () => {
+    bufferCurrentEditor();
     for (const { input } of state.enhancedControls) {
       input.dataset.enhancedDirty = "false";
     }
   });
   byId("load-more-records").addEventListener("click", renderNavigatorBatch);
   byId("delete-record").addEventListener("click", deleteRecord);
-  byId("restore-record").addEventListener("click", () => renderRecord(state.record));
+  byId("restore-record").addEventListener("click", () => {
+    if (!state.selection) return;
+    state.buffer = discardBufferedRecord(state.buffer, recordBufferKey(state.selection));
+    renderDiagnostics([]);
+    renderRecord(state.record);
+  });
   byId("query-form").addEventListener("submit", runQuery);
   byId("graph-depth").addEventListener("click", () => {
     if (!state.selection) return;
