@@ -97,7 +97,7 @@ jobs:
           "${UV_TOOL_BIN_DIR}/embed-context" curate --no-open --port 8123 >curator.log 2>&1 &
           curator_pid=$!
           trap 'kill "${curator_pid}" 2>/dev/null || true' EXIT
-          curl --fail --retry 10 --retry-delay 1 http://127.0.0.1:8123/ >curator.html
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:8123/ >curator.html
           grep -q "EMBED catalog curator" curator.html
           curl --fail \
             -H 'Content-Type: application/json' \
