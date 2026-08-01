@@ -316,6 +316,10 @@ class CuratorSession:
                     error_type="local_validation_error",
                     details=diagnostics,
                 )
+            if storage == "map" and "id" in record and record.get("id") != identifier:
+                raise CuratorError(
+                    "Map record id must match the requested stable ID."
+                )
             insert_authored_record(self._draft, container_path=path, storage=storage, identifier=identifier, record=record)
             return self._finish_mutation()
 
@@ -566,8 +570,15 @@ class CuratorSession:
         }
 
     def _origin(self, kind: str, identifier: str) -> dict[str, Any]:
+        catalog = self._current_catalog()
+        if kind == "qualification":
+            qualification = catalog.qualifications.get(identifier)
+            return qualification.origin.to_dict() if qualification is not None else {}
+        if kind == "revision":
+            revision = catalog.revisions.get(identifier)
+            return revision.origin.to_dict() if revision is not None else {}
         aliases = {"feature": "concept", "table": "table", "feature_binding": "binding", "object_binding": "binding", "relationship_binding": "binding", "relationship_binding_path": "binding"}
-        origin = self._current_catalog().origins.get(f"{aliases.get(kind, kind)}:{identifier}")
+        origin = catalog.origins.get(f"{aliases.get(kind, kind)}:{identifier}")
         return origin.to_dict() if origin is not None else {}
 
     def _current_catalog(self) -> Any:
@@ -638,6 +649,23 @@ class CuratorSession:
             references.setdefault(reference_kind, []).append(
                 {"id": item.identifier, "label": item.identifier}
             )
+            if item.kind != "context":
+                continue
+            document = self._document_for_entry(item)
+            context = record_at(document.mapping, item)
+            claims = context.get("claims", ())
+            if not isinstance(claims, Sequence) or isinstance(claims, (str, bytes)):
+                continue
+            for claim in claims:
+                if not isinstance(claim, Mapping) or not isinstance(claim.get("id"), str):
+                    continue
+                claim_identifier = f"{item.identifier}#{claim['id']}"
+                references.setdefault("claim", []).append(
+                    {
+                        "id": claim_identifier,
+                        "label": str(claim.get("statement") or claim_identifier),
+                    }
+                )
         return references
 
     def _draft_state(self, entry: SourceEntry) -> str:

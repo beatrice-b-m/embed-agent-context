@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from embed_context.curator.session import CuratorError, CuratorSession
+from tests.test_catalog_composition import representative_extension
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -137,6 +138,64 @@ class CuratorSessionTests(unittest.TestCase):
         after = session.session_info()
         self.assertEqual(after["revision"], before["revision"])
         self.assertEqual(after["dirty"], before["dirty"])
+
+    def test_map_create_rejects_mismatched_embedded_id_without_mutation(self) -> None:
+        session = self.session()
+        record = session.get_record("qualification", QUALIFICATION)["authored"]
+        record["id"] = "project.embedded-id"
+        before = session.session_info()
+
+        with self.assertRaises(CuratorError) as caught:
+            session.create_record(
+                {
+                    "revision": before["revision"],
+                    "kind": "qualification",
+                    "identifier": "project.map-key",
+                    "record": record,
+                }
+            )
+
+        self.assertIn("must match", str(caught.exception))
+        after = session.session_info()
+        self.assertEqual(after["revision"], before["revision"])
+        self.assertEqual(after["dirty"], before["dirty"])
+
+    def test_claim_reference_choices_include_context_claims(self) -> None:
+        session = self.session()
+        record = session.get_record("qualification", QUALIFICATION)
+        claim_refs = next(
+            field
+            for field in record["form_spec"]["fields"]
+            if field["name"] == "claim_refs"
+        )
+
+        choice_ids = {choice["id"] for choice in claim_refs["choices"]}
+        self.assertIn(record["authored"]["claim_refs"][0], choice_ids)
+
+    def test_qualification_and_revision_origins_use_contribution_registries(self) -> None:
+        qualification = self.session(editable=False).get_record(
+            "qualification", QUALIFICATION
+        )
+        self.assertEqual(
+            qualification["origin"]["contribution_class"], "released_profile"
+        )
+        self.assertEqual(qualification["origin"]["module_id"], "open-v2")
+
+        extension = Path(self.temporary.name) / "extension.json"
+        extension.write_text(
+            json.dumps(representative_extension(), indent=2) + "\n",
+            encoding="utf-8",
+        )
+        revision_id = "project.alpha.revision.race-concept"
+        revision = CuratorSession(
+            self.semantic,
+            profile_paths=[self.profile],
+            extension_paths=[extension],
+            edit_module=extension,
+        ).get_record("revision", revision_id)
+        self.assertEqual(revision["origin"]["contribution_class"], "project")
+        self.assertEqual(revision["origin"]["module_id"], "project.alpha")
+        self.assertEqual(revision["origin"]["lifecycle_status"], "work_in_progress")
 
     def test_invalid_draft_graph_uses_current_broken_reference(self) -> None:
         session = self.session()
