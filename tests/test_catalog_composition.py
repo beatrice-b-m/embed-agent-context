@@ -381,12 +381,29 @@ class CatalogCompositionTests(unittest.TestCase):
             original["effective_view"]["replacement_id"],
             "project.alpha.cleaned_race",
         )
+        concept_revision = original["active_revisions"][0]
+        self.assertEqual(
+            concept_revision["semantic_difference"],
+            "The project uses a revised category meaning.",
+        )
+        self.assertEqual(
+            concept_revision["reason"],
+            "Exercise an intentional project reinterpretation.",
+        )
+        self.assertEqual(
+            concept_revision["origin"]["module_id"], "project.alpha"
+        )
+        self.assertIn("provenance", concept_revision)
         original_binding = next(
             item
             for item in original["bindings"]
             if item.get("effective_view", {}).get("superseded_in_view")
         )
         self.assertTrue(original_binding["effective_view"]["superseded_in_view"])
+        self.assertEqual(
+            original_binding["active_revisions"][0]["reason"],
+            "Prefer the project interpretation at this occurrence.",
+        )
 
         replacement = catalog.get_feature(
             "project.alpha.cleaned_race", profile="open-v2"
@@ -420,6 +437,136 @@ class CatalogCompositionTests(unittest.TestCase):
             if item["identifier"] == "project.alpha.cleaned_race"
         )
         self.assertEqual(project_match["origin"]["module_id"], "project.alpha")
+        self.assertEqual(
+            project_match["active_revisions"][0]["semantic_difference"],
+            "The project uses a revised category meaning.",
+        )
+
+    def test_contribution_ids_are_unique_across_collection_kinds(self) -> None:
+        extension = empty_extension("project.duplicate")
+        duplicate_id = "project.duplicate.evidence"
+        profile = read_json(OPEN_PROFILE_PATH)
+        extension["sources"][duplicate_id] = deepcopy(
+            next(iter(profile["sources"].values()))
+        )
+        extension["contexts"][duplicate_id] = deepcopy(
+            next(iter(profile["contexts"].values()))
+        )
+        extension_path = write_json(self.directory / "duplicate.json", extension)
+
+        with self.assertRaisesRegex(
+            CatalogValidationError,
+            rf"duplicate contribution ID {duplicate_id!r}",
+        ):
+            load_catalog(
+                SEMANTIC_PATH,
+                profile_paths=[OPEN_PROFILE_PATH],
+                extension_paths=[extension_path],
+            )
+
+    def test_code_lookup_reports_vocabulary_feature_and_binding_origins(self) -> None:
+        catalog = load_catalog()
+        result = catalog.lookup_code(
+            "pathology.severity", "0", profile="open-v2"
+        )
+
+        self.assertEqual(result["origin"]["module_id"], "open-v2")
+        self.assertEqual(result["origin"]["target_profile"], "open-v2")
+        self.assertEqual(
+            result["origin"]["contribution_class"], "released_profile"
+        )
+        self.assertEqual(
+            result["feature_origin"]["contribution_class"], "portable"
+        )
+        self.assertTrue(result["binding_origins"])
+        self.assertEqual(
+            {item["origin"]["module_id"] for item in result["binding_origins"]},
+            {"open-v2"},
+        )
+
+        extension = empty_extension("project.codes")
+        extension["vocabularies"]["project.codes.severity"] = deepcopy(
+            read_json(OPEN_PROFILE_PATH)["vocabularies"][
+                "open-v2.pathology.severity"
+            ]
+        )
+        extension_path = write_json(self.directory / "codes.json", extension)
+        project_catalog = load_catalog(
+            SEMANTIC_PATH,
+            profile_paths=[OPEN_PROFILE_PATH],
+            extension_paths=[extension_path],
+        )
+        project_result = project_catalog.lookup_code(
+            "project.codes.severity", "0", profile="open-v2"
+        )
+        self.assertEqual(project_result["origin"]["module_id"], "project.codes")
+        self.assertEqual(
+            project_result["origin"]["lifecycle_status"], "work_in_progress"
+        )
+        self.assertEqual(project_result["origin"]["target_profile"], "open-v2")
+
+    def test_revisions_apply_only_to_their_target_profile(self) -> None:
+        synthetic_path = write_json(
+            self.directory / "synthetic.json", renamed_profile("synthetic-v1")
+        )
+        extension_path = write_json(
+            self.directory / "alpha.json", representative_extension()
+        )
+        catalog = load_catalog(
+            SEMANTIC_PATH,
+            profile_paths=[OPEN_PROFILE_PATH, synthetic_path],
+            extension_paths=[extension_path],
+        )
+
+        open_feature = catalog.get_feature(
+            "demographics.race", profile="open-v2"
+        )
+        self.assertTrue(open_feature["effective_view"]["superseded_in_view"])
+        self.assertEqual(len(open_feature["active_revisions"]), 1)
+
+        synthetic_feature = catalog.get_feature(
+            "demographics.race", profile="synthetic-v1"
+        )
+        self.assertNotIn("effective_view", synthetic_feature)
+        self.assertEqual(synthetic_feature["active_revisions"], [])
+        self.assertTrue(
+            all(
+                "effective_view" not in binding
+                and binding.get("active_revisions", []) == []
+                for binding in synthetic_feature["bindings"]
+            )
+        )
+
+        open_discovery = catalog.discover(
+            "demographics race",
+            profile="open-v2",
+            kinds=["feature"],
+            limit=20,
+        )
+        open_match = next(
+            item
+            for item in open_discovery["matches"]
+            if item["identifier"] == "demographics.race"
+        )
+        self.assertEqual(len(open_match["active_revisions"]), 1)
+        self.assertEqual(
+            open_match["active_revisions"][0]["origin"]["target_profile"],
+            "open-v2",
+        )
+
+        synthetic_discovery = catalog.discover(
+            "demographics race",
+            profile="synthetic-v1",
+            kinds=["feature"],
+            limit=20,
+        )
+        synthetic_match = next(
+            item
+            for item in synthetic_discovery["matches"]
+            if item["identifier"] == "demographics.race"
+        )
+        self.assertNotIn("effective_view", synthetic_match)
+        self.assertEqual(synthetic_match["active_revisions"], [])
 
     def test_extension_dependency_failures_are_structured(self) -> None:
         missing = empty_extension("project.missing", dependencies=["project.absent"])
@@ -505,6 +652,27 @@ class CatalogCompositionTests(unittest.TestCase):
                 SEMANTIC_PATH,
                 profile_paths=[OPEN_PROFILE_PATH],
                 extension_paths=[cycle_path],
+            )
+
+    def test_external_module_cannot_replace_runtime_schema(self) -> None:
+        extension = empty_extension("project.permissive-schema")
+        extension["unexpected"] = "not allowed by extension schema v1"
+        extension_path = write_json(
+            self.directory / "external/extension.json", extension
+        )
+        write_json(
+            extension_path.parent / "extension.schema.json",
+            {},
+        )
+
+        with self.assertRaisesRegex(
+            CatalogValidationError,
+            r"unexpected.*was unexpected",
+        ):
+            load_catalog(
+                SEMANTIC_PATH,
+                profile_paths=[OPEN_PROFILE_PATH],
+                extension_paths=[extension_path],
             )
 
 

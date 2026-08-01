@@ -164,6 +164,12 @@ surface portable entities, qualifications, contribution origins, applicable
 constraints, lineage, and active revisions in distinct sections rather than
 merging module-owned assertions into the portable record.
 
+`lookup_code` reports the resolved vocabulary contribution as `origin`. When
+the lookup also resolves through a semantic feature or physical bindings, it
+reports `feature_origin` and ID-associated `binding_origins` so callers retain
+the ownership, target-profile, and lifecycle boundaries used to interpret the
+code.
+
 ## Python, CLI, and MCP
 
 The Python composition interface is:
