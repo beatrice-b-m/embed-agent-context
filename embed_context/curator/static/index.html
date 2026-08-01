@@ -25,6 +25,11 @@
         <form id="filters" class="filter-stack">
           <label>Search records <input id="filter-text" name="text" type="search" autocomplete="off"></label>
           <label>Kind <select id="filter-kind" name="kind"><option value="">All kinds</option></select></label>
+          <label>Origin <select id="filter-origin" name="origin"><option value="">All origins</option><option value="portable">Portable</option><option value="released_profile">Released profile</option><option value="project">Project</option></select></label>
+          <label>Profile <input id="filter-profile" name="profile" placeholder="open-v2"></label>
+          <label>Lifecycle <input id="filter-lifecycle" name="lifecycle" placeholder="draft, released…"></label>
+          <label>Domain <input id="filter-domain" name="domain" placeholder="pathology"></label>
+          <label>Draft status <select id="filter-status" name="status"><option value="">All statuses</option><option value="baseline">Baseline</option><option value="modified">Modified</option><option value="new">New</option><option value="deleted">Deleted</option></select></label>
           <button type="submit">Apply filters</button>
         </form>
         <button id="new-record" class="secondary" type="button">Create record</button>
@@ -67,7 +72,7 @@
       </section>
 
       <aside class="pane connections" aria-labelledby="connections-title">
-        <div class="pane-heading"><h2 id="connections-title">Connections</h2></div>
+        <div class="pane-heading"><h2 id="connections-title">Connections</h2><button id="graph-depth" class="secondary" type="button" disabled>Show second hop</button></div>
         <p id="connection-help" class="muted">Select a record to inspect its typed neighborhood.</p>
         <div id="connection-groups"></div>
       </aside>
@@ -80,10 +85,13 @@
           <form id="query-form" class="query-form">
             <label>Clinical-language query <input id="query-text" name="query" required></label>
             <label>Profile <input id="query-profile" name="profile" placeholder="open-v2"></label>
+            <label>Kinds <input id="query-kinds" name="kinds" placeholder="feature, guardrail"></label>
+            <label>Domain <input id="query-domain" name="domain" placeholder="pathology"></label>
             <label>Limit <input id="query-limit" name="limit" type="number" min="1" max="100" value="10"></label>
             <button type="submit">Run query</button>
           </form>
           <div id="query-notice" class="notice" hidden></div>
+          <section id="query-comparison" class="query-comparison" aria-live="polite" hidden></section>
           <ol id="query-results" class="query-results"></ol>
         </div>
       </details>

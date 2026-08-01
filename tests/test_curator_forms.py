@@ -130,12 +130,46 @@ class CuratorStaticContractTests(unittest.TestCase):
         self.assertNotIn("innerHTML", javascript)
         self.assertIn("textContent", javascript)
 
+    def test_shell_exposes_complete_navigation_query_and_graph_controls(self):
+        html = (ROOT / "embed_context/curator/static/index.html").read_text()
+        for control in (
+            "filter-text",
+            "filter-kind",
+            "filter-origin",
+            "filter-profile",
+            "filter-lifecycle",
+            "filter-domain",
+            "filter-status",
+            "query-kinds",
+            "query-domain",
+            "query-comparison",
+            "graph-depth",
+        ):
+            with self.subTest(control=control):
+                self.assertIn(f'id="{control}"', html)
+
+    def test_javascript_uses_layered_metadata_and_complete_comparisons(self):
+        javascript = (ROOT / "embed_context/curator/static/app.js").read_text()
+        for contract in (
+            "data?.source",
+            "origin.contribution_class",
+            "comparison.changes",
+            "implementation_bindings",
+            'history: "none"',
+            "graphDepth",
+            "?depth=${depth}",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, javascript)
+
     @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
     def test_dom_independent_javascript_draft_helpers(self):
         app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
         script = f"""
           import {{createDraftBuffer, bufferRecord, discardBufferedRecord,
-                   localShapeChecks, mergeRecordValues}} from {json.dumps(app_uri)};
+                   localShapeChecks, mergeRecordValues, parseKinds,
+                   encodeEnhancedValue, decodeEnhancedValue,
+                   recordOwnershipFacts}} from {json.dumps(app_uri)};
           let state = createDraftBuffer(4);
           state = bufferRecord(state, 'concept:project.x', {{id: 'project.x'}});
           if (!state.dirty || state.revision !== 4) process.exit(1);
@@ -148,6 +182,23 @@ class CuratorStaticContractTests(unittest.TestCase):
           if (errors.length !== 2) process.exit(3);
           state = discardBufferedRecord(state, 'concept:project.x');
           if (state.dirty) process.exit(4);
+          const kinds = parseKinds('feature, guardrail, feature');
+          if (JSON.stringify(kinds) !== JSON.stringify(['feature', 'guardrail'])) process.exit(5);
+          const arrayField = {{name: 'claim_refs', type: 'array', control: 'reference'}};
+          const refs = ['context.example#claim'];
+          if (JSON.stringify(decodeEnhancedValue(arrayField, encodeEnhancedValue(arrayField, refs))) !== JSON.stringify(refs)) process.exit(6);
+          try {{ decodeEnhancedValue(arrayField, '"scalar"'); process.exit(7); }} catch {{}}
+          const objectField = {{name: 'subject', type: 'object', control: 'reference'}};
+          const subject = {{kind: 'concept', id: 'project.x'}};
+          const decodedSubject = decodeEnhancedValue(objectField, encodeEnhancedValue(objectField, subject));
+          if (Array.isArray(decodedSubject) || decodedSubject.id !== 'project.x') process.exit(8);
+          const facts = Object.fromEntries(recordOwnershipFacts({{
+            editable: true, draft_state: 'modified',
+            source: {{document: '/tmp/catalog.json', document_kind: 'extension', module_id: 'project', target_profile: 'open-v2'}},
+            origin: {{contribution_class: 'project', lifecycle_status: 'draft'}}
+          }}, {{kind: 'feature', id: 'project.x'}}));
+          if (facts['Owning document'] !== '/tmp/catalog.json' || facts.Module !== 'project' || facts.Lifecycle !== 'draft') process.exit(9);
+          if (Object.values(facts).includes('[object Object]')) process.exit(10);
         """
         completed = subprocess.run(
             ["node", "--input-type=module", "--eval", script],

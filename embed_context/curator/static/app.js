@@ -46,12 +46,51 @@ export function localShapeChecks(spec, record) {
   return errors;
 }
 
+export function parseKinds(value) {
+  return [...new Set(String(value || "").split(",").map((item) => item.trim()).filter(Boolean))];
+}
+
+export function encodeEnhancedValue(field, value) {
+  if (field?.type === "array") return JSON.stringify(value ?? [], null, 2);
+  if (field?.type === "object") return JSON.stringify(value ?? {}, null, 2);
+  return value ?? "";
+}
+
+export function decodeEnhancedValue(field, raw, checked = false) {
+  if (field?.control === "checkbox") return checked;
+  if (field?.control === "number") return Number(raw);
+  if (field?.type === "array" || field?.type === "object") {
+    const value = JSON.parse(raw);
+    if (field.type === "array" && !Array.isArray(value)) throw new TypeError("Value must be an array.");
+    if (field.type === "object" && (!value || Array.isArray(value) || typeof value !== "object")) throw new TypeError("Value must be an object.");
+    return value;
+  }
+  return raw;
+}
+
+export function recordOwnershipFacts(data, identity) {
+  const source = data?.source || {};
+  const origin = data?.origin || {};
+  return [
+    ["Stable ID", identity.id], ["Kind", identity.kind],
+    ["Contribution class", origin.contribution_class],
+    ["Owning document", source.document],
+    ["Document kind", source.document_kind || origin.document_kind],
+    ["Module", source.module_id || origin.module_id],
+    ["Target profile", source.target_profile || origin.target_profile],
+    ["Lifecycle", origin.lifecycle_status],
+    ["Access", data?.editable ? "Editable" : "Read only"],
+    ["Draft status", data?.draft_state],
+  ];
+}
+
 const state = {
   session: null,
   selection: null,
   record: null,
   formSpec: null,
   graph: null,
+  graphDepth: 1,
   buffer: createDraftBuffer(),
 };
 
@@ -156,16 +195,12 @@ function renderRecord(data) {
   const authored = editableAuthored(data);
   byId("record-kind").textContent = identity.kind;
   byId("record-title").textContent = data.label || authored?.label || identity.id;
-  byId("record-state").textContent = data.draft_state || (data.editable ? "editable" : "read only");
+  byId("record-state").textContent = `${data.editable ? "editable" : "read only"} · ${data.draft_state || "baseline"}`;
   byId("authored-record").textContent = jsonText(authored);
   byId("layered-record").textContent = jsonText(data.effective || data.layers || data);
   const summary = byId("record-summary");
   clear(summary);
-  const facts = [
-    ["Stable ID", identity.id], ["Kind", identity.kind],
-    ["Origin", data.origin], ["Module", data.module || data.module_id],
-    ["Profile", data.profile || data.target_profile], ["Lifecycle", data.lifecycle],
-  ];
+  const facts = recordOwnershipFacts(data, identity);
   for (const [term, description] of facts) {
     if (description === undefined || description === null) continue;
     summary.append(element("div", {}, [element("dt", { text: term }), element("dd", { text: String(description) })]));
@@ -184,41 +219,73 @@ function renderEnhancedFields(spec, authored) {
   for (const field of spec.fields || []) {
     if (field.control === "json" || field.immutable) continue;
     let input;
-    if (field.control === "select") {
+    if (field.type === "array" || field.type === "object") {
+      input = element("textarea", { rows: "5", spellcheck: "false" });
+    } else if (field.control === "select") {
       input = element("select");
       for (const value of field.enum || []) input.append(element("option", { value, text: value }));
     } else if (field.control === "textarea") input = element("textarea");
     else input = element("input", { type: field.control === "number" ? "number" : field.control === "checkbox" ? "checkbox" : "text" });
     if (field.control === "checkbox") input.checked = Boolean(authored[field.name]);
-    else input.value = authored[field.name] ?? "";
-    input.addEventListener("change", () => {
+    else input.value = encodeEnhancedValue(field, authored[field.name]);
+
+    const updateRecord = () => {
       let record;
       try { record = JSON.parse(byId("record-editor").value); } catch { return; }
-      if (field.control === "checkbox") record[field.name] = input.checked;
-      else if (field.control === "number") record[field.name] = Number(input.value);
-      else record[field.name] = input.value;
+      try { record[field.name] = decodeEnhancedValue(field, input.value, input.checked); }
+      catch (error) {
+        renderDiagnostics([{ pointer: `/${field.name}`, message: error.message }]);
+        return;
+      }
+      renderDiagnostics([]);
       byId("record-editor").value = jsonText(record);
-    });
-    const children = [element("span", { text: field.label }), input];
+    };
+    input.addEventListener("change", updateRecord);
+    const label = element("label", {}, [element("span", { text: field.label }), input]);
     const help = field.warning || field.help;
-    if (help) children.push(element("small", { text: help }));
-    container.append(element("label", {}, children));
+    if (help) label.append(element("small", { text: help }));
+    const wrapper = element("div", { className: "enhanced-field" }, [label]);
+    if (field.control === "reference" && field.choices?.length) {
+      const choices = element("div", { className: "reference-choices" });
+      for (const choice of field.choices) {
+        const button = element("button", { type: "button", text: choice.label || choice.id, title: `${choice.kind}: ${choice.id}` });
+        button.addEventListener("click", () => {
+          if (field.type === "array") {
+            let values;
+            try { values = decodeEnhancedValue(field, input.value); } catch { values = []; }
+            if (!values.includes(choice.id)) values.push(choice.id);
+            input.value = encodeEnhancedValue(field, values);
+          } else if (field.type === "object" && field.schema?.properties?.kind && field.schema?.properties?.id) {
+            input.value = encodeEnhancedValue(field, { kind: choice.kind, id: choice.id });
+          } else if (field.type !== "object") input.value = choice.id;
+          updateRecord();
+        });
+        choices.append(button);
+      }
+      wrapper.append(choices);
+    }
+    container.append(wrapper);
   }
 }
 
-async function selectRecord(kind, id) {
+async function selectRecord(kind, id, options = {}) {
+  if (options.depth === undefined && options.history !== "none") state.graphDepth = 1;
+  const depth = options.depth || state.graphDepth;
   state.selection = { kind, id };
   state.formSpec = null;
   showNotice("record-notice", "", "info");
   try {
     const path = `/api/records/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`;
-    const [record, graph] = await Promise.all([api(path), api(`/api/graph/${encodeURIComponent(kind)}/${encodeURIComponent(id)}?depth=1`)]);
+    const [record, graph] = await Promise.all([api(path), api(`/api/graph/${encodeURIComponent(kind)}/${encodeURIComponent(id)}?depth=${depth}`)]);
     state.record = record;
     state.graph = graph;
     state.formSpec = record.form || record.form_spec || null;
     renderRecord(record);
     renderConnections(graph);
-    history.pushState({ kind, id }, "", `#${encodeURIComponent(kind)}:${encodeURIComponent(id)}`);
+    const depthButton = byId("graph-depth");
+    depthButton.disabled = false;
+    depthButton.textContent = depth === 2 ? "Show one hop" : "Show second hop";
+    if (options.history !== "none") history.pushState({ kind, id }, "", `#${encodeURIComponent(kind)}:${encodeURIComponent(id)}`);
   } catch (error) { showNotice("record-notice", error.message); }
 }
 
@@ -241,6 +308,21 @@ function renderConnections(graph) {
     }
     section.append(list);
     container.append(section);
+  }
+  if (graph.depth === 2) {
+    const direct = new Set([graph.focus]);
+    for (const edge of [...(graph.incoming || []), ...(graph.outgoing || [])]) {
+      direct.add(edge.source); direct.add(edge.target);
+    }
+    const nodes = (graph.nodes || []).filter((node) => !direct.has(node.key));
+    const section = element("section", { className: "edge-group" }, [element("h3", { text: `Second-hop neighborhood (${nodes.length})` })]);
+    const list = element("ul", { className: "edge-list" });
+    for (const node of nodes) {
+      const button = element("button", { type: "button", text: node.label || node.identifier });
+      button.addEventListener("click", () => selectRecord(node.kind, node.identifier));
+      list.append(element("li", {}, [element("span", { className: "edge-type", text: node.kind }), button]));
+    }
+    section.append(list); container.append(section);
   }
 }
 
@@ -265,7 +347,7 @@ async function applyRecord() {
     state.session = { ...state.session, ...data, dirty: true };
     state.buffer = bufferRecord({ ...state.buffer, revision: state.session.revision }, `${kind}:${id}`, replacement);
     renderSession();
-    await selectRecord(kind, id);
+    await selectRecord(kind, id, { history: "none" });
   } catch (error) { renderDiagnostics(error.details?.length ? error.details : [{ pointer: "/", message: error.message }]); }
 }
 
@@ -308,6 +390,77 @@ function discoveryItems(data) {
   return data.draft?.matches || data.baseline?.matches || data.matches || [];
 }
 
+function renderQueryComparison(data) {
+  const container = byId("query-comparison"); clear(container); container.hidden = false;
+  const comparison = data.comparison || { available: false, reason: "baseline_only" };
+  container.append(element("h3", { text: "Baseline versus draft" }));
+  if (!comparison.available) {
+    const unavailable = data.draft_unavailable;
+    const revision = unavailable?.revision === undefined ? "" : ` Current draft r${unavailable.revision}.`;
+    const lastValid = unavailable?.last_valid_revision === null || unavailable?.last_valid_revision === undefined ? "" : ` Last valid draft: r${unavailable.last_valid_revision}.`;
+    container.append(element("p", { text: `Comparison unavailable (${unavailable?.reason || comparison.reason || "no valid draft"}).${revision}${lastValid}` }));
+    if (unavailable?.diagnostics?.length) container.append(element("pre", { className: "json-view", text: jsonText(unavailable.diagnostics) }));
+    else if (data.baseline?.diagnostics?.length) container.append(
+      element("h4", { text: "Baseline discovery diagnostics" }),
+      element("pre", { className: "json-view", text: jsonText(data.baseline.diagnostics) }),
+    );
+    return;
+  }
+  container.append(element("p", { text: `Baseline ${comparison.baseline_count} · draft ${comparison.draft_count} · ${comparison.changed_count} changed · ${comparison.unchanged_count} unchanged` }));
+  const list = element("ol", { className: "comparison-list" });
+  for (const change of comparison.changes || []) {
+    list.append(element("li", {}, [
+      element("strong", { text: `${change.status}: ${change.kind}:${change.identifier}` }),
+      element("pre", { className: "json-view", text: jsonText(change) }),
+    ]));
+  }
+  if (!(comparison.changes || []).length) list.append(element("li", { text: "No ranked-result changes." }));
+  container.append(list);
+  if (comparison.diagnostics_changed) container.append(
+    element("h4", { text: "Discovery diagnostics changed" }),
+    element("pre", { className: "json-view", text: jsonText(comparison.diagnostics) }),
+  );
+  else if (data.draft?.diagnostics?.length || data.baseline?.diagnostics?.length) container.append(
+    element("h4", { text: "Discovery diagnostics" }),
+    element("pre", { className: "json-view", text: jsonText(data.draft?.diagnostics || data.baseline.diagnostics) }),
+  );
+}
+
+function renderQueryResults(data) {
+  const list = byId("query-results"); clear(list);
+  const resultSet = data.draft || data.baseline || data;
+  for (const [index, result] of discoveryItems(data).entries()) {
+    const id = result.id || result.identifier;
+    const button = element("button", { type: "button", text: result.label || id });
+    button.addEventListener("click", () => selectRecord(result.kind, id));
+    const reasons = result.match_reasons || result.reasons || [];
+    const reasonText = reasons.map((reason) => typeof reason === "string" ? reason : `${reason.field || "match"}: ${(reason.terms || []).join(", ")}`).join(" · ");
+    const details = {
+      matched_fields: result.matched_fields,
+      matched_terms: result.matched_terms,
+      unmatched_query_terms: result.unmatched_query_terms,
+      match_reasons: reasons,
+      diagnostics: result.diagnostics,
+      origin: result.origin,
+      qualifications: result.qualifications,
+      profile_coverage: result.profile_coverage,
+      active_revisions: result.active_revisions,
+      implementation_bindings: result.implementation_bindings,
+    };
+    const metadata = element("details", { className: "result-metadata" }, [
+      element("summary", { text: "Match, provenance, coverage, revisions, and bindings" }),
+      element("pre", { className: "json-view", text: jsonText(details) }),
+    ]);
+    list.append(element("li", {}, [
+      button,
+      element("span", { className: "score", text: `rank ${index + 1} · score ${result.score ?? "—"} · ${result.kind}:${id}` }),
+      element("p", { text: reasonText || "No match reasons returned." }),
+      metadata,
+    ]));
+  }
+  if (resultSet?.diagnostics?.length) showNotice("query-notice", `Discovery returned ${resultSet.diagnostics.length} diagnostic(s); inspect result metadata and comparison.`, "info");
+}
+
 async function runQuery(event) {
   event.preventDefault();
   showNotice("query-notice", "", "info");
@@ -316,18 +469,14 @@ async function runQuery(event) {
     limit: Number(byId("query-limit").value),
   };
   if (byId("query-profile").value) body.profile = byId("query-profile").value;
+  const kinds = parseKinds(byId("query-kinds").value);
+  if (kinds.length) body.kinds = kinds;
+  if (byId("query-domain").value.trim()) body.domain = byId("query-domain").value.trim();
   try {
     const data = await api("/api/discover", { method: "POST", body });
-    const list = byId("query-results"); clear(list);
-    for (const result of discoveryItems(data)) {
-      const id = result.id || result.identifier;
-      const button = element("button", { type: "button", text: result.label || id });
-      button.addEventListener("click", () => selectRecord(result.kind, id));
-      const reasons = result.match_reasons || result.reasons || [];
-      const reasonText = reasons.map((reason) => typeof reason === "string" ? reason : `${reason.field || "match"}: ${(reason.terms || []).join(", ")}`).join(" · ");
-      list.append(element("li", {}, [button, element("span", { className: "score", text: `score ${result.score ?? "—"}` }), element("p", { text: reasonText })]));
-    }
-    if (data.draft_unavailable) showNotice("query-notice", "Draft comparison is unavailable; baseline results are shown.", "info");
+    renderQueryResults(data);
+    renderQueryComparison(data);
+    if (data.draft_unavailable) showNotice("query-notice", "Draft comparison is unavailable; current baseline results are shown.", "info");
   } catch (error) { showNotice("query-notice", error.message); }
 }
 
@@ -359,6 +508,11 @@ async function boot() {
   byId("delete-record").addEventListener("click", deleteRecord);
   byId("restore-record").addEventListener("click", () => renderRecord(state.record));
   byId("query-form").addEventListener("submit", runQuery);
+  byId("graph-depth").addEventListener("click", () => {
+    if (!state.selection) return;
+    state.graphDepth = state.graphDepth === 1 ? 2 : 1;
+    selectRecord(state.selection.kind, state.selection.id, { history: "none", depth: state.graphDepth });
+  });
   byId("new-record").addEventListener("click", () => byId("create-dialog").showModal());
   byId("cancel-create").addEventListener("click", () => byId("create-dialog").close());
   byId("create-form").addEventListener("submit", createRecord);
@@ -379,7 +533,7 @@ async function boot() {
   });
   byId("close-dialog").addEventListener("click", () => byId("data-dialog").close());
   window.addEventListener("popstate", (event) => {
-    if (event.state?.kind && event.state?.id) selectRecord(event.state.kind, event.state.id);
+    if (event.state?.kind && event.state?.id) selectRecord(event.state.kind, event.state.id, { history: "none" });
   });
 }
 
