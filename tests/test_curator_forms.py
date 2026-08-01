@@ -193,6 +193,60 @@ class CuratorStaticContractTests(unittest.TestCase):
             javascript,
         )
 
+    def test_save_and_shutdown_paths_track_unapplied_editor_buffers(self):
+        javascript = (ROOT / "embed_context/curator/static/app.js").read_text()
+        self.assertIn(
+            "rebaseDraftBuffer(state.buffer, data.revision || 0)",
+            javascript,
+        )
+        self.assertIn(
+            "const discardUnsaved = hasUnsavedWork(state.session, state.buffer);",
+            javascript,
+        )
+        self.assertIn("discard_unsaved: discardUnsaved", javascript)
+        self.assertIn(
+            'draftAction("/api/draft/reset", "Draft reset", '
+            "{ discardLocal: true })",
+            javascript,
+        )
+        self.assertNotIn("if (data.saved || data.dirty === false)", javascript)
+
+    @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
+    def test_apply_edit_save_shutdown_buffer_interaction(self):
+        app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
+        script = f"""
+          import {{createDraftBuffer, bufferRecord, discardBufferedRecord,
+                   bufferedRecordValue, rebaseDraftBuffer,
+                   hasUnsavedWork}} from {json.dumps(app_uri)};
+          let session = {{revision: 0, dirty: false}};
+          let buffer = createDraftBuffer(session.revision);
+
+          buffer = bufferRecord(buffer, 'qualification:record-a', 'applied A');
+          session = {{revision: 1, dirty: true}};
+          buffer = discardBufferedRecord(buffer, 'qualification:record-a');
+          buffer = bufferRecord(buffer, 'qualification:record-b', '{{"id":');
+
+          session = {{revision: 1, dirty: false, saved: true}};
+          buffer = rebaseDraftBuffer(buffer, session.revision);
+          if (bufferedRecordValue(buffer, 'qualification:record-b', '') !== '{{"id":') process.exit(1);
+          if (!buffer.dirty || !hasUnsavedWork(session, buffer)) process.exit(2);
+
+          const discardUnsaved = hasUnsavedWork(session, buffer);
+          if (!discardUnsaved) process.exit(3);
+          const shutdownBody = {{discard_unsaved: discardUnsaved}};
+          if (shutdownBody.discard_unsaved !== true) process.exit(4);
+
+          buffer = createDraftBuffer(session.revision);
+          if (hasUnsavedWork(session, buffer)) process.exit(5);
+        """
+        completed = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
     @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
     def test_dom_independent_javascript_draft_helpers(self):
         app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()

@@ -22,6 +22,15 @@ export function recordBufferKey(identity) {
   return `${identity.kind}:${identity.id}`;
 }
 
+export function rebaseDraftBuffer(buffer, revision) {
+  const records = Object.assign(Object.create(null), buffer.records);
+  return { revision, records, dirty: Object.keys(records).length > 0 };
+}
+
+export function hasUnsavedWork(session, buffer) {
+  return Boolean(session?.dirty || buffer?.dirty);
+}
+
 export function mergeRecordValues(original, replacement) {
   return Object.assign({}, structuredClone(original), structuredClone(replacement));
 }
@@ -165,10 +174,11 @@ function renderSession() {
     element("span", { className: `badge ${session.valid === false ? "invalid" : "valid"}`, text: session.valid === false ? "Invalid draft" : "Validated" }),
     element("span", { className: "badge", text: session.editable ? "Editable module" : "Read only" }),
     element("span", { className: "badge", text: session.dirty ? `Draft r${session.revision}` : "Baseline" }),
+    ...(state.buffer.dirty ? [element("span", { className: "badge", text: "Unapplied local edits" })] : []),
   );
   byId("save-draft").disabled = !session.editable || !session.dirty || session.valid === false;
   byId("validate-draft").disabled = !session.editable;
-  byId("reset-draft").disabled = !session.editable || !session.dirty;
+  byId("reset-draft").disabled = !session.editable || !hasUnsavedWork(session, state.buffer);
   byId("new-record").disabled = !session.editable;
 }
 
@@ -241,6 +251,7 @@ function bufferCurrentEditor() {
     recordBufferKey(state.selection),
     byId("record-editor").value,
   );
+  renderSession();
 }
 
 function renderRecord(data) {
@@ -581,13 +592,13 @@ function showData(title, data) {
   byId("data-dialog").showModal();
 }
 
-async function draftAction(path, title) {
+async function draftAction(path, title, { discardLocal = false } = {}) {
   try {
     const data = await api(path, { method: "POST", body: { revision: state.session.revision } });
     state.session = { ...state.session, ...data };
-    if (data.saved || data.dirty === false) {
-      state.buffer = createDraftBuffer(data.revision || 0);
-    }
+    state.buffer = discardLocal
+      ? createDraftBuffer(data.revision || 0)
+      : rebaseDraftBuffer(state.buffer, data.revision || 0);
     renderSession();
     showData(title, data);
     return data;
@@ -615,6 +626,7 @@ async function boot() {
   byId("restore-record").addEventListener("click", () => {
     if (!state.selection) return;
     state.buffer = discardBufferedRecord(state.buffer, recordBufferKey(state.selection));
+    renderSession();
     renderDiagnostics([]);
     renderRecord(state.record);
   });
@@ -634,7 +646,7 @@ async function boot() {
   byId("validate-draft").addEventListener("click", () => draftAction("/api/draft/validate", "Draft validation"));
   byId("reset-draft").addEventListener("click", () => {
     if (!window.confirm("Discard all in-memory draft changes?")) return;
-    draftAction("/api/draft/reset", "Draft reset").then(() => loadRecords());
+    draftAction("/api/draft/reset", "Draft reset", { discardLocal: true }).then(() => loadRecords());
   });
   byId("save-draft").addEventListener("click", async () => {
     const data = await draftAction("/api/draft/save", "Save result");
@@ -645,8 +657,9 @@ async function boot() {
     }
   });
   byId("shutdown").addEventListener("click", async () => {
-    if (state.session?.dirty && !window.confirm("Discard the unsaved draft and shut down?")) return;
-    try { await api("/api/shutdown", { method: "POST", body: { discard_unsaved: Boolean(state.session?.dirty) } }); document.body.textContent = "The local curator has shut down."; }
+    const discardUnsaved = hasUnsavedWork(state.session, state.buffer);
+    if (discardUnsaved && !window.confirm("Discard the unsaved draft and unapplied editor changes, then shut down?")) return;
+    try { await api("/api/shutdown", { method: "POST", body: { discard_unsaved: discardUnsaved } }); document.body.textContent = "The local curator has shut down."; }
     catch (error) { showData("Shutdown", { message: error.message }); }
   });
   byId("close-dialog").addEventListener("click", () => byId("data-dialog").close());

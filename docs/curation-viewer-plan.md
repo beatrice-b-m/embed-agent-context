@@ -270,7 +270,10 @@ server draft mutation. The browser submits a create or replacement only after
 the record passes local shape checks. The server draft may still fail
 cross-reference, composition, or domain validation; those failures are retained
 as draft diagnostics. This prevents incomplete skeletal records from creating
-ambiguous server state.
+ambiguous server state. Saving an applied server draft preserves unapplied
+buffers for other records. Reset explicitly discards both server-draft and
+browser-local changes, and shutdown requires confirmation when either layer has
+unsaved work.
 
 ### Layered record presentation
 
@@ -615,6 +618,11 @@ Saving follows this sequence:
    and
 10. update baseline bytes, digest, catalog, fingerprint, and draft state.
 
+A successful save rebases the revision associated with browser-local record
+buffers but does not clear them. Those buffers have not been submitted to the
+server and are therefore neither included in the prospective bytes nor made
+safe by saving a different applied record.
+
 Validation occurs against exactly the bytes written. A failure after
 `os.replace` is therefore reported as `saved_reload_failed`, not as an unsaved
 draft; the file has already been atomically replaced and the message directs
@@ -716,6 +724,8 @@ Acceptance criteria:
 - invalid namespace, reference, dependency, and revision changes cannot save;
 - two browser tabs cannot silently overwrite draft state;
 - incomplete browser-local forms do not mutate the server draft;
+- saving applied changes preserves unapplied buffers for other records;
+- shutdown acknowledges both server-draft and browser-local unsaved work;
 - changes to the editable source or any loaded filesystem context prevent save;
 - the displayed diff is byte-for-byte the content that will be written; and
 - a successfully saved extension reloads to the same configuration
@@ -771,7 +781,8 @@ All fixtures must remain synthetic and count-free.
 - deterministic inventory filtering and result limiting;
 - schema-derived field coverage, JSON fallback round-trips, local form
   validation, and compatible reference choices;
-- incomplete browser-local form behavior in extracted JavaScript state helpers;
+- incomplete browser-local form behavior, including save and shutdown
+  interactions, in extracted JavaScript state helpers;
 - baseline/draft discovery comparison;
 - draft revision conflicts and last-valid-draft behavior;
 - session locking and rejection of stale validation results;
