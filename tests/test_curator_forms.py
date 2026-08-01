@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+from types import MappingProxyType
 import unittest
 
 from embed_context.curator.forms import (
@@ -105,6 +106,20 @@ class CuratorFormTests(unittest.TestCase):
         merged["nested"]["preserve"] = False
         self.assertTrue(original["nested"]["preserve"])
 
+    def test_form_spec_normalizes_nested_immutable_record_values(self):
+        record = MappingProxyType(
+            {
+                "id": "project.x",
+                "nested": MappingProxyType({"values": ("one", "two")}),
+            }
+        )
+        spec = build_form_spec(
+            self.extension_schema, "revision", record=record
+        )
+        self.assertEqual(
+            spec["record"]["nested"], {"values": ["one", "two"]}
+        )
+
     def test_local_validation_returns_normalized_schema_diagnostics(self):
         diagnostics = local_validate_record(
             self.extension_schema, "qualification", {"id": "bad id"}
@@ -158,6 +173,7 @@ class CuratorStaticContractTests(unittest.TestCase):
             'history: "none"',
             "graphDepth",
             "?depth=${depth}",
+            "load-more-records",
         ):
             with self.subTest(contract=contract):
                 self.assertIn(contract, javascript)
@@ -169,7 +185,8 @@ class CuratorStaticContractTests(unittest.TestCase):
           import {{createDraftBuffer, bufferRecord, discardBufferedRecord,
                    localShapeChecks, mergeRecordValues, parseKinds,
                    encodeEnhancedValue, decodeEnhancedValue,
-                   recordOwnershipFacts}} from {json.dumps(app_uri)};
+                   recordOwnershipFacts, applyEnhancedValues,
+                   nextRenderBatch}} from {json.dumps(app_uri)};
           let state = createDraftBuffer(4);
           state = bufferRecord(state, 'concept:project.x', {{id: 'project.x'}});
           if (!state.dirty || state.revision !== 4) process.exit(1);
@@ -199,6 +216,14 @@ class CuratorStaticContractTests(unittest.TestCase):
           }}, {{kind: 'feature', id: 'project.x'}}));
           if (facts['Owning document'] !== '/tmp/catalog.json' || facts.Module !== 'project' || facts.Lifecycle !== 'draft') process.exit(9);
           if (Object.values(facts).includes('[object Object]')) process.exit(10);
+          const enhanced = applyEnhancedValues({{summary: 'Before', untouched: true}}, [{{
+            field: {{name: 'summary', type: 'string', control: 'textarea'}},
+            raw: 'After', checked: false
+          }}]);
+          if (enhanced.summary !== 'After' || !enhanced.untouched) process.exit(11);
+          const records = Array.from({{length: 120}}, (_, index) => index);
+          const batch = nextRenderBatch(records, 50);
+          if (batch.length !== 50 || batch[0] !== 50 || batch[49] !== 99) process.exit(12);
         """
         completed = subprocess.run(
             ["node", "--input-type=module", "--eval", script],

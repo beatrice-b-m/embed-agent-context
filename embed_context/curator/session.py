@@ -34,7 +34,7 @@ from .documents import (
 )
 from .graph import AuthoredGraphRecord, build_graph
 from .query_diff import run_discovery_comparison
-from .forms import build_form_spec
+from .forms import build_form_spec, local_validate_record
 
 
 class CuratorError(ValueError):
@@ -237,7 +237,7 @@ class CuratorSession:
                     self._editable_document.mapping, before[key]
                 )
                 current_record = record_at(self._draft_document().mapping, current)
-                if baseline_record == current_record:
+                if _records_equal(baseline_record, current_record):
                     continue
             document = self._document_for_entry(current or entry)
             origin = self._origin(entry.kind, entry.identifier)
@@ -308,8 +308,37 @@ class CuratorSession:
         with self._lock:
             self._check_revision(revision)
             path, storage = creation_location(self._editable_document.kind, kind)
+            schema, family = self._schema_and_family(self._editable_document, kind)
+            diagnostics = local_validate_record(schema, family, record)
+            if diagnostics:
+                raise CuratorError(
+                    "Record does not pass local shape checks.",
+                    error_type="local_validation_error",
+                    details=diagnostics,
+                )
             insert_authored_record(self._draft, container_path=path, storage=storage, identifier=identifier, record=record)
             return self._finish_mutation()
+
+    def creation_form_spec(self, kind: str) -> dict[str, Any]:
+        """Return local shape metadata before a create mutates the draft."""
+
+        self._require_editable()
+        with self._lock:
+            try:
+                creation_location(self._editable_document.kind, kind)
+                schema, family = self._schema_and_family(
+                    self._editable_document, kind
+                )
+                return build_form_spec(
+                    schema,
+                    family,
+                    references=self._reference_choices(),
+                    creating=True,
+                )
+            except (KeyError, OSError, json.JSONDecodeError, ValueError) as exc:
+                raise CuratorError(
+                    f"{kind!r} is not a creatable record kind for this module."
+                ) from exc
 
     def replace_record(self, kind: str, identifier: str, request: Mapping[str, Any]) -> dict[str, Any]:
         record = request.get("record")
@@ -428,7 +457,11 @@ class CuratorSession:
             self._valid_revision = self._revision
             self._diagnostics = []
             self._index = build_source_index(reloaded.documents, path)
-            return {"saved": True, "revision": self._revision, "configuration_fingerprint": reloaded.catalog.fingerprint, "source_digest": _digest(prospective)}
+            return {
+                **self.session_info(),
+                "saved": True,
+                "source_digest": _digest(prospective),
+            }
 
     def _finish_mutation(self) -> dict[str, Any]:
         self._revision += 1
@@ -571,26 +604,41 @@ class CuratorSession:
         )
         if document.kind == "legacy" or not document.schema_resource:
             return None
-        family = {
-            "feature": "extension_concept" if document.kind == "extension" else "concept",
-            "context": "clinical_context",
-            "source": "context_source",
-        }.get(entry.kind, entry.kind)
         try:
-            schema = json.loads(
-                _schema_path_for(document.schema_resource).read_text(encoding="utf-8")
-            )
-            references: dict[str, list[dict[str, str]]] = {}
-            for item in self._current_index():
-                reference_kind = "concept" if item.kind == "feature" else item.kind
-                references.setdefault(reference_kind, []).append(
-                    {"id": item.identifier, "label": item.identifier}
-                )
+            schema, family = self._schema_and_family(document, entry.kind)
             return build_form_spec(
-                schema, family, record=record, references=references
+                schema,
+                family,
+                record=record,
+                references=self._reference_choices(),
             )
         except (KeyError, OSError, json.JSONDecodeError):
             return None
+
+    @staticmethod
+    def _schema_and_family(document: Any, kind: str) -> tuple[dict[str, Any], str]:
+        if document.kind == "legacy" or not document.schema_resource:
+            raise KeyError(kind)
+        family = {
+            "feature": (
+                "extension_concept" if document.kind == "extension" else "concept"
+            ),
+            "context": "clinical_context",
+            "source": "context_source",
+        }.get(kind, kind)
+        schema = json.loads(
+            _schema_path_for(document.schema_resource).read_text(encoding="utf-8")
+        )
+        return schema, family
+
+    def _reference_choices(self) -> dict[str, list[dict[str, str]]]:
+        references: dict[str, list[dict[str, str]]] = {}
+        for item in self._current_index():
+            reference_kind = "concept" if item.kind == "feature" else item.kind
+            references.setdefault(reference_kind, []).append(
+                {"id": item.identifier, "label": item.identifier}
+            )
+        return references
 
     def _draft_state(self, entry: SourceEntry) -> str:
         if not entry.editable or self._draft is None:
@@ -602,7 +650,7 @@ class CuratorSession:
         try:
             old = record_at(self._editable_document.mapping, baseline)
             new = record_at(self._draft_document().mapping, entry)
-            return "baseline" if old == new else "modified"
+            return "baseline" if _records_equal(old, new) else "modified"
         except (KeyError, StopIteration):
             return "deleted"
 
@@ -615,7 +663,10 @@ class CuratorSession:
                 state = "new"
             elif key not in after:
                 state = "deleted"
-            elif record_at(self._editable_document.mapping, before[key]) != record_at(self._draft_document().mapping, after[key]):
+            elif not _records_equal(
+                record_at(self._editable_document.mapping, before[key]),
+                record_at(self._draft_document().mapping, after[key]),
+            ):
                 state = "modified"
             else:
                 continue
@@ -655,6 +706,12 @@ class CuratorSession:
 
 def _digest(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
+
+
+def _records_equal(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    """Compare authored values after normalizing frozen and mutable shapes."""
+
+    return mutable_copy(left) == mutable_copy(right)
 
 
 def _diagnostic(exc: Exception, fallback: Path) -> dict[str, Any]:

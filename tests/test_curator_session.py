@@ -64,6 +64,8 @@ class CuratorSessionTests(unittest.TestCase):
         self.assertEqual(caught.exception.error_type, "revision_conflict")
         saved = session.save(expected_revision=1)
         self.assertTrue(saved["saved"])
+        self.assertFalse(saved["dirty"])
+        self.assertTrue(saved["valid"])
         self.assertFalse(session.dirty)
         authored = json.loads(self.profile.read_text(encoding="utf-8"))
         self.assertEqual(authored["qualifications"][QUALIFICATION]["summary"], replacement["summary"])
@@ -80,6 +82,61 @@ class CuratorSessionTests(unittest.TestCase):
         with self.assertRaises(CuratorError) as caught:
             session.save(expected_revision=1)
         self.assertEqual(caught.exception.error_type, "validation_error")
+
+    def test_immutable_feature_opens_and_one_edit_has_one_changed_record(self) -> None:
+        session = self.session()
+        feature = session.get_record("feature", "pathology.severity")
+        self.assertEqual(feature["identifier"], "pathology.severity")
+        self.assertIsInstance(
+            feature["form_spec"]["record"]["aggregations"], list
+        )
+        self.assertIn(
+            "aggregation.pathology-severity-to-side",
+            feature["form_spec"]["record"]["aggregations"],
+        )
+
+        record = session.get_record("qualification", QUALIFICATION)["authored"]
+        record["summary"] += " Reviewed."
+        session.replace_record(
+            "qualification",
+            QUALIFICATION,
+            {"revision": 0, "record": record},
+        )
+        self.assertEqual(
+            session.diff()["changed_records"],
+            [
+                {
+                    "kind": "qualification",
+                    "identifier": QUALIFICATION,
+                    "state": "modified",
+                }
+            ],
+        )
+
+    def test_incomplete_create_is_rejected_without_mutating_draft(self) -> None:
+        session = self.session()
+        spec = session.creation_form_spec("qualification")
+        self.assertTrue(spec["enhanced"])
+        self.assertTrue(
+            next(field for field in spec["fields"] if field["name"] == "id")[
+                "required"
+            ]
+        )
+
+        before = session.session_info()
+        with self.assertRaises(CuratorError) as caught:
+            session.create_record(
+                {
+                    "revision": before["revision"],
+                    "kind": "qualification",
+                    "identifier": "project.incomplete",
+                    "record": {},
+                }
+            )
+        self.assertEqual(caught.exception.error_type, "local_validation_error")
+        after = session.session_info()
+        self.assertEqual(after["revision"], before["revision"])
+        self.assertEqual(after["dirty"], before["dirty"])
 
     def test_invalid_draft_graph_uses_current_broken_reference(self) -> None:
         session = self.session()

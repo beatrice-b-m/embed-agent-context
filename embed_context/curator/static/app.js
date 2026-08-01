@@ -68,6 +68,18 @@ export function decodeEnhancedValue(field, raw, checked = false) {
   return raw;
 }
 
+export function applyEnhancedValues(record, controls) {
+  const replacement = structuredClone(record);
+  for (const { field, raw, checked } of controls) {
+    replacement[field.name] = decodeEnhancedValue(field, raw, checked);
+  }
+  return replacement;
+}
+
+export function nextRenderBatch(records, rendered, size = 50) {
+  return records.slice(rendered, rendered + size);
+}
+
 export function recordOwnershipFacts(data, identity) {
   const source = data?.source || {};
   const origin = data?.origin || {};
@@ -92,6 +104,9 @@ const state = {
   graph: null,
   graphDepth: 1,
   buffer: createDraftBuffer(),
+  enhancedControls: [],
+  navigatorRecords: [],
+  navigatorRendered: 0,
 };
 
 const byId = (id) => document.getElementById(id);
@@ -160,6 +175,7 @@ function recordIdentity(item) {
 }
 
 async function loadRecords(params = new URLSearchParams()) {
+  if (!params.has("limit")) params.set("limit", "1000");
   const data = await api(`/api/records?${params.toString()}`);
   const records = data.records || data.items || [];
   byId("record-total").textContent = String(data.total ?? records.length);
@@ -167,8 +183,25 @@ async function loadRecords(params = new URLSearchParams()) {
   clear(list);
   const kinds = new Set();
   for (const item of records) {
+    kinds.add(recordIdentity(item).kind);
+  }
+  state.navigatorRecords = records;
+  state.navigatorRendered = 0;
+  renderNavigatorBatch();
+  const select = byId("filter-kind");
+  if (select.options.length === 1) {
+    for (const kind of [...kinds].sort()) select.append(element("option", { value: kind, text: kind }));
+  }
+}
+
+function renderNavigatorBatch() {
+  const list = byId("record-list");
+  const batch = nextRenderBatch(
+    state.navigatorRecords,
+    state.navigatorRendered,
+  );
+  for (const item of batch) {
     const identity = recordIdentity(item);
-    kinds.add(identity.kind);
     const button = element("button", { type: "button" }, [
       element("span", { className: "record-label", text: item.label || identity.id }),
       element("span", { className: "record-meta", text: `${identity.kind} · ${identity.id}` }),
@@ -176,10 +209,13 @@ async function loadRecords(params = new URLSearchParams()) {
     button.addEventListener("click", () => selectRecord(identity.kind, identity.id));
     list.append(element("li", {}, [button]));
   }
-  const select = byId("filter-kind");
-  if (select.options.length === 1) {
-    for (const kind of [...kinds].sort()) select.append(element("option", { value: kind, text: kind }));
-  }
+  state.navigatorRendered += batch.length;
+  const remaining = state.navigatorRecords.length - state.navigatorRendered;
+  const more = byId("load-more-records");
+  more.hidden = remaining <= 0;
+  more.textContent = remaining > 0
+    ? `Show ${Math.min(50, remaining)} more records (${remaining} remaining)`
+    : "Show more records";
 }
 
 function jsonText(value) {
@@ -215,6 +251,7 @@ function renderRecord(data) {
 
 function renderEnhancedFields(spec, authored) {
   const container = byId("enhanced-fields"); clear(container);
+  state.enhancedControls = [];
   if (!spec?.enhanced) return;
   for (const field of spec.fields || []) {
     if (field.control === "json" || field.immutable) continue;
@@ -230,6 +267,7 @@ function renderEnhancedFields(spec, authored) {
     else input.value = encodeEnhancedValue(field, authored[field.name]);
 
     const updateRecord = () => {
+      input.dataset.enhancedDirty = "true";
       let record;
       try { record = JSON.parse(byId("record-editor").value); } catch { return; }
       try { record[field.name] = decodeEnhancedValue(field, input.value, input.checked); }
@@ -240,7 +278,9 @@ function renderEnhancedFields(spec, authored) {
       renderDiagnostics([]);
       byId("record-editor").value = jsonText(record);
     };
+    input.addEventListener("input", updateRecord);
     input.addEventListener("change", updateRecord);
+    state.enhancedControls.push({ field, input });
     const label = element("label", {}, [element("span", { text: field.label }), input]);
     const help = field.warning || field.help;
     if (help) label.append(element("small", { text: help }));
@@ -336,6 +376,22 @@ async function applyRecord() {
   let replacement;
   try { replacement = JSON.parse(byId("record-editor").value); }
   catch (error) { renderDiagnostics([{ pointer: "/", message: error.message }]); return; }
+  try {
+    replacement = applyEnhancedValues(
+      replacement,
+      state.enhancedControls
+        .filter(({ input }) => input.dataset.enhancedDirty === "true")
+        .map(({ field, input }) => ({
+          field,
+          raw: input.value,
+          checked: input.checked,
+        })),
+    );
+    byId("record-editor").value = jsonText(replacement);
+  } catch (error) {
+    renderDiagnostics([{ pointer: "/", message: error.message }]);
+    return;
+  }
   const checks = localShapeChecks(state.formSpec, replacement);
   renderDiagnostics(checks);
   if (checks.length) return;
@@ -380,6 +436,12 @@ async function createRecord(event) {
   const kind = byId("create-kind").value.trim();
   const id = byId("create-id").value.trim();
   try {
+    const spec = await api(`/api/forms/${encodeURIComponent(kind)}`);
+    const identifierField = (spec.fields || []).find((field) => field.name === "id");
+    if (identifierField && record.id === undefined) record.id = id;
+    const checks = localShapeChecks(spec, record);
+    renderDiagnosticsAt("create-errors", checks);
+    if (checks.length) return;
     const data = await api("/api/draft/records", { method: "POST", body: { revision: state.session.revision, kind, identifier: id, record } });
     state.session = { ...state.session, ...data, dirty: true };
     renderSession(); byId("create-dialog").close(); await loadRecords(); await selectRecord(kind, id);
@@ -490,8 +552,12 @@ async function draftAction(path, title) {
   try {
     const data = await api(path, { method: "POST", body: { revision: state.session.revision } });
     state.session = { ...state.session, ...data };
+    if (data.saved || data.dirty === false) {
+      state.buffer = createDraftBuffer(data.revision || 0);
+    }
     renderSession();
     showData(title, data);
+    return data;
   } catch (error) { showData(title, { type: error.type, message: error.message, details: error.details }); }
 }
 
@@ -505,6 +571,12 @@ async function boot() {
     loadRecords(params).catch((error) => showNotice("record-notice", error.message));
   });
   byId("apply-record").addEventListener("click", applyRecord);
+  byId("record-editor").addEventListener("input", () => {
+    for (const { input } of state.enhancedControls) {
+      input.dataset.enhancedDirty = "false";
+    }
+  });
+  byId("load-more-records").addEventListener("click", renderNavigatorBatch);
   byId("delete-record").addEventListener("click", deleteRecord);
   byId("restore-record").addEventListener("click", () => renderRecord(state.record));
   byId("query-form").addEventListener("submit", runQuery);
@@ -525,7 +597,14 @@ async function boot() {
     if (!window.confirm("Discard all in-memory draft changes?")) return;
     draftAction("/api/draft/reset", "Draft reset").then(() => loadRecords());
   });
-  byId("save-draft").addEventListener("click", () => draftAction("/api/draft/save", "Save result"));
+  byId("save-draft").addEventListener("click", async () => {
+    const data = await draftAction("/api/draft/save", "Save result");
+    if (!data?.saved) return;
+    await loadRecords();
+    if (state.selection) {
+      await selectRecord(state.selection.kind, state.selection.id, { history: "none" });
+    }
+  });
   byId("shutdown").addEventListener("click", async () => {
     if (state.session?.dirty && !window.confirm("Discard the unsaved draft and shut down?")) return;
     try { await api("/api/shutdown", { method: "POST", body: { discard_unsaved: Boolean(state.session?.dirty) } }); document.body.textContent = "The local curator has shut down."; }

@@ -23,6 +23,9 @@ class FakeSession:
     def discover(self, body):
         return {"request": body, "baseline": {"matches": []}}
 
+    def creation_form_spec(self, kind):
+        return {"family": kind, "fields": []}
+
 
 class CuratorServerTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -54,6 +57,9 @@ class CuratorServerTests(unittest.TestCase):
         self.assertIn(b"EMBED catalog curator", body)
         response, body = self.request("GET", "/api/session")
         self.assertEqual(json.loads(body)["data"]["revision"], 0)
+        response, body = self.request("GET", "/api/forms/qualification")
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(body)["data"]["family"], "qualification")
 
     def test_host_origin_content_type_and_preflight_are_rejected(self) -> None:
         response, _ = self.request("GET", "/api/session", headers={"Host": "localhost:1"})

@@ -116,6 +116,13 @@ class _CuratorHandler(BaseHTTPRequestHandler):
                 )
             elif path == "/api/draft/diff":
                 data = self.server.session.diff()
+            elif path.startswith("/api/forms/"):
+                kind = unquote(path.removeprefix("/api/forms/"))
+                if not kind or "/" in kind:
+                    raise SessionHTTPError(
+                        404, "not_found", "Form specification was not found."
+                    )
+                data = self.server.session.creation_form_spec(kind)
             elif path.startswith("/api/records/"):
                 kind, identifier = _route_key(path, "/api/records/")
                 data = self.server.session.get_record(kind, identifier)

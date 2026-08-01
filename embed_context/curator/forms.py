@@ -13,6 +13,8 @@ from typing import Any, Iterable, Mapping
 
 from jsonschema import Draft202012Validator
 
+from .documents import mutable_copy
+
 
 _MULTILINE_FIELDS = {
     "definition",
@@ -248,7 +250,7 @@ def build_form_spec(
         "enhanced": enhanced,
         "variants": variants,
         "fields": fields,
-        "record": deepcopy(dict(record or {})),
+        "record": mutable_copy(record or {}),
         "fallback": {
             "control": "record_json",
             "label": "Complete authored record JSON",
@@ -260,8 +262,8 @@ def build_form_spec(
 def merge_record_json(original: Mapping[str, Any], replacement: Mapping[str, Any]) -> dict[str, Any]:
     """Return a lossless record replacement without mutating either input."""
 
-    merged = deepcopy(dict(original))
-    merged.update(deepcopy(dict(replacement)))
+    merged = mutable_copy(original)
+    merged.update(mutable_copy(replacement))
     return merged
 
 
