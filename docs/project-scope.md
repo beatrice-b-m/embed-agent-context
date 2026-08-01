@@ -352,7 +352,9 @@ vector databases, search services, SQLite FTS, and fuzzy-matching dependencies
 remain outside the core.
 
 The optional stdio MCP adapter calls the same core API as the CLI, writes
-protocol messages only to stdout, and exposes read-only tools.
+protocol messages only to stdout, and exposes read-only tools. The optional
+local curation viewer is a separate companion distribution; its Python modules
+and browser assets are not present in the base wheel.
 
 Source distributions retain canonical resources under `catalog/`; built
 wheels bundle the JSON and JSON Schema so the default loader and installed
@@ -403,12 +405,13 @@ cardinality, clinical attribution, outcome capture, or availability.
 
 ## Documentation synchronization
 
-Any functional catalog, CLI, MCP, or schema change must update relevant usage,
-format, architecture, and configuration documentation in the same logical
-commit. Examples and cross-references must be checked for stale identifiers,
-commands, filters, fields, and file paths. The current architectural decision
-is documented in [`architecture-v6.md`](architecture-v6.md). Schema v5 is
-retained in [`architecture-v5.md`](architecture-v5.md) as history.
+Any functional catalog, CLI, MCP, curator, packaging, or schema change must
+update relevant usage, format, architecture, and configuration documentation
+in the same logical commit. Examples and cross-references must be checked for
+stale identifiers, commands, filters, fields, and file paths. The current
+architectural decision is documented in
+[`architecture-v7.md`](architecture-v7.md). Earlier architecture pages are
+retained as history.
 
 ## Completion criteria
 

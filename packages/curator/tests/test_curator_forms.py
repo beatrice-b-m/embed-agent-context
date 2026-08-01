@@ -6,7 +6,7 @@ import subprocess
 from types import MappingProxyType
 import unittest
 
-from embed_context.curator.forms import (
+from embed_context_curator.forms import (
     build_form_spec,
     definition_schema,
     local_validate_record,
@@ -14,7 +14,8 @@ from embed_context.curator.forms import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
+STATIC_ROOT = ROOT / "packages/curator/src/embed_context_curator/static"
 
 
 class CuratorFormTests(unittest.TestCase):
@@ -132,13 +133,13 @@ class CuratorFormTests(unittest.TestCase):
 
 class CuratorStaticContractTests(unittest.TestCase):
     def test_static_assets_are_package_resources(self):
-        static = importlib.resources.files("embed_context.curator").joinpath("static")
+        static = importlib.resources.files("embed_context_curator").joinpath("static")
         for name in ("index.html", "app.js", "styles.css"):
             self.assertTrue(static.joinpath(name).is_file(), name)
 
     def test_shell_uses_external_assets_and_safe_dom_rendering(self):
-        html = (ROOT / "embed_context/curator/static/index.html").read_text()
-        javascript = (ROOT / "embed_context/curator/static/app.js").read_text()
+        html = (STATIC_ROOT / "index.html").read_text()
+        javascript = (STATIC_ROOT / "app.js").read_text()
         self.assertIn('src="/app.js"', html)
         self.assertIn('href="/styles.css"', html)
         self.assertNotIn("<script>", html)
@@ -146,7 +147,7 @@ class CuratorStaticContractTests(unittest.TestCase):
         self.assertIn("textContent", javascript)
 
     def test_shell_exposes_complete_navigation_query_and_graph_controls(self):
-        html = (ROOT / "embed_context/curator/static/index.html").read_text()
+        html = (STATIC_ROOT / "index.html").read_text()
         for control in (
             "filter-text",
             "filter-kind",
@@ -164,7 +165,7 @@ class CuratorStaticContractTests(unittest.TestCase):
                 self.assertIn(f'id="{control}"', html)
 
     def test_javascript_uses_layered_metadata_and_complete_comparisons(self):
-        javascript = (ROOT / "embed_context/curator/static/app.js").read_text()
+        javascript = (STATIC_ROOT / "app.js").read_text()
         for contract in (
             "data?.source",
             "origin.contribution_class",
@@ -179,7 +180,7 @@ class CuratorStaticContractTests(unittest.TestCase):
                 self.assertIn(contract, javascript)
 
     def test_javascript_buffers_unapplied_editor_text_per_record(self):
-        javascript = (ROOT / "embed_context/curator/static/app.js").read_text()
+        javascript = (STATIC_ROOT / "app.js").read_text()
         self.assertIn("const buffered = bufferedRecordValue(", javascript)
         self.assertIn("recordBufferKey(identity)", javascript)
         self.assertIn(
@@ -194,7 +195,7 @@ class CuratorStaticContractTests(unittest.TestCase):
         )
 
     def test_save_and_shutdown_paths_track_unapplied_editor_buffers(self):
-        javascript = (ROOT / "embed_context/curator/static/app.js").read_text()
+        javascript = (STATIC_ROOT / "app.js").read_text()
         self.assertIn(
             "rebaseDraftBuffer(state.buffer, data.revision || 0)",
             javascript,
@@ -213,7 +214,7 @@ class CuratorStaticContractTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
     def test_create_form_dom_events_track_cancelled_work_until_reset(self):
-        app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
+        app_uri = (STATIC_ROOT / "app.js").as_uri()
         script = f"""
           import {{createDraftBuffer, hasUnsavedWork,
                    trackCreateFormChanges, updateCreateFormBuffer}}
@@ -259,7 +260,7 @@ class CuratorStaticContractTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
     def test_apply_edit_save_shutdown_buffer_interaction(self):
-        app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
+        app_uri = (STATIC_ROOT / "app.js").as_uri()
         script = f"""
           import {{createDraftBuffer, bufferRecord, discardBufferedRecord,
                    bufferedRecordValue, rebaseDraftBuffer,
@@ -295,7 +296,7 @@ class CuratorStaticContractTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
     def test_dom_independent_javascript_draft_helpers(self):
-        app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
+        app_uri = (STATIC_ROOT / "app.js").as_uri()
         script = f"""
           import {{createDraftBuffer, bufferRecord, discardBufferedRecord,
                    bufferedRecordValue, recordBufferKey,

@@ -37,6 +37,11 @@ jobs:
       - name: Run the complete test suite
         run: uv run --locked python -m unittest discover -v
 
+      - name: Run the optional curator test suite
+        run: >-
+          uv run --locked --no-dev --extra curator python -m unittest
+          discover -s packages/curator/tests -v
+
       - name: Validate the bundled catalog
         run: uv run --locked embed-context validate
 
@@ -61,15 +66,43 @@ jobs:
           python-version: "3.13"
 
       - name: Build release artifacts
-        run: uv build
+        run: uv build --all-packages
 
-      - name: Install and invoke the wheel outside the checkout
+      - name: Verify the base wheel outside the checkout
         working-directory: ${{ runner.temp }}
         env:
           UV_TOOL_DIR: ${{ runner.temp }}/embed-context-tools
           UV_TOOL_BIN_DIR: ${{ runner.temp }}/embed-context-bin
         run: |
-          uv tool install --with mcp==2.0.0 "${GITHUB_WORKSPACE}"/dist/*.whl
+          uv tool install "${GITHUB_WORKSPACE}"/dist/embedv2_agent_context-0.9.0-py3-none-any.whl
           "${UV_TOOL_BIN_DIR}/embed-context" --version
           "${UV_TOOL_BIN_DIR}/embed-context" validate
+          if "${UV_TOOL_BIN_DIR}/embed-context" curate --no-open 2>curator-error.log; then
+            echo "base-only curator command unexpectedly succeeded" >&2
+            exit 1
+          fi
+          grep -q "optional curator companion package" curator-error.log
+
+      - name: Verify optional interfaces outside the checkout
+        working-directory: ${{ runner.temp }}
+        env:
+          UV_TOOL_DIR: ${{ runner.temp }}/embed-context-tools
+          UV_TOOL_BIN_DIR: ${{ runner.temp }}/embed-context-bin
+        run: |
+          uv tool install --reinstall \
+            --with "${GITHUB_WORKSPACE}"/dist/embedv2_agent_context_curator-0.9.0-py3-none-any.whl \
+            --with mcp==2.0.0 \
+            "${GITHUB_WORKSPACE}"/dist/embedv2_agent_context-0.9.0-py3-none-any.whl
           "${UV_TOOL_BIN_DIR}/embed-context-mcp" --version
+          "${UV_TOOL_BIN_DIR}/embed-context" curate --no-open --port 8123 >curator.log 2>&1 &
+          curator_pid=$!
+          trap 'kill "${curator_pid}" 2>/dev/null || true' EXIT
+          curl --fail --retry 10 --retry-delay 1 http://127.0.0.1:8123/ >curator.html
+          grep -q "EMBED catalog curator" curator.html
+          curl --fail \
+            -H 'Content-Type: application/json' \
+            -H 'Origin: http://127.0.0.1:8123' \
+            --data '{"discard_unsaved":true}' \
+            http://127.0.0.1:8123/api/shutdown
+          wait "${curator_pid}"
+          trap - EXIT

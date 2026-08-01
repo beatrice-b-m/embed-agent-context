@@ -12,10 +12,11 @@ Read these in order before changing behavior or catalog meaning:
 5. `docs/catalog-format.md` and `docs/architecture-v7.md` when changing the
    serialized model or query behavior.
 
-The current version axes are independent: software `0.8.0`, semantic catalog
+The current version axes are independent: software `0.9.0`, semantic catalog
 schema version `7`, profile-module schema version `1`, extension-module schema
 version `1`, registered physical profile `open-v2`, and optional MCP SDK
-dependency `2.0.0`.
+dependency `2.0.0`. The optional `embedv2-agent-context-curator` companion is
+versioned in lockstep with the core distribution.
 
 ## Canonical-source hierarchy
 
@@ -69,6 +70,8 @@ uv run --locked python -m unittest discover -v
 uv run --locked embed-context validate
 uv run --locked --no-dev --extra mcp python -m unittest \
   tests.test_mcp_server -v
+uv run --locked --package embedv2-agent-context-curator python -m unittest \
+  discover -s packages/curator/tests -v
 ```
 
 Run focused tests while iterating:
@@ -77,15 +80,19 @@ Run focused tests while iterating:
 - JSON Schema parity: `tests.test_catalog_schema`
 - CLI: `tests.test_cli`
 - MCP: `tests.test_mcp_server` with `--extra mcp`
+- curator companion: `packages/curator/tests` with
+  `--package embedv2-agent-context-curator`
 - footer verifier implementation: `tests.test_source_profile`
 
 Run `uv run --locked python scripts/validate_source_profile.py` only when the
 optional ignored artifacts are already present and footer verification is
 actually in scope.
 
-For packaging changes, build a wheel, inspect it for both catalog resources and
-entry points, install into temporary `UV_TOOL_DIR` and `UV_TOOL_BIN_DIR`
-locations, and run `embed-context validate` from outside the checkout.
+For packaging changes, build both workspace distributions. Verify that the core
+wheel contains the catalog resources and entry points but no curator
+implementation or browser assets, and that the companion wheel owns all viewer
+code and static resources. Test base-only and combined installs in temporary
+`UV_TOOL_DIR` and `UV_TOOL_BIN_DIR` locations from outside the checkout.
 
 ## Change-specific interface checklist
 
@@ -99,7 +106,8 @@ locations, and run `embed-context validate` from outside the checkout.
   annotations, generic structured output, dispatch, and stderr-only startup
   errors.
 - Packaging: keep the bundled catalog/schema, console scripts, package version,
-  README install path, and client configurations synchronized.
+  companion version, README install paths, and client configurations
+  synchronized.
 - Any public interface change: update the relevant usage, format, and
   architecture documentation.
 

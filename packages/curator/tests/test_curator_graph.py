@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from embed_context import load_catalog
-from embed_context.curator.graph import AuthoredGraphRecord, GraphIndex, node_key
+from embed_context_curator.graph import AuthoredGraphRecord, GraphIndex, node_key
 
 
 class CuratorGraphTests(unittest.TestCase):

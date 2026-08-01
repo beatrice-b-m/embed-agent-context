@@ -30,18 +30,45 @@ counts, distributions, or executable cohort definitions.
 ## Install
 
 You need [uv](https://docs.astral.sh/uv/getting-started/installation/). Install
-the CLI and optional MCP server directly from GitHub:
+the lightweight catalog, Python API, and CLI directly from GitHub:
 
 ```bash
 uv tool install \
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
+```
+
+Add only the optional interfaces you need:
+
+```bash
+# Read-only stdio MCP server.
+uv tool install \
+  'embedv2-agent-context[mcp] @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
+
+# Local catalog curation web viewer.
+uv tool install \
+  --with \
+  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git#subdirectory=packages/curator' \
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
+
+# Both optional interfaces.
+uv tool install \
+  --with \
+  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git#subdirectory=packages/curator' \
   'embedv2-agent-context[mcp] @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
 ```
 
-This creates an isolated environment and installs two commands into uv's
+These commands create an isolated environment and install commands into uv's
 executable directory:
 
 - `embed-context` queries the catalog from a terminal or script.
-- `embed-context-mcp` lets an AI client query the same catalog over stdio MCP.
+- `embed-context-mcp`, when the `mcp` extra is selected, lets an AI client
+  query the same catalog over stdio MCP.
+
+The `curator` extra installs the separate
+`embedv2-agent-context-curator` companion distribution. The base wheel contains
+neither its Python implementation nor its HTML, JavaScript, and CSS assets.
+The `curate` subcommand remains visible in base CLI help and reports the exact
+extra needed when the companion is absent.
 
 If uv says its executable directory is not on `PATH`, run:
 
@@ -56,8 +83,29 @@ embed-context --version
 embed-context validate
 ```
 
-To install from a local clone instead, run `uv tool install '.[mcp]'` in the
-repository root. Contributors should use the development environment described
+For a reproducible Git installation, select the root project at a tag or
+commit:
+
+```bash
+uv tool install \
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git@REV'
+```
+
+Add `[mcp]` after `embedv2-agent-context` when needed. A curator installation
+must install both projects from the same revision:
+
+```bash
+uv tool install \
+  --with \
+  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git@REV#subdirectory=packages/curator' \
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git@REV'
+```
+
+Add the root package's `mcp` extra to the final argument when both optional
+interfaces are needed. Keeping both URLs at the same revision preserves the
+lockstep core/curator compatibility contract. To install from a local clone,
+run `uv tool install '.[curator]'` in the repository root.
+Contributors should instead use the workspace development environment described
 in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Start with a clinical question
@@ -148,11 +196,11 @@ interactive use.
 
 ## Curate catalog modules locally
 
-Maintainers can open the temporary local metadata workbench without accessing
-EMBED data:
+Maintainers who installed the `curator` extra can open the temporary local
+metadata workbench without accessing EMBED data:
 
 ```bash
-uv run --locked embed-context curate
+embed-context curate
 ```
 
 The server binds only to `127.0.0.1`, opens an automatically allocated port,
@@ -160,17 +208,17 @@ and stops with the command. Review mode is read-only. To edit, explicitly name
 one loaded filesystem-backed schema-v7 module:
 
 ```bash
-uv run --locked embed-context \
+embed-context \
   --extension-file project-configs/review.json \
   curate --edit-module project-configs/review.json
 ```
 
-The workbench edits the authored module, validates it through the same catalog
-resolver and domain checks as normal loading, compares real catalog discovery
-before and after the draft, and displays the exact prospective bytes before an
-atomic save. It never serializes the effective catalog, reads clinical
-artifacts, runs git commands, or exposes a remote service. Use `--no-open` for
-manual browser launch.
+The companion workbench edits the authored module and validates it through the
+same catalog resolver and domain checks as normal loading. It compares real
+catalog discovery before and after the draft and displays the exact prospective
+bytes before an atomic save. It never serializes the effective catalog, reads
+clinical artifacts, runs git commands, or exposes a remote service. Use
+`--no-open` for manual browser launch.
 
 ## Connect an AI client
 
@@ -337,12 +385,13 @@ The version numbers describe different things:
 
 | Axis | Current value |
 | --- | --- |
-| Software package and commands | `0.8.0` |
+| Software package and commands | `0.9.0` |
 | Semantic catalog schema | `7` |
 | Profile-module schema | `1` |
 | Extension-module schema | `1` |
 | Registered EMBED V2 physical profile | `open-v2` |
 | Optional MCP SDK dependency | `2.0.0` |
+| Optional curator companion | lockstep `0.9.0` |
 
 ## Learn more
 

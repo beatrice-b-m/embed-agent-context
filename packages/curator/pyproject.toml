@@ -1,0 +1,42 @@
+[project]
+name = "embedv2-agent-context-curator"
+version = "0.9.0"
+description = "Optional local curation viewer for EMBED Agent Context"
+readme = "README.md"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Beatrice Brown-Mulry" },
+]
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "embedv2-agent-context==0.9.0",
+]
+keywords = ["EMBED", "breast imaging", "clinical semantics", "curation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+
+[project.urls]
+Repository = "https://github.com/beatrice-b-m/embedv2-agent-context"
+Issues = "https://github.com/beatrice-b-m/embedv2-agent-context/issues"
+Documentation = "https://github.com/beatrice-b-m/embedv2-agent-context#readme"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/embed_context_curator"]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+embedv2-agent-context = { workspace = true }

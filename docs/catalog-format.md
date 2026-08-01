@@ -208,7 +208,11 @@ The fingerprint never incorporates absolute paths or input ordering.
 
 ## Authoring and evolution
 
-The optional `embed-context curate` adapter maintains two separate views. Its
+The optional `embed-context curate` adapter is installed through the `curator`
+extra as the separate `embedv2-agent-context-curator` distribution. The base
+wheel retains only CLI discovery and dispatch for the command; the companion
+owns the implementation and browser assets. The adapter maintains two separate
+views. Its
 authored view retains validated source documents, exact bytes, module
 ownership, and record addresses; only one explicitly selected filesystem
 module can be changed. Its effective view is an immutable composed `Catalog`

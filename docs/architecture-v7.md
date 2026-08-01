@@ -61,21 +61,31 @@ validation errors.
 ## Safety and deployment
 
 All modules are descriptive, count-free, and non-executable. Loading and normal
-validation require no clinical data. The wheel includes the manifest, every
-bundled manifest target, and every standalone schema. Runtime JSON Schema
-validation is part of the core package; MCP remains an optional interface.
+validation require no clinical data. The core wheel includes the manifest,
+every bundled manifest target, and every standalone schema. Runtime JSON Schema
+validation is part of the core package. MCP remains an optional dependency, and
+the local web viewer is shipped in a separate optional companion distribution.
 
-Current independent version axes are software `0.8.0`, semantic schema `7`,
+Current independent version axes are software `0.9.0`, semantic schema `7`,
 profile-module schema `1`, extension-module schema `1`, profile ID `open-v2`,
-and optional MCP SDK `2.0.0`.
+optional MCP SDK `2.0.0`, and lockstep curator companion `0.9.0`.
 
 ## Optional local authoring adapter
 
-The private `embed_context.curator` package uses the canonical resolver's
-immutable authored snapshots alongside the effective `Catalog`. A loopback-only
-standard-library HTTP server exposes bundled static assets, typed graph and
-discovery adapters, and one lock-protected draft session. The adapter adds no
-catalog mutation methods and does not alter composition semantics.
+The separately installed `embedv2-agent-context-curator` distribution owns the
+private `embed_context_curator` package and all browser assets. It depends on
+the same-version core distribution and uses the core's narrow private curator
+integration surface to access canonical resolver snapshots alongside the
+effective `Catalog`. The base distribution keeps the `curate` CLI dispatch stub
+and installation diagnostic, but its wheel contains no viewer implementation or
+HTML, JavaScript, or CSS.
+
+A loopback-only standard-library HTTP server exposes the companion's static
+assets, typed graph and discovery adapters, and one lock-protected draft
+session. The adapter adds no catalog mutation methods and does not alter
+composition semantics. The two distributions are developed in one uv workspace
+so resolver and viewer changes can be tested atomically; their distinct import
+namespaces preserve wheel ownership and clean uninstall behavior.
 
 Only one explicitly selected schema-v7 source document is writable. Drafts are
 recomposed from immutable session snapshots, validated synchronously, compared

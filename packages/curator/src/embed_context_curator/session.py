@@ -14,7 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from embed_context.catalog import (
+from embed_context._curator_api import (
     CatalogError,
     _replace_resolved_document,
     _resolve_catalog,

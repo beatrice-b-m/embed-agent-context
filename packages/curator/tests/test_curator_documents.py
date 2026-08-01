@@ -6,7 +6,7 @@ import unittest
 from types import SimpleNamespace
 from pathlib import Path
 
-from embed_context.curator.documents import (
+from embed_context_curator.documents import (
     build_source_index,
     canonical_json_bytes,
     creation_location,

@@ -2,6 +2,12 @@ version = 1
 revision = 3
 requires-python = ">=3.11, <3.14"
 
+[manifest]
+members = [
+    "embedv2-agent-context",
+    "embedv2-agent-context-curator",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.8.0"
@@ -149,13 +155,16 @@ wheels = [
 
 [[package]]
 name = "embedv2-agent-context"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
 ]
 
 [package.optional-dependencies]
+curator = [
+    { name = "embedv2-agent-context-curator" },
+]
 mcp = [
     { name = "mcp" },
 ]
@@ -167,13 +176,25 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "embedv2-agent-context-curator", marker = "extra == 'curator'", editable = "packages/curator" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = "==2.0.0" },
 ]
-provides-extras = ["mcp"]
+provides-extras = ["mcp", "curator"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pyarrow", specifier = "==20.0.0" }]
+
+[[package]]
+name = "embedv2-agent-context-curator"
+version = "0.9.0"
+source = { editable = "packages/curator" }
+dependencies = [
+    { name = "embedv2-agent-context" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "embedv2-agent-context", editable = "." }]
 
 [[package]]
 name = "h11"

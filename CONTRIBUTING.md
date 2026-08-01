@@ -15,6 +15,12 @@ uv sync --locked --all-extras
 uv run --locked embed-context validate
 ```
 
+This repository is a uv workspace. The root project builds the lightweight
+`embedv2-agent-context` distribution; `packages/curator` builds the optional
+`embedv2-agent-context-curator` companion. `--all-extras` selects the root MCP
+and curator extras, and the workspace source mapping resolves the companion
+locally. The two projects use one lockfile and the same software version.
+
 This setup and the baseline test suite need no EMBED data. Read
 [the documentation map](docs/README.md), then
 [project scope](docs/project-scope.md) before changing catalog meaning.
@@ -82,6 +88,8 @@ uv run --locked python -m unittest discover -v
 uv run --locked embed-context validate
 uv run --locked --no-dev --extra mcp python -m unittest \
   tests.test_mcp_server -v
+uv run --locked --package embedv2-agent-context-curator python -m unittest \
+  discover -s packages/curator/tests -v
 ```
 
 `tests/test_catalog_schema.py` checks the canonical and synthetic catalogs
@@ -96,15 +104,31 @@ Use focused checks while iterating:
 | JSON Schema or loader validation | `uv run --locked python -m unittest tests.test_catalog_schema tests.test_catalog -v` |
 | CLI | `uv run --locked python -m unittest tests.test_cli -v` |
 | MCP adapter | `uv run --locked --no-dev --extra mcp python -m unittest tests.test_mcp_server -v` |
-| Packaging or entry points | `uv build`; install the wheel or checkout into temporary uv tool directories; run `embed-context validate` outside the checkout |
+| Packaging or entry points | Build both workspace distributions; inspect core exclusion and companion ownership; install base-only and combined wheels into temporary uv tool directories; run installed commands outside the checkout |
 | Source-profile verifier | `uv run --locked python -m unittest tests.test_source_profile -v` |
-| Local curation viewer | `uv run --locked python -m unittest tests.test_curator_documents tests.test_curator_forms tests.test_curator_graph tests.test_curator_query_diff tests.test_curator_session tests.test_curator_server tests.test_curator_cli -v` |
+| Local curation viewer | `uv run --locked --package embedv2-agent-context-curator python -m unittest discover -s packages/curator/tests -v` plus the root missing-extra CLI tests |
+
+For the packaging row, build the distributions independently:
+
+```bash
+uv build
+uv build --package embedv2-agent-context-curator
+```
+
+The root wheel must contain no `embed_context_curator` files or browser assets.
+The companion wheel must contain its Python package and all files under
+`embed_context_curator/static`, and must declare the exact matching core
+version. Installed-tool acceptance covers a base-only environment and a
+combined environment containing both optional interfaces; isolated MCP and
+curator tests cover each extra separately. It also checks that base-only
+`curate` exits with the installation hint instead of an import traceback.
 
 ## Local curation workbench
 
-Launch read-only review with `uv run --locked embed-context curate`. To curate,
-load and select exactly one source-tree or external schema-v7 module, for
-example:
+The viewer lives in the `packages/curator` workspace member and is not included
+in the base wheel. After the workspace setup above, launch read-only review
+with `uv run --locked embed-context curate`. To curate, load and select exactly
+one source-tree or external schema-v7 module, for example:
 
 ```bash
 uv run --locked embed-context \
@@ -141,11 +165,14 @@ be committed.
 
 ## Continuous integration
 
-GitHub Actions runs the clone-safe baseline on Python 3.11, 3.12, and 3.13 for
-every pull request and every push to `main`. A separate packaging job builds
-the source distribution and wheel, installs the wheel with its MCP extra into
-temporary tool directories outside the checkout, and invokes both installed
-entry points. The workflow never accesses EMBED data or `reference_files/`.
+GitHub Actions runs the clone-safe core and companion baselines on Python 3.11,
+3.12, and 3.13 for every pull request and every push to `main`. A separate
+packaging job builds both distributions and verifies that the core wheel has no
+viewer modules or browser assets while the companion wheel owns all of them.
+It tests base-only and combined optional-interface tool installations outside
+the checkout, including the base CLI's missing-curator diagnostic; isolated
+test steps cover MCP and curator independently. The workflow never accesses
+EMBED data or `reference_files/`.
 
 ## Pull request checklist
 

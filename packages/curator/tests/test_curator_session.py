@@ -9,11 +9,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from embed_context.curator.session import CuratorError, CuratorSession
+from embed_context_curator.session import CuratorError, CuratorSession
 from tests.test_catalog_composition import representative_extension
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 SEMANTIC = ROOT / "catalog/semantic/catalog.json"
 PROFILE = ROOT / "catalog/profiles/open-v2.json"
 QUALIFICATION = "open-v2.qualification.clinical_object.breast_imaging_episode"
@@ -383,7 +383,7 @@ class CuratorSessionTests(unittest.TestCase):
                 source_edited = True
 
         with patch(
-            "embed_context.curator.session.os.fsync",
+            "embed_context_curator.session.os.fsync",
             side_effect=edit_source_after_temporary_file_sync,
         ):
             with self.assertRaises(CuratorError) as caught:

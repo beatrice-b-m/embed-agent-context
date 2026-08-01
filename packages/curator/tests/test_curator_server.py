@@ -7,7 +7,7 @@ import json
 import threading
 import unittest
 
-from embed_context.curator.server import CuratorServer
+from embed_context_curator.server import CuratorServer
 
 
 class FakeSession:

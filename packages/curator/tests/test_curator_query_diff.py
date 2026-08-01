@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from embed_context import load_catalog
-from embed_context.curator.query_diff import (
+from embed_context_curator.query_diff import (
     compare_discovery_results,
     run_discovery_comparison,
 )

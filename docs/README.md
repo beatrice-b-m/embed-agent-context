@@ -5,7 +5,8 @@ Choose the page that matches what you want to do.
 ## Use the catalog
 
 Start with the repository [README](../README.md). It explains why the catalog
-exists, installs the commands with `uv tool install`, and walks through a
+exists, installs the lightweight base command with `uv tool install`, describes
+the separately selected `mcp` and `curator` extras, and walks through a
 clinical-first query. No EMBED data or repository checkout is needed.
 
 If EMBED itself is new to you, begin with the HITI Lab's
@@ -35,8 +36,9 @@ ask a clinical question with `embed-context discover`
   composition, module boundaries, deterministic loading, and effective query
   view.
 - [Local catalog curation viewer](curation-viewer-plan.md) records the delivered
-  design and acceptance contract for the temporary local browser, connection
-  graph, query comparison, validated draft editing, and atomic module saves.
+  design, companion-distribution boundary, and acceptance contract for the
+  temporary local browser, connection graph, query comparison, validated draft
+  editing, and atomic module saves.
 - [Architecture v6](architecture-v6.md) preserves the preceding monolithic
   schema-v6 architecture as history.
 - [Profile-module migration](profile-module-migration.md) records the design and

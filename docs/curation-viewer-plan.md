@@ -2,9 +2,16 @@
 
 ## Status
 
-Delivered on the `codex/curation-viewer` implementation branch. This document
-now records the design, acceptance contract, and intentional implementation
-boundaries for the temporary maintainer-operated schema-v7 viewer and editor.
+Delivered and merged into `main`. This document now records the design,
+acceptance contract, and intentional implementation boundaries for the
+temporary maintainer-operated schema-v7 viewer and editor.
+
+As of software `0.9.0`, the delivered viewer is packaged as the separately
+installed `embedv2-agent-context-curator` companion distribution. Selecting the
+root package's `curator` extra installs it; the lightweight base wheel contains
+only the `curate` command's dispatch stub and installation diagnostic, not the
+viewer implementation or browser assets. The core and companion versions are
+kept in lockstep while the private integration boundary evolves.
 
 Phases 0 through 4 are implemented. The initial connection renderer remains an
 accessible typed edge list and grouped neighborhood; no SVG renderer was added
@@ -392,8 +399,10 @@ browser assets
       -> graph and query-diff adapters
 ```
 
-Keep this implementation private to a new `embed_context.curator` package. Do
-not add viewer-only mutation methods to `Catalog`.
+Keep this implementation private to the companion distribution's distinct
+`embed_context_curator` import package. Do not let two distributions install
+files into `embed_context`, and do not add viewer-only mutation methods to
+`Catalog`.
 
 Before the curator package is implemented, refactor the canonical loader to
 produce a private resolved-composition value containing:
@@ -414,12 +423,17 @@ resolved composition and calls the same schema, composition, and domain
 validators. The curator must not reconstruct manifests, duplicate locator
 resolution, or add viewer-only loading rules.
 
-Recommended files:
+The delivered files are split across the core project and companion workspace
+member:
 
 ```text
 embed_context/
-  catalog.py            shared resolver and structured validation diagnostics
-  curator/
+  catalog.py             shared resolver and structured validation diagnostics
+  _curator_api.py        narrow private companion integration surface
+  cli.py                 lazy curate dispatch and missing-extra diagnostic
+packages/curator/
+  pyproject.toml          companion distribution and exact core dependency
+  src/embed_context_curator/
     __init__.py
     server.py          loopback server, routing, headers, lifecycle
     session.py         baseline/draft state, validation, diff, save
@@ -431,18 +445,22 @@ embed_context/
       index.html
       app.js
       styles.css
+  tests/
+    test_curator_documents.py
+    test_curator_forms.py
+    test_curator_graph.py
+    test_curator_query_diff.py
+    test_curator_session.py
+    test_curator_server.py
 tests/
-  test_curator_documents.py
-  test_curator_graph.py
-  test_curator_session.py
-  test_curator_server.py
-  test_curator_cli.py
+  test_curator_cli.py       base CLI dispatch and missing-extra behavior
 ```
 
 Use the Python standard library `ThreadingHTTPServer` and bundled vanilla
-HTML, CSS, and JavaScript for the first release. This adds no core or optional
-runtime dependency and requires no frontend compilation step. Static assets
-must be packaged into the wheel and covered by packaging tests.
+HTML, CSS, and JavaScript for the first release. This requires no frontend
+compilation step. Static assets must be packaged only into the companion wheel
+and covered by packaging tests; the core wheel must explicitly be checked for
+their absence.
 
 The initial automated frontend contract is exercised through HTTP API tests
 and tests of extracted, DOM-independent JavaScript state helpers. End-to-end
@@ -707,7 +725,8 @@ Acceptance criteria:
 - discovery results and match explanations agree with direct `Catalog.discover`;
 - server headers, Host, Origin, content-type, method, and body-limit checks pass
   HTTP contract tests without an authentication token; and
-- installed-wheel launch finds all static and catalog resources.
+- an installation containing both wheels launches outside the checkout and
+  finds companion static assets and core catalog resources.
 
 ### Phase 2: extension draft editing — delivered
 
@@ -799,19 +818,26 @@ All fixtures must remain synthetic and count-free.
   defaults;
 - JSON API success and error envelopes;
 - full `load_catalog` validation for semantic, profile, and extension drafts;
-- installed-wheel static-resource and command checks;
+- core-wheel exclusion and companion-wheel static-resource checks;
+- base-only command failure with an actionable `curator` extra hint;
+- installed two-wheel command checks outside the checkout;
+- mismatch diagnostics for incompatible core and companion versions;
 - documented manual browser acceptance for navigation, editing, validation,
   query comparison, reset, and save, unless a dev-only browser-test dependency
   is intentionally added; and
 - regression tests proving existing CLI and MCP query results are unchanged.
 
-Run the repository clone-safe baseline after every phase:
+Run the repository clone-safe baseline after every phase. The workspace setup
+installs all members and extras, while the `--package` selection makes the
+curator test owner explicit:
 
 ```bash
 uv run --locked python -m unittest discover -v
 uv run --locked embed-context validate
 uv run --locked --no-dev --extra mcp python -m unittest \
   tests.test_mcp_server -v
+uv run --locked --package embedv2-agent-context-curator python -m unittest \
+  discover -s packages/curator/tests -v
 ```
 
 Packaging changes additionally require the documented wheel inspection and
@@ -831,7 +857,7 @@ The implementation is not complete until these remain synchronized:
   changing catalog-set composition;
 - `CONTRIBUTING.md`: viewer validation matrix and maintainer save/review flow;
 - CLI help and tests; and
-- packaging configuration and tests for browser assets.
+- packaging configuration and tests for the two-wheel ownership boundary.
 
 No MCP write tool should be added. MCP remains a read-only query surface.
 

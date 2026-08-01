@@ -18,8 +18,13 @@ class PackagingContractTests(unittest.TestCase):
         cls.configuration = tomllib.loads(
             (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         )
+        cls.curator_configuration = tomllib.loads(
+            (REPOSITORY_ROOT / "packages/curator/pyproject.toml").read_text(
+                encoding="utf-8"
+            )
+        )
 
-    def test_package_cli_and_mcp_versions_share_one_release(self) -> None:
+    def test_package_entry_points_share_one_release(self) -> None:
         self.assertEqual(
             self.configuration["project"]["version"],
             __version__,
@@ -92,27 +97,55 @@ class PackagingContractTests(unittest.TestCase):
                 "catalog/extensions/extension.schema.json": (
                     "embed_context/_data/extensions/extension.schema.json"
                 ),
-                "embed_context/curator/static/index.html": (
-                    "embed_context/curator/static/index.html"
-                ),
-                "embed_context/curator/static/app.js": (
-                    "embed_context/curator/static/app.js"
-                ),
-                "embed_context/curator/static/styles.css": (
-                    "embed_context/curator/static/styles.css"
-                ),
             },
         )
 
-    def test_curator_static_shell_is_packaged(self) -> None:
+    def test_curator_is_an_optional_companion_distribution(self) -> None:
+        optional = self.configuration["project"]["optional-dependencies"]
+
+        self.assertEqual(
+            optional["curator"],
+            ["embedv2-agent-context-curator==0.9.0"],
+        )
+        self.assertEqual(
+            self.configuration["tool"]["uv"]["sources"][
+                "embedv2-agent-context-curator"
+            ],
+            {"workspace": True},
+        )
+        self.assertEqual(
+            self.configuration["tool"]["uv"]["workspace"]["members"],
+            ["packages/curator"],
+        )
+
+    def test_curator_companion_is_versioned_with_the_core(self) -> None:
+        curator = self.curator_configuration
+
+        self.assertEqual(curator["project"]["version"], __version__)
+        self.assertEqual(
+            curator["project"]["dependencies"],
+            [f"embedv2-agent-context=={__version__}"],
+        )
+        self.assertEqual(
+            curator["tool"]["hatch"]["build"]["targets"]["wheel"][
+                "packages"
+            ],
+            ["src/embed_context_curator"],
+        )
+        self.assertEqual(curator["project"]["license-files"], ["LICENSE"])
+        self.assertEqual(
+            (REPOSITORY_ROOT / "packages/curator/LICENSE").read_text(),
+            (REPOSITORY_ROOT / "LICENSE").read_text(),
+        )
+
+    def test_base_wheel_does_not_force_include_curator_assets(self) -> None:
         force_include = self.configuration["tool"]["hatch"]["build"][
             "targets"
         ]["wheel"]["force-include"]
         for name in ("index.html", "app.js", "styles.css"):
             source = f"embed_context/curator/static/{name}"
             with self.subTest(source=source):
-                self.assertEqual(force_include[source], source)
-                self.assertTrue((REPOSITORY_ROOT / source).is_file())
+                self.assertNotIn(source, force_include)
 
     def test_every_bundled_manifest_target_is_packaged(self) -> None:
         import json

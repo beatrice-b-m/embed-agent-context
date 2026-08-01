@@ -19,6 +19,19 @@ from .catalog import (
 )
 
 
+CURATOR_INSTALL_HINT = (
+    "Catalog curation requires the optional curator companion package. "
+    "Install a published release with `uv tool install --reinstall "
+    "'embedv2-agent-context[curator]'`; from a project checkout, run "
+    "`uv tool install --reinstall '.[curator]'`; or install matching Git "
+    "revisions with `uv tool install --reinstall --with "
+    "'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/"
+    "embedv2-agent-context.git@REV#subdirectory=packages/curator' "
+    "'embedv2-agent-context @ git+https://github.com/beatrice-b-m/"
+    "embedv2-agent-context.git@REV'`."
+)
+
+
 class UsageError(Exception):
     """An argparse usage error requested in machine-readable form."""
 
@@ -225,7 +238,10 @@ def build_parser(
     relationships_parser.add_argument("--limit", type=int, default=50)
     curate_parser = subparsers.add_parser(
         "curate",
-        help="open the temporary local catalog curation workbench",
+        help=(
+            "open the temporary local catalog curation workbench "
+            "(requires the curator extra)"
+        ),
     )
     curate_parser.add_argument(
         "--edit-module",
@@ -324,7 +340,7 @@ def _run_curator_command(args: argparse.Namespace) -> int:
         _emit_error("text", "curate", ValueError("--port must be between 0 and 65535"))
         return 2
     try:
-        from .curator import CuratorSession, serve_curator
+        CuratorSession, serve_curator = _require_curator()
 
         session = CuratorSession(
             args.catalog,
@@ -339,10 +355,26 @@ def _run_curator_command(args: argparse.Namespace) -> int:
             port=args.port,
             open_browser=not args.no_open,
         )
-    except (CatalogError, OSError, ValueError) as exc:
+    except (CatalogError, CuratorUnavailableError, OSError, ValueError) as exc:
         _emit_error("text", "curate", exc)
         return 2
     return 0
+
+
+class CuratorUnavailableError(RuntimeError):
+    """Raised when the separately installed curator package is absent."""
+
+
+def _require_curator() -> tuple[type[Any], Any]:
+    """Load the optional curator without hiding its own missing dependencies."""
+
+    try:
+        from embed_context_curator import CuratorSession, serve_curator
+    except ModuleNotFoundError as exc:
+        if exc.name != "embed_context_curator":
+            raise
+        raise CuratorUnavailableError(CURATOR_INSTALL_HINT) from exc
+    return CuratorSession, serve_curator
 
 
 def _run_command(catalog: Any, args: argparse.Namespace) -> dict[str, Any]:

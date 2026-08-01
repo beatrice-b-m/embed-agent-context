@@ -209,7 +209,7 @@ class _CuratorHandler(BaseHTTPRequestHandler):
         if name not in {"index.html", "app.js", "styles.css"}:
             self._error(HTTPStatus.NOT_FOUND, "not_found", "Asset was not found.")
             return
-        resource = files("embed_context.curator.static").joinpath(name)
+        resource = files("embed_context_curator.static").joinpath(name)
         try:
             payload = resource.read_bytes()
         except (FileNotFoundError, OSError):
