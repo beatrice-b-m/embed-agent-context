@@ -34,6 +34,9 @@ ask a clinical question with `embed-context discover`
 - [Architecture v7](architecture-v7.md) explains the current catalog-set
   composition, module boundaries, deterministic loading, and effective query
   view.
+- [Local catalog curation viewer implementation plan](curation-viewer-plan.md)
+  defines the staged design for a temporary local browser, connection graph,
+  query comparison, validated draft editing, and atomic module saves.
 - [Architecture v6](architecture-v6.md) preserves the preceding monolithic
   schema-v6 architecture as history.
 - [Profile-module migration](profile-module-migration.md) records the design and
