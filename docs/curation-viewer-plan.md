@@ -2,9 +2,16 @@
 
 ## Status
 
-This document is the implementation plan for a temporary, maintainer-operated
-web viewer and editor for the schema-v7 catalog set. It is a design and delivery
-contract, not documentation for an already available command.
+Delivered on the `codex/curation-viewer` implementation branch. This document
+now records the design, acceptance contract, and intentional implementation
+boundaries for the temporary maintainer-operated schema-v7 viewer and editor.
+
+Phases 0 through 4 are implemented. The initial connection renderer remains an
+accessible typed edge list and grouped neighborhood; no SVG renderer was added
+because it was not required for the delivered workbench. Frontend automation
+is limited to DOM-independent state-helper and static-shell contracts, with the
+HTTP API covered separately; manual browser acceptance remains the DOM-level
+check described below.
 
 The viewer must remain a metadata-only tool. It must not inspect EMBED clinical
 artifacts, connect to a database, execute cohort logic, or weaken any catalog
@@ -656,7 +663,7 @@ supported as a secondary command-line API.
 Each phase is a separate coherent commit with synchronized documentation and
 tests.
 
-### Phase 0: resolved composition and structured diagnostics
+### Phase 0: resolved composition and structured diagnostics — delivered
 
 Refactor catalog-set loading so one canonical resolver returns immutable
 authored document snapshots and the effective `Catalog`. Add structured fields
@@ -675,7 +682,7 @@ Acceptance criteria:
   retaining existing human-readable messages; and
 - focused loader, composition, CLI, MCP, and fingerprint regressions pass.
 
-### Phase 1: read-only session, inventory, and query inspector
+### Phase 1: read-only session, inventory, and query inspector — delivered
 
 Implement the `curator` package, source-document index, effective inventory,
 loopback server, packaged static shell, distinct `curate` CLI lifecycle,
@@ -693,7 +700,7 @@ Acceptance criteria:
   HTTP contract tests without an authentication token; and
 - installed-wheel launch finds all static and catalog resources.
 
-### Phase 2: extension draft editing
+### Phase 2: extension draft editing — delivered
 
 Add the hybrid record editor, browser-local incomplete form buffers, draft
 revisions, create/update/delete operations, synchronous snapshot-based
@@ -714,7 +721,7 @@ Acceptance criteria:
 - a successfully saved extension reloads to the same configuration
   fingerprint shown by the viewer.
 
-### Phase 3: draft query comparison and graph enhancements
+### Phase 3: draft query comparison and graph enhancements — delivered
 
 Add baseline-versus-current-valid-draft discovery comparison, the complete
 typed graph index, incoming-reference and deletion-impact navigation, and
@@ -731,7 +738,7 @@ Acceptance criteria:
 - an invalid draft never presents a stale result as current; and
 - no graph or query code accesses clinical artifacts.
 
-### Phase 4: semantic and profile maintainer editing
+### Phase 4: semantic and profile maintainer editing — delivered
 
 Enable the same draft workflow for filesystem-backed semantic and profile
 modules. Add stronger warnings for portable meaning and released-profile

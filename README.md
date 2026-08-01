@@ -146,6 +146,32 @@ Errors use the same envelope with `ok: false`, a structured error type, and a
 message. This makes the CLI suitable for scripts and agent tooling as well as
 interactive use.
 
+## Curate catalog modules locally
+
+Maintainers can open the temporary local metadata workbench without accessing
+EMBED data:
+
+```bash
+uv run --locked embed-context curate
+```
+
+The server binds only to `127.0.0.1`, opens an automatically allocated port,
+and stops with the command. Review mode is read-only. To edit, explicitly name
+one loaded filesystem-backed schema-v7 module:
+
+```bash
+uv run --locked embed-context \
+  --extension-file project-configs/review.json \
+  curate --edit-module project-configs/review.json
+```
+
+The workbench edits the authored module, validates it through the same catalog
+resolver and domain checks as normal loading, compares real catalog discovery
+before and after the draft, and displays the exact prospective bytes before an
+atomic save. It never serializes the effective catalog, reads clinical
+artifacts, runs git commands, or exposes a remote service. Use `--no-open` for
+manual browser launch.
+
 ## Connect an AI client
 
 The optional `embed-context-mcp` command exposes the catalog as thirteen

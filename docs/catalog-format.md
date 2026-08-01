@@ -208,6 +208,20 @@ The fingerprint never incorporates absolute paths or input ordering.
 
 ## Authoring and evolution
 
+The optional `embed-context curate` adapter maintains two separate views. Its
+authored view retains validated source documents, exact bytes, module
+ownership, and record addresses; only one explicitly selected filesystem
+module can be changed. Its effective view is an immutable composed `Catalog`
+used for navigation, constraints, provenance, and discovery. Effective query
+results, qualifications, origins, and computed relationships are never
+serialized into an authored module.
+
+Draft validation substitutes the prospective authored mapping into the shared
+resolved composition and reruns the version-matched schema, composition, and
+domain validators. Saving writes exactly the canonical bytes shown in the
+viewer and atomically replaces only the selected module after all loaded file
+digests are checked.
+
 Search existing stable IDs before adding meaning. Put portable clinical meaning
 in the semantic catalog, released representation and evidence in one profile,
 and project-owned additions or intentional revisions in an explicitly selected

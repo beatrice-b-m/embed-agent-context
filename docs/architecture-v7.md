@@ -68,3 +68,17 @@ validation is part of the core package; MCP remains an optional interface.
 Current independent version axes are software `0.8.0`, semantic schema `7`,
 profile-module schema `1`, extension-module schema `1`, profile ID `open-v2`,
 and optional MCP SDK `2.0.0`.
+
+## Optional local authoring adapter
+
+The private `embed_context.curator` package uses the canonical resolver's
+immutable authored snapshots alongside the effective `Catalog`. A loopback-only
+standard-library HTTP server exposes bundled static assets, typed graph and
+discovery adapters, and one lock-protected draft session. The adapter adds no
+catalog mutation methods and does not alter composition semantics.
+
+Only one explicitly selected schema-v7 source document is writable. Drafts are
+recomposed from immutable session snapshots, validated synchronously, compared
+with baseline discovery, digest-checked against every filesystem input, and
+saved by atomic replacement. Legacy schema-v6 input remains review-only. This
+is a temporary local maintainer interface, not a hosted or stable remote API.

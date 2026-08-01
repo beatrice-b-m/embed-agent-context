@@ -98,6 +98,25 @@ Use focused checks while iterating:
 | MCP adapter | `uv run --locked --no-dev --extra mcp python -m unittest tests.test_mcp_server -v` |
 | Packaging or entry points | `uv build`; install the wheel or checkout into temporary uv tool directories; run `embed-context validate` outside the checkout |
 | Source-profile verifier | `uv run --locked python -m unittest tests.test_source_profile -v` |
+| Local curation viewer | `uv run --locked python -m unittest tests.test_curator_documents tests.test_curator_forms tests.test_curator_graph tests.test_curator_query_diff tests.test_curator_session tests.test_curator_server tests.test_curator_cli -v` |
+
+## Local curation workbench
+
+Launch read-only review with `uv run --locked embed-context curate`. To curate,
+load and select exactly one source-tree or external schema-v7 module, for
+example:
+
+```bash
+uv run --locked embed-context \
+  --extension-file project-configs/review.json \
+  curate --edit-module project-configs/review.json
+```
+
+Before saving, validate the current revision, compare baseline and draft query
+behavior, and inspect the exact source diff. A save is refused if any loaded
+module changed on disk. After saving, rerun the normal focused checks and
+clone-safe baseline, inspect `git diff`, and commit through the ordinary review
+flow. The viewer does not stage or commit files.
 
 Before committing, inspect `git diff`, stage only the coherent unit, and verify:
 
