@@ -458,6 +458,7 @@ class CuratorSession:
             self._baseline_bytes = prospective
             self._draft = mutable_copy(self._editable_document.mapping)
             self._draft_composition = reloaded
+            self._revision += 1
             self._valid_revision = self._revision
             self._diagnostics = []
             self._index = build_source_index(reloaded.documents, path)

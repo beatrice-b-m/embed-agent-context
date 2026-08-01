@@ -65,11 +65,54 @@ class CuratorSessionTests(unittest.TestCase):
         self.assertEqual(caught.exception.error_type, "revision_conflict")
         saved = session.save(expected_revision=1)
         self.assertTrue(saved["saved"])
+        self.assertEqual(saved["revision"], 2)
         self.assertFalse(saved["dirty"])
         self.assertTrue(saved["valid"])
         self.assertFalse(session.dirty)
         authored = json.loads(self.profile.read_text(encoding="utf-8"))
         self.assertEqual(authored["qualifications"][QUALIFICATION]["summary"], replacement["summary"])
+
+    def test_save_advances_revision_and_rejects_stale_tab_mutation(self) -> None:
+        session = self.session()
+        first_tab = session.get_record("qualification", QUALIFICATION)
+        second_tab = session.get_record("qualification", QUALIFICATION)
+        first_replacement = dict(first_tab["authored"])
+        first_replacement["summary"] = "Saved by the first browser tab."
+        second_replacement = dict(second_tab["authored"])
+        second_replacement["summary"] = "Stale replacement from the second tab."
+
+        mutation = session.replace_record(
+            "qualification",
+            QUALIFICATION,
+            {"revision": first_tab["revision"], "record": first_replacement},
+        )
+        saved = session.save(expected_revision=mutation["revision"])
+
+        self.assertEqual(saved["revision"], mutation["revision"] + 1)
+        self.assertEqual(saved["last_valid_revision"], saved["revision"])
+        with self.assertRaises(CuratorError) as caught:
+            session.replace_record(
+                "qualification",
+                QUALIFICATION,
+                {"revision": mutation["revision"], "record": second_replacement},
+            )
+        self.assertEqual(caught.exception.error_type, "revision_conflict")
+        self.assertEqual(caught.exception.http_status, 409)
+        self.assertEqual(
+            caught.exception.details,
+            {"current_revision": saved["revision"]},
+        )
+        self.assertEqual(session.session_info()["revision"], saved["revision"])
+        self.assertFalse(session.dirty)
+        self.assertEqual(
+            session.get_record("qualification", QUALIFICATION)["authored"]["summary"],
+            first_replacement["summary"],
+        )
+        authored = json.loads(self.profile.read_text(encoding="utf-8"))
+        self.assertEqual(
+            authored["qualifications"][QUALIFICATION]["summary"],
+            first_replacement["summary"],
+        )
 
     def test_invalid_draft_is_retained_but_cannot_save(self) -> None:
         session = self.session()

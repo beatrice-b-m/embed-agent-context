@@ -272,10 +272,10 @@ class CuratorStaticContractTests(unittest.TestCase):
           buffer = discardBufferedRecord(buffer, 'qualification:record-a');
           buffer = bufferRecord(buffer, 'qualification:record-b', '{{"id":');
 
-          session = {{revision: 1, dirty: false, saved: true}};
+          session = {{revision: 2, dirty: false, saved: true}};
           buffer = rebaseDraftBuffer(buffer, session.revision);
           if (bufferedRecordValue(buffer, 'qualification:record-b', '') !== '{{"id":') process.exit(1);
-          if (!buffer.dirty || !hasUnsavedWork(session, buffer)) process.exit(2);
+          if (buffer.revision !== 2 || !buffer.dirty || !hasUnsavedWork(session, buffer)) process.exit(2);
 
           const discardUnsaved = hasUnsavedWork(session, buffer);
           if (!discardUnsaved) process.exit(3);
