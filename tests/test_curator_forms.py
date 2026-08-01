@@ -212,6 +212,52 @@ class CuratorStaticContractTests(unittest.TestCase):
         self.assertNotIn("if (data.saved || data.dirty === false)", javascript)
 
     @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
+    def test_create_form_dom_events_track_cancelled_work_until_reset(self):
+        app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
+        script = f"""
+          import {{createDraftBuffer, hasUnsavedWork,
+                   trackCreateFormChanges, updateCreateFormBuffer}}
+            from {json.dumps(app_uri)};
+
+          class Input extends EventTarget {{
+            constructor(value) {{ super(); this.value = value; }}
+            enter(value) {{
+              this.value = value;
+              this.dispatchEvent(new Event('input'));
+            }}
+          }}
+
+          const controls = {{
+            kind: new Input(''),
+            identifier: new Input(''),
+            recordJson: new Input('{{}}'),
+          }};
+          const session = {{revision: 0, dirty: false}};
+          let buffer = createDraftBuffer(session.revision);
+          trackCreateFormChanges(controls, (values) => {{
+            buffer = updateCreateFormBuffer(buffer, values);
+          }});
+
+          controls.kind.enter('qualification');
+          controls.identifier.enter('project.incomplete');
+          controls.recordJson.enter('{{"id":');
+          // Closing the dialog emits no input event, so the draft must remain dirty.
+          if (!hasUnsavedWork(session, buffer)) process.exit(1);
+
+          controls.kind.enter('');
+          controls.identifier.enter('');
+          controls.recordJson.enter('{{}}');
+          if (hasUnsavedWork(session, buffer)) process.exit(2);
+        """
+        completed = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    @unittest.skipUnless(shutil.which("node"), "Node is unavailable")
     def test_apply_edit_save_shutdown_buffer_interaction(self):
         app_uri = (ROOT / "embed_context/curator/static/app.js").as_uri()
         script = f"""

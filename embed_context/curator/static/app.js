@@ -31,6 +31,29 @@ export function hasUnsavedWork(session, buffer) {
   return Boolean(session?.dirty || buffer?.dirty);
 }
 
+export const CREATE_FORM_BUFFER_KEY = "$create-record";
+
+export function updateCreateFormBuffer(buffer, values) {
+  const snapshot = {
+    kind: values.kind,
+    identifier: values.identifier,
+    recordJson: values.recordJson,
+  };
+  const isEmpty = snapshot.kind === "" && snapshot.identifier === "" && snapshot.recordJson === "{}";
+  return isEmpty
+    ? discardBufferedRecord(buffer, CREATE_FORM_BUFFER_KEY)
+    : bufferRecord(buffer, CREATE_FORM_BUFFER_KEY, snapshot);
+}
+
+export function trackCreateFormChanges(controls, onChange) {
+  const update = () => onChange({
+    kind: controls.kind.value,
+    identifier: controls.identifier.value,
+    recordJson: controls.recordJson.value,
+  });
+  for (const control of Object.values(controls)) control.addEventListener("input", update);
+}
+
 export function mergeRecordValues(original, replacement) {
   return Object.assign({}, structuredClone(original), structuredClone(replacement));
 }
@@ -471,6 +494,12 @@ function renderDiagnosticsAt(id, errors) {
   for (const error of errors) list.append(element("li", { text: `${error.pointer || error.json_pointer || "/"}: ${error.message}` }));
 }
 
+function resetCreateForm() {
+  byId("create-form").reset();
+  renderDiagnosticsAt("create-errors", []);
+  state.buffer = discardBufferedRecord(state.buffer, CREATE_FORM_BUFFER_KEY);
+}
+
 async function createRecord(event) {
   event.preventDefault();
   let record;
@@ -487,7 +516,7 @@ async function createRecord(event) {
     if (checks.length) return;
     const data = await api("/api/draft/records", { method: "POST", body: { revision: state.session.revision, kind, identifier: id, record } });
     state.session = { ...state.session, ...data, dirty: true };
-    state.buffer = discardBufferedRecord(state.buffer, recordBufferKey({ kind, id }));
+    resetCreateForm();
     renderSession(); byId("create-dialog").close(); await loadRecords(); await selectRecord(kind, id);
   } catch (error) { renderDiagnosticsAt("create-errors", error.details?.length ? error.details : [{ pointer: "/", message: error.message }]); }
 }
@@ -599,6 +628,7 @@ async function draftAction(path, title, { discardLocal = false } = {}) {
     state.buffer = discardLocal
       ? createDraftBuffer(data.revision || 0)
       : rebaseDraftBuffer(state.buffer, data.revision || 0);
+    if (discardLocal) resetCreateForm();
     renderSession();
     showData(title, data);
     return data;
@@ -639,6 +669,14 @@ async function boot() {
   byId("new-record").addEventListener("click", () => byId("create-dialog").showModal());
   byId("cancel-create").addEventListener("click", () => byId("create-dialog").close());
   byId("create-form").addEventListener("submit", createRecord);
+  trackCreateFormChanges({
+    kind: byId("create-kind"),
+    identifier: byId("create-id"),
+    recordJson: byId("create-json"),
+  }, (values) => {
+    state.buffer = updateCreateFormBuffer(state.buffer, values);
+    renderSession();
+  });
   byId("show-diff").addEventListener("click", async () => {
     try { showData("Exact prospective source diff", await api("/api/draft/diff")); }
     catch (error) { showData("Draft diff", { message: error.message, details: error.details }); }
