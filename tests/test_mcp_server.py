@@ -1,4 +1,4 @@
-"""Focused contract and real-catalog tests for the schema-v6 MCP adapter."""
+"""Focused contract and real-catalog tests for the composable MCP adapter."""
 
 from __future__ import annotations
 
@@ -99,11 +99,16 @@ class FakeCatalog:
         identifier: str,
         *,
         include_codes: bool = False,
+        profile: str | None = None,
     ) -> dict[str, Any]:
         self.calls.append(
             (
                 "get_feature",
-                {"identifier": identifier, "include_codes": include_codes},
+                {
+                    "identifier": identifier,
+                    "include_codes": include_codes,
+                    "profile": profile,
+                },
             )
         )
         return {
@@ -143,10 +148,13 @@ class FakeCatalog:
         self,
         feature_or_vocabulary: str,
         code: str,
+        *,
+        profile: str | None = None,
     ) -> dict[str, Any]:
         arguments = {
             "feature_or_vocabulary": feature_or_vocabulary,
             "code": code,
+            "profile": profile,
         }
         self.calls.append(("lookup_code", arguments))
         return {
@@ -299,9 +307,52 @@ class ModuleEntryPointTests(unittest.TestCase):
             result = main([])
 
         self.assertEqual(result, 0)
-        load_catalog.assert_called_once_with(None)
+        load_catalog.assert_called_once_with(
+            None,
+            profile_paths=(),
+            extension_paths=(),
+            include_default_profiles=True,
+            include_default_extensions=False,
+        )
         build_server_mock.assert_called_once_with(catalog)
         server.run.assert_called_once_with(transport="stdio")
+
+    def test_main_forwards_repeatable_module_selection_options(self) -> None:
+        catalog = FakeCatalog()
+        server = Mock()
+        with (
+            patch(
+                "embed_context.mcp_server._require_mcp",
+                return_value=(Mock, Mock),
+            ),
+            patch(
+                "embed_context.mcp_server._load_catalog",
+                return_value=catalog,
+            ) as load_catalog,
+            patch(
+                "embed_context.mcp_server.build_server",
+                return_value=server,
+            ),
+        ):
+            result = main(
+                (
+                    "--catalog", "set.json",
+                    "--profile-file", "v1.json",
+                    "--profile-file", "v2.json",
+                    "--extension-file", "project.json",
+                    "--no-default-profiles",
+                    "--include-default-extensions",
+                )
+            )
+
+        self.assertEqual(result, 0)
+        load_catalog.assert_called_once()
+        positional, keywords = load_catalog.call_args
+        self.assertEqual(str(positional[0]), "set.json")
+        self.assertEqual(tuple(map(str, keywords["profile_paths"])), ("v1.json", "v2.json"))
+        self.assertEqual(tuple(map(str, keywords["extension_paths"])), ("project.json",))
+        self.assertFalse(keywords["include_default_profiles"])
+        self.assertTrue(keywords["include_default_extensions"])
 
 
 @unittest.skipUnless(MCP_AVAILABLE, "optional MCP SDK is not installed")
@@ -346,14 +397,14 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
         expected_properties = {
             "discover": {"query", "profile", "kinds", "domain", "limit"},
             "get_clinical_object": {"identifier"},
-            "get_feature": {"identifier", "include_codes"},
+            "get_feature": {"identifier", "include_codes", "profile"},
             "get_semantic_relationship": {"identifier"},
             "get_temporal_semantic": {"identifier"},
             "get_aggregation": {"identifier"},
             "get_guardrail": {"identifier"},
             "get_coverage": {"identifier"},
             "get_context": {"identifier"},
-            "lookup_code": {"feature_or_vocabulary", "code"},
+            "lookup_code": {"feature_or_vocabulary", "code", "profile"},
             "get_profile_table": {"profile", "table"},
             "get_relationship_binding": {"identifier"},
             "search_relationship_bindings": {
@@ -468,6 +519,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "identifier": "pathology.severity",
                     "include_codes": True,
+                    "profile": "open-v2",
                 },
             )
             code = await client.call_tool(
@@ -475,6 +527,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "feature_or_vocabulary": "pathology-severity",
                     "code": "MiXeD,Value",
+                    "profile": "open-v2",
                 },
             )
 
@@ -490,6 +543,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "identifier": "pathology.severity",
                         "include_codes": True,
+                        "profile": "open-v2",
                     },
                 ),
                 (
@@ -497,6 +551,7 @@ class MCPServerContractTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "feature_or_vocabulary": "pathology-severity",
                         "code": "MiXeD,Value",
+                        "profile": "open-v2",
                     },
                 ),
             ],

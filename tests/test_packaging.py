@@ -66,19 +66,74 @@ class PackagingContractTests(unittest.TestCase):
         ]["wheel"]["force-include"]
 
         self.assertEqual(
-            force_include["catalog/catalog.json"],
-            "embed_context/_data/catalog.json",
+            force_include,
+            {
+                "catalog/catalog-set.json": (
+                    "embed_context/_data/catalog-set.json"
+                ),
+                "catalog/catalog-set.schema.json": (
+                    "embed_context/_data/catalog-set.schema.json"
+                ),
+                "catalog/catalog.schema.json": (
+                    "embed_context/_data/catalog.schema.json"
+                ),
+                "catalog/semantic/catalog.json": (
+                    "embed_context/_data/semantic/catalog.json"
+                ),
+                "catalog/semantic/catalog.schema.json": (
+                    "embed_context/_data/semantic/catalog.schema.json"
+                ),
+                "catalog/profiles/open-v2.json": (
+                    "embed_context/_data/profiles/open-v2.json"
+                ),
+                "catalog/profiles/profile.schema.json": (
+                    "embed_context/_data/profiles/profile.schema.json"
+                ),
+                "catalog/extensions/extension.schema.json": (
+                    "embed_context/_data/extensions/extension.schema.json"
+                ),
+            },
         )
-        self.assertEqual(
-            force_include["catalog/catalog.schema.json"],
-            "embed_context/_data/catalog.schema.json",
+
+    def test_every_bundled_manifest_target_is_packaged(self) -> None:
+        import json
+
+        manifest = json.loads(
+            (REPOSITORY_ROOT / "catalog/catalog-set.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        locators = [
+            manifest["semantic_catalog"],
+            *manifest["profiles"],
+            *manifest["extensions"],
+        ]
+        force_include = self.configuration["tool"]["hatch"]["build"][
+            "targets"
+        ]["wheel"]["force-include"]
+        for locator in locators:
+            if locator["kind"] != "bundled":
+                continue
+            source = f"catalog/{locator['resource']}"
+            with self.subTest(source=source):
+                self.assertIn(source, force_include)
+                self.assertTrue((REPOSITORY_ROOT / source).is_file())
+
+    def test_jsonschema_is_a_core_dependency(self) -> None:
+        self.assertIn(
+            "jsonschema==4.26.0",
+            self.configuration["project"]["dependencies"],
+        )
+        self.assertNotIn(
+            "jsonschema==4.26.0",
+            self.configuration["dependency-groups"]["dev"],
         )
 
     def test_default_catalog_is_present_and_loadable(self) -> None:
         path = default_catalog_path()
 
         self.assertTrue(path.is_file(), path)
-        self.assertEqual(load_catalog().schema_version, 6)
+        self.assertEqual(load_catalog().schema_version, 7)
 
 
 if __name__ == "__main__":

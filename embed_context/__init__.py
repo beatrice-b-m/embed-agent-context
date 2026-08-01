@@ -1,6 +1,6 @@
 """Dependency-free access to the EMBED clinical-semantic catalog."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 from .catalog import (
     AGGREGATION_STATUSES,
@@ -30,6 +30,7 @@ from .catalog import (
     ClinicalContext,
     ClinicalObject,
     Concept,
+    ContributionOrigin,
     ContextClaim,
     ContextSource,
     ContextTableReference,
@@ -41,6 +42,8 @@ from .catalog import (
     ObjectBinding,
     OccurrenceInterpretation,
     ProfileBinding,
+    Qualification,
+    Revision,
     RelationshipBinding,
     RelationshipBindingPath,
     RelationshipEndpoint,
@@ -83,6 +86,7 @@ __all__ = [
     "ClinicalContext",
     "ClinicalObject",
     "Concept",
+    "ContributionOrigin",
     "ContextClaim",
     "ContextSource",
     "ContextTableReference",
@@ -94,6 +98,8 @@ __all__ = [
     "ObjectBinding",
     "OccurrenceInterpretation",
     "ProfileBinding",
+    "Qualification",
+    "Revision",
     "RelationshipBinding",
     "RelationshipBindingPath",
     "RelationshipEndpoint",

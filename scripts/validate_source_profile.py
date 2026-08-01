@@ -28,7 +28,7 @@ if str(REPO_ROOT) not in sys.path:
 from embed_context import Catalog, CatalogError, load_catalog
 
 
-DEFAULT_CATALOG = REPO_ROOT / "catalog/catalog.json"
+DEFAULT_CATALOG = REPO_ROOT / "catalog/catalog-set.json"
 DEFAULT_TABLES = REPO_ROOT / "reference_files/clinical_tables"
 SAFE_TABLE_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 
@@ -205,7 +205,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--catalog",
         type=Path,
         default=DEFAULT_CATALOG,
-        help="clinical-semantic catalog JSON path",
+        help=(
+            "catalog-set manifest or legacy clinical-semantic catalog JSON "
+            "path (default: catalog/catalog-set.json)"
+        ),
     )
     parser.add_argument(
         "--tables",

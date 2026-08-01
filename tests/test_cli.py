@@ -1,4 +1,4 @@
-"""Contract tests for the schema-v6 clinical-semantic CLI."""
+"""Contract tests for the schema-v7 composable clinical-semantic CLI."""
 
 from __future__ import annotations
 
@@ -20,7 +20,13 @@ class FakeCatalog:
     def summary(self) -> dict[str, Any]:
         self.calls.append(("summary", {}))
         return {
-            "schema_version": 6,
+            "semantic_schema_version": 7,
+            "schema_version": 7,
+            "manifest": "bundled:catalog-set.json",
+            "profile_schema_versions": {"open-v2": 1},
+            "extension_schema_versions": {},
+            "extensions": [],
+            "configuration_fingerprint": "sha256:synthetic",
             "profiles": ["open-v2"],
             "binding_grains": ["patient", "exam", "imaging_finding"],
             "feature_kinds": ["date", "coded"],
@@ -129,11 +135,16 @@ class FakeCatalog:
         identifier: str,
         *,
         include_codes: bool = False,
+        profile: str | None = None,
     ) -> dict[str, Any]:
         self.calls.append(
             (
                 "get_feature",
-                {"identifier": identifier, "include_codes": include_codes},
+                {
+                    "identifier": identifier,
+                    "include_codes": include_codes,
+                    "profile": profile,
+                },
             )
         )
         result: dict[str, Any] = {
@@ -303,6 +314,8 @@ class FakeCatalog:
         self,
         feature_or_vocabulary: str,
         code: str,
+        *,
+        profile: str | None = None,
     ) -> dict[str, Any]:
         self.calls.append(
             (
@@ -310,6 +323,7 @@ class FakeCatalog:
                 {
                     "feature_or_vocabulary": feature_or_vocabulary,
                     "code": code,
+                    "profile": profile,
                 },
             )
         )
@@ -476,8 +490,38 @@ class CatalogCLITests(unittest.TestCase):
             "https://github.com/beatrice-b-m/embedv2-agent-context",
             help_text,
         )
+        self.assertIn("catalog-set manifest or legacy schema-v6", help_text)
+        self.assertIn("--profile-file", help_text)
+        self.assertIn("--extension-file", help_text)
+        self.assertIn("--no-default-profiles", help_text)
+        self.assertIn("--include-default-extensions", help_text)
 
-    def test_validate_json_uses_stable_envelope_and_v6_inventory(self) -> None:
+    def test_startup_composition_options_are_forwarded_to_loader(self) -> None:
+        with patch(
+            "embed_context.cli.load_catalog", return_value=self.catalog
+        ) as load_catalog:
+            status = main(
+                (
+                    "--catalog", "set.json",
+                    "--profile-file", "v1.json",
+                    "--profile-file", "v2.json",
+                    "--extension-file", "project.json",
+                    "--no-default-profiles",
+                    "--include-default-extensions",
+                    "validate",
+                )
+            )
+
+        self.assertEqual(status, 0)
+        load_catalog.assert_called_once()
+        positional, keywords = load_catalog.call_args
+        self.assertEqual(str(positional[0]), "set.json")
+        self.assertEqual(tuple(map(str, keywords["profile_paths"])), ("v1.json", "v2.json"))
+        self.assertEqual(tuple(map(str, keywords["extension_paths"])), ("project.json",))
+        self.assertFalse(keywords["include_default_profiles"])
+        self.assertTrue(keywords["include_default_extensions"])
+
+    def test_validate_json_uses_stable_envelope_and_module_inventory(self) -> None:
         status, stdout, stderr = self.run_cli(
             "--format",
             "json",
@@ -489,7 +533,7 @@ class CatalogCLITests(unittest.TestCase):
         envelope = json.loads(stdout)
         self.assertEqual(envelope["ok"], True)
         self.assertEqual(envelope["command"], "validate")
-        self.assertEqual(envelope["data"]["schema_version"], 6)
+        self.assertEqual(envelope["data"]["semantic_schema_version"], 7)
         self.assertEqual(envelope["data"]["clinical_objects"], 3)
         self.assertEqual(envelope["data"]["relationship_bindings"], 1)
 
@@ -502,6 +546,9 @@ class CatalogCLITests(unittest.TestCase):
         self.assertIn("2 semantic relationships", stdout)
         self.assertIn("1 relationship bindings", stdout)
         self.assertIn("temporal kinds: event_time, documentation_time", stdout)
+        self.assertIn("valid: semantic schema v7", stdout)
+        self.assertIn("profile module schema versions: open-v2=1", stdout)
+        self.assertIn("configuration fingerprint: sha256:synthetic", stdout)
 
     def test_discover_passes_clinical_filters_and_explains_matches(self) -> None:
         status, stdout, stderr = self.run_cli(
@@ -645,11 +692,23 @@ class CatalogCLITests(unittest.TestCase):
                 {
                     "identifier": "pathology.severity",
                     "include_codes": True,
+                    "profile": None,
                 },
             ),
         )
         self.assertIn("codes:", stdout)
         self.assertIn("0 — Invasive breast cancer", stdout)
+
+    def test_feature_and_code_forward_optional_profile_selection(self) -> None:
+        self.run_cli(
+            "feature", "pathology.severity", "--profile", "open-v2"
+        )
+        self.assertEqual(self.catalog.calls[-1][1]["profile"], "open-v2")
+
+        self.run_cli(
+            "code", "pathology.severity", "0", "--profile", "open-v2"
+        )
+        self.assertEqual(self.catalog.calls[-1][1]["profile"], "open-v2")
 
     def test_text_semantic_getters_expose_choices_and_limitations(self) -> None:
         _, relationship, _ = self.run_cli(
@@ -707,6 +766,7 @@ class CatalogCLITests(unittest.TestCase):
                 {
                     "feature_or_vocabulary": "pathology-severity",
                     "code": "MiXeD,Value",
+                    "profile": None,
                 },
             ),
         )

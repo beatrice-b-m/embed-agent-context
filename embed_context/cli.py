@@ -64,7 +64,34 @@ def build_parser(
     parser.add_argument(
         "--catalog",
         type=Path,
-        help="catalog JSON path; defaults to the bundled catalog",
+        help=(
+            "catalog-set manifest or legacy schema-v6 catalog JSON path; "
+            "defaults to the bundled catalog set"
+        ),
+    )
+    parser.add_argument(
+        "--profile-file",
+        type=Path,
+        action="append",
+        default=[],
+        help="additional profile-module JSON path; repeat to load multiple",
+    )
+    parser.add_argument(
+        "--extension-file",
+        type=Path,
+        action="append",
+        default=[],
+        help="additional extension-module JSON path; repeat to load multiple",
+    )
+    parser.add_argument(
+        "--no-default-profiles",
+        action="store_true",
+        help="exclude profile modules selected by the catalog-set manifest",
+    )
+    parser.add_argument(
+        "--include-default-extensions",
+        action="store_true",
+        help="include extension modules selected by the catalog-set manifest",
     )
     parser.add_argument(
         "--format",
@@ -118,6 +145,10 @@ def build_parser(
         action="store_true",
         help="include the complete code map when a vocabulary is attached",
     )
+    feature_parser.add_argument(
+        "--profile",
+        help="resolve profile-dependent bindings and vocabulary for this profile",
+    )
     _add_identifier_command(
         subparsers,
         "semantic-relationship",
@@ -155,6 +186,10 @@ def build_parser(
     code_parser = subparsers.add_parser("code", help="look up an exact code")
     code_parser.add_argument("feature_or_vocabulary")
     code_parser.add_argument("code")
+    code_parser.add_argument(
+        "--profile",
+        help="resolve a profile-dependent feature vocabulary for this profile",
+    )
 
     table_parser = subparsers.add_parser(
         "profile-table",
@@ -228,7 +263,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
     try:
-        catalog = load_catalog(args.catalog)
+        catalog = load_catalog(
+            args.catalog,
+            profile_paths=tuple(args.profile_file),
+            extension_paths=tuple(args.extension_file),
+            include_default_profiles=not args.no_default_profiles,
+            include_default_extensions=args.include_default_extensions,
+        )
         data = _run_command(catalog, args)
     except (CatalogError, OSError, ValueError) as exc:
         _emit_error(args.format, args.command, exc)
@@ -264,6 +305,7 @@ def _run_command(catalog: Any, args: argparse.Namespace) -> dict[str, Any]:
         return catalog.get_feature(
             args.identifier,
             include_codes=args.include_codes,
+            profile=args.profile,
         )
     if args.command == "semantic-relationship":
         return catalog.get_semantic_relationship(args.identifier)
@@ -278,7 +320,11 @@ def _run_command(catalog: Any, args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "context":
         return catalog.get_context(args.identifier)
     if args.command == "code":
-        return catalog.lookup_code(args.feature_or_vocabulary, args.code)
+        return catalog.lookup_code(
+            args.feature_or_vocabulary,
+            args.code,
+            profile=args.profile,
+        )
     if args.command == "profile-table":
         return catalog.get_profile_table(args.profile, args.table)
     if args.command == "relationship-binding":
@@ -371,7 +417,12 @@ def _command_hint(arguments: Sequence[str]) -> str | None:
         if skip_next:
             skip_next = False
             continue
-        if argument in {"--catalog", "--format"}:
+        if argument in {
+            "--catalog",
+            "--format",
+            "--profile-file",
+            "--extension-file",
+        }:
             skip_next = True
             continue
         if argument.startswith("-"):
@@ -447,11 +498,35 @@ def _format_summary(data: Mapping[str, Any]) -> str:
         for key, label in labels
         if isinstance(data.get(key), int)
     ]
-    prefix = f"valid: schema v{data['schema_version']}"
+    schema_version = data.get("semantic_schema_version", data.get("schema_version"))
+    prefix = f"valid: semantic schema v{schema_version}"
     if counts:
         prefix += "; " + ", ".join(counts)
+    configuration = _format_configuration(data)
     facets = _format_facets(data)
-    return "\n".join((prefix, *facets))
+    return "\n".join((prefix, *configuration, *facets))
+
+
+def _format_configuration(data: Mapping[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for key, label in (
+        ("manifest", "manifest"),
+        ("profile_schema_versions", "profile module schema versions"),
+        ("extension_schema_versions", "extension module schema versions"),
+        ("extensions", "extensions"),
+        ("configuration_fingerprint", "configuration fingerprint"),
+    ):
+        value = data.get(key)
+        if value in (None, "", (), [], {}):
+            continue
+        if isinstance(value, Mapping):
+            rendered = ", ".join(f"{name}={version}" for name, version in value.items())
+        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            rendered = ", ".join(map(str, value))
+        else:
+            rendered = str(value)
+        lines.append(f"{label}: {rendered}")
+    return lines
 
 
 def _format_facets(data: Mapping[str, Any]) -> list[str]:

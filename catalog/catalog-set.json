@@ -1,0 +1,15 @@
+{
+  "$schema": "./catalog-set.schema.json",
+  "catalog_set_schema_version": 1,
+  "semantic_catalog": {
+    "kind": "bundled",
+    "resource": "semantic/catalog.json"
+  },
+  "profiles": [
+    {
+      "kind": "bundled",
+      "resource": "profiles/open-v2.json"
+    }
+  ],
+  "extensions": []
+}

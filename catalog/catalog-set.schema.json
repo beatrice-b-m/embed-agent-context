@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "catalog-set.schema.json",
+  "title": "EMBED composable catalog-set manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "catalog_set_schema_version",
+    "semantic_catalog",
+    "profiles",
+    "extensions"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "./catalog-set.schema.json"
+    },
+    "catalog_set_schema_version": {
+      "const": 1
+    },
+    "semantic_catalog": {
+      "$ref": "#/$defs/resource_locator"
+    },
+    "profiles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/resource_locator"
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/resource_locator"
+      }
+    }
+  },
+  "$defs": {
+    "nonblank_string": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\s)[\\s\\S]*\\S(?![\\s\\S])"
+    },
+    "resource_locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "resource"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bundled"
+            },
+            "resource": {
+              "$ref": "#/$defs/nonblank_string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "$ref": "#/$defs/nonblank_string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

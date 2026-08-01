@@ -29,8 +29,10 @@ from embed_context.catalog import (
     TEMPORAL_KINDS,
 )
 from scripts.validate_source_profile import (
+    DEFAULT_CATALOG,
     ProfileValidationError,
     main,
+    parse_args,
     validate_source_profile,
 )
 
@@ -183,6 +185,14 @@ class SourceProfileVerifierTests(unittest.TestCase):
             self.binding("beta", "event_time", "timestamp[ns]", True),
         ]
 
+    def test_default_catalog_is_the_canonical_catalog_set_manifest(self) -> None:
+        args = parse_args([])
+        self.assertEqual(args.catalog, DEFAULT_CATALOG)
+        self.assertEqual(
+            DEFAULT_CATALOG,
+            Path(__file__).resolve().parents[1] / "catalog/catalog-set.json",
+        )
+
     def write_valid_tables(self) -> None:
         self.write_schema(
             "alpha",
@@ -303,7 +313,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
         self.catalog_path.write_text(json.dumps(document), encoding="utf-8")
 
         with self.assertRaisesRegex(
-            ProfileValidationError, "invalid catalog.*unexpected fields"
+            ProfileValidationError,
+            "invalid catalog.*Additional properties are not allowed",
         ):
             validate_source_profile(
                 self.catalog_path, self.table_directory, "sample"
@@ -323,7 +334,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
         self.write_catalog(self.valid_bindings(), profiles=["sample", "empty"])
 
         with self.assertRaisesRegex(
-            ProfileValidationError, "profiles have no physical bindings"
+            ProfileValidationError, "invalid catalog.*should be non-empty"
         ):
             validate_source_profile(
                 self.catalog_path, self.table_directory, "empty"

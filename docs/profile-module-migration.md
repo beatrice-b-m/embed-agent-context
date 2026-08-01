@@ -1,13 +1,12 @@
 # Profile-module migration
 
-## Status and goal
+## Status and outcome
 
 This document defines the agreed target state for the schema-v7 migration from
 one closed catalog file to a composable catalog set. It is the durable
-implementation reference; schema v6 remains the active serialized contract
-until the corresponding migration phases land.
+implementation reference for the active schema-v7 catalog-set contract.
 
-The goal is to let the same EMBED clinical-semantic backbone load independently
+The implemented catalog set lets the same EMBED clinical-semantic backbone load independently
 authored physical profiles, including public V1, public V2, and uncommitted
 internal working versions, without copying portable clinical meaning into every
 profile or treating `open-v2` as part of the runtime structure. It must also
@@ -631,6 +630,19 @@ otherwise multiply across module types.
 The old monolith remains only as a frozen compatibility/equivalence fixture or
 is removed after the deprecation window. It never remains a competing manually
 edited source of truth.
+
+The checked normalized-equivalence test preserves Open V2 inventory, stable
+clinical meaning, physical occurrences, vocabulary codes, resolved provenance,
+and the leading clinical answer for representative discovery questions. The
+intentional schema-v7 differences are:
+
+- portable records no longer embed direct Open V2 claim references;
+- profile vocabulary IDs are module-qualified and selected by bindings;
+- authored binding IDs, contribution origins, qualifications, lineage, and
+  effective-revision metadata appear as separate result fields; and
+- discovery ties can reorder within the same normalized result set because
+  nested profile claim text is indexed through subject-level qualifications
+  instead of portable-record fields.
 
 ### Phase 5: add profile-aware values and interfaces
 

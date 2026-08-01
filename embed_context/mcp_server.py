@@ -67,6 +67,7 @@ class CatalogProtocol(Protocol):
         identifier: str,
         *,
         include_codes: bool = False,
+        profile: str | None = None,
     ) -> dict[str, Any]: ...
 
     def get_semantic_relationship(self, identifier: str) -> dict[str, Any]: ...
@@ -85,6 +86,8 @@ class CatalogProtocol(Protocol):
         self,
         feature_or_vocabulary: str,
         code: str,
+        *,
+        profile: str | None = None,
     ) -> dict[str, Any]: ...
 
     def get_profile_table(self, profile: str, table: str) -> dict[str, Any]: ...
@@ -279,10 +282,15 @@ def build_server(catalog: CatalogProtocol) -> Any:
     def get_feature(
         identifier: str,
         include_codes: bool = False,
+        profile: str | None = None,
     ) -> dict[str, Any]:
         """Get one semantic feature and optional complete vocabulary code map."""
 
-        return catalog.get_feature(identifier, include_codes=include_codes)
+        return catalog.get_feature(
+            identifier,
+            include_codes=include_codes,
+            profile=profile,
+        )
 
     @server.tool(
         annotations=read_only,
@@ -346,10 +354,14 @@ def build_server(catalog: CatalogProtocol) -> Any:
         return catalog.get_context(identifier)
 
     @server.tool(annotations=read_only, structured_output=True)
-    def lookup_code(feature_or_vocabulary: str, code: str) -> dict[str, Any]:
+    def lookup_code(
+        feature_or_vocabulary: str,
+        code: str,
+        profile: str | None = None,
+    ) -> dict[str, Any]:
         """Look up one exact code without interpreting missing values as negative."""
 
-        return catalog.lookup_code(feature_or_vocabulary, code)
+        return catalog.lookup_code(feature_or_vocabulary, code, profile=profile)
 
     @server.tool(annotations=read_only, structured_output=True)
     def get_profile_table(profile: str, table: str) -> dict[str, Any]:
@@ -416,9 +428,22 @@ def build_server(catalog: CatalogProtocol) -> Any:
     return server
 
 
-def _load_catalog(path: Path | None) -> CatalogProtocol:
+def _load_catalog(
+    path: Path | None,
+    *,
+    profile_paths: Sequence[Path] = (),
+    extension_paths: Sequence[Path] = (),
+    include_default_profiles: bool = True,
+    include_default_extensions: bool = False,
+) -> CatalogProtocol:
     try:
-        return _catalog.load_catalog(path)
+        return _catalog.load_catalog(
+            path,
+            profile_paths=profile_paths,
+            extension_paths=extension_paths,
+            include_default_profiles=include_default_profiles,
+            include_default_extensions=include_default_extensions,
+        )
     except _catalog.CatalogError as exc:
         raise RuntimeError(str(exc)) from exc
 
@@ -438,12 +463,45 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--catalog",
         type=Path,
-        help="catalog JSON path; defaults to the bundled catalog",
+        help=(
+            "catalog-set manifest or legacy schema-v6 catalog JSON path; "
+            "defaults to the bundled catalog set"
+        ),
+    )
+    parser.add_argument(
+        "--profile-file",
+        type=Path,
+        action="append",
+        default=[],
+        help="additional profile-module JSON path; repeat to load multiple",
+    )
+    parser.add_argument(
+        "--extension-file",
+        type=Path,
+        action="append",
+        default=[],
+        help="additional extension-module JSON path; repeat to load multiple",
+    )
+    parser.add_argument(
+        "--no-default-profiles",
+        action="store_true",
+        help="exclude profile modules selected by the catalog-set manifest",
+    )
+    parser.add_argument(
+        "--include-default-extensions",
+        action="store_true",
+        help="include extension modules selected by the catalog-set manifest",
     )
     args = parser.parse_args(argv)
     try:
         _require_mcp()
-        catalog = _load_catalog(args.catalog)
+        catalog = _load_catalog(
+            args.catalog,
+            profile_paths=tuple(args.profile_file),
+            extension_paths=tuple(args.extension_file),
+            include_default_profiles=not args.no_default_profiles,
+            include_default_extensions=args.include_default_extensions,
+        )
         server = build_server(catalog)
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"MCP server error: {exc}", file=sys.stderr)

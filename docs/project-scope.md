@@ -28,9 +28,12 @@ pipelines, and analyses. It does not prescribe those designs.
 
 ## Canonical deliverable
 
-`catalog/catalog.json` is the source of truth. It must remain:
+`catalog/semantic/catalog.json` is the source of truth for portable clinical
+meaning. `catalog/profiles/open-v2.json` owns the released representation and
+`catalog/catalog-set.json` selects the bundled defaults. Together they must
+remain:
 
-- valid against the version-matched `catalog/catalog.schema.json`;
+- valid against their version-matched standalone JSON Schemas;
 - directly usable without a database, index service, or generated Markdown;
 - clinically normalized independently of physical storage;
 - explicit about evidence, coverage, missing states, uncertainty, attribution,

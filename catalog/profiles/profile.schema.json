@@ -1,0 +1,1792 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "profile.schema.json",
+  "title": "EMBED dataset profile module",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "profile_schema_version",
+    "profile",
+    "requires",
+    "sources",
+    "contexts",
+    "coverage",
+    "qualifications",
+    "vocabularies",
+    "profile_binding"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "./profile.schema.json"
+    },
+    "profile_schema_version": {
+      "const": 1
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        }
+      }
+    },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_schema_version"
+      ],
+      "properties": {
+        "semantic_schema_version": {
+          "const": 7
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/context_source"
+        }
+      },
+      "additionalProperties": false
+    },
+    "contexts": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/clinical_context"
+        }
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/coverage"
+        }
+      },
+      "additionalProperties": false
+    },
+    "qualifications": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/qualification"
+        }
+      },
+      "additionalProperties": false
+    },
+    "vocabularies": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/vocabulary"
+        }
+      },
+      "additionalProperties": false
+    },
+    "profile_binding": {
+      "$ref": "#/$defs/profile_binding"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])"
+    },
+    "nonblank_string": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\s)[\\s\\S]*\\S(?![\\s\\S])"
+    },
+    "physical_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\s)(?!.*\\s$)[^:]+$"
+    },
+    "claim_ref": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*#[a-z][a-z0-9_.-]*(?![\\s\\S])"
+    },
+    "domain": {
+      "enum": [
+        "identity",
+        "demographics",
+        "social_determinants_of_health",
+        "exam",
+        "breast_side",
+        "imaging",
+        "mammography",
+        "ultrasound",
+        "mri",
+        "pathology",
+        "procedure",
+        "report",
+        "risk",
+        "temporal",
+        "workflow",
+        "technical"
+      ]
+    },
+    "binding_grain": {
+      "enum": [
+        "patient",
+        "exam",
+        "breast_side",
+        "imaging_finding",
+        "pathology_finding",
+        "report",
+        "risk_assessment",
+        "wide_row"
+      ]
+    },
+    "evidence": {
+      "enum": [
+        "release_schema",
+        "release_legend",
+        "observed_v2_values",
+        "cross_table_check",
+        "maintainer_confirmed",
+        "inference",
+        "unresolved"
+      ]
+    },
+    "claim_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/claim_ref"
+      }
+    },
+    "identifiers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "nonblank_strings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonblank_string"
+      }
+    },
+    "domains_list": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/domain"
+      }
+    },
+    "search_terms": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonblank_string"
+      }
+    },
+    "clinical_object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "definition",
+        "grain",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "definition": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "grain": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "missing_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "representation",
+        "meaning",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "representation": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "meaning": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "definition",
+        "feature_kind",
+        "domains",
+        "search_terms",
+        "caveats",
+        "evidence",
+        "objects"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "definition": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "feature_kind": {
+          "enum": [
+            "identifier",
+            "date",
+            "categorical",
+            "coded",
+            "flag",
+            "numeric",
+            "text",
+            "aggregate",
+            "model_output",
+            "technical"
+          ]
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "objects": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "vocabulary": {
+          "$ref": "#/$defs/identifier"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "missing_states": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/missing_state"
+          }
+        },
+        "temporal_semantics": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "aggregations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "feature_kind": {
+                "const": "technical"
+              }
+            },
+            "required": [
+              "feature_kind"
+            ]
+          },
+          "else": {
+            "properties": {
+              "objects": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cardinality_value": {
+      "enum": [
+        "exactly_one",
+        "zero_or_one",
+        "one_or_more",
+        "zero_or_more",
+        "unknown"
+      ]
+    },
+    "cardinality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targets_per_source",
+        "sources_per_target"
+      ],
+      "properties": {
+        "targets_per_source": {
+          "$ref": "#/$defs/cardinality_value"
+        },
+        "sources_per_target": {
+          "$ref": "#/$defs/cardinality_value"
+        }
+      }
+    },
+    "optionality_value": {
+      "enum": [
+        "required",
+        "optional",
+        "unknown"
+      ]
+    },
+    "semantic_optionality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "target"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/optionality_value"
+        },
+        "target": {
+          "$ref": "#/$defs/optionality_value"
+        }
+      }
+    },
+    "semantic_relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "kind",
+        "source_object",
+        "target_object",
+        "cardinality",
+        "optionality",
+        "attribution",
+        "attribution_limitations",
+        "temporal_qualification",
+        "temporal_semantics",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "kind": {
+          "enum": [
+            "hierarchy",
+            "association",
+            "attribution",
+            "documentation",
+            "derivation"
+          ]
+        },
+        "source_object": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target_object": {
+          "$ref": "#/$defs/identifier"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/cardinality"
+        },
+        "optionality": {
+          "$ref": "#/$defs/semantic_optionality"
+        },
+        "attribution": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "attribution_limitations": {
+          "$ref": "#/$defs/nonblank_strings"
+        },
+        "temporal_qualification": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "temporal_semantics": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "temporal_semantic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "kind",
+        "meaning",
+        "objects",
+        "feature_refs",
+        "relative_to",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "kind": {
+          "enum": [
+            "event_time",
+            "documentation_time",
+            "availability_time"
+          ]
+        },
+        "meaning": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "objects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "feature_refs": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "relative_to": {
+          "description": "Reference time semantics that this time is generally downstream of in the represented clinical context; membership does not assert universal ordering, causality, certainty, or a required interval.",
+          "$ref": "#/$defs/identifiers"
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "aggregation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "status",
+        "source_object",
+        "target_object",
+        "source_concept",
+        "result_concept",
+        "semantic_relationships",
+        "method",
+        "ordering",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "status": {
+          "enum": [
+            "provided",
+            "analyst_defined",
+            "unsupported",
+            "unresolved"
+          ]
+        },
+        "source_object": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target_object": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_concept": {
+          "$ref": "#/$defs/identifier"
+        },
+        "result_concept": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "semantic_relationships": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "method": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "ordering": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "scope_profiles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "guardrail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "statement",
+        "rationale",
+        "category",
+        "priority",
+        "scope",
+        "profiles",
+        "objects",
+        "concepts",
+        "semantic_relationships",
+        "temporal_semantics",
+        "aggregations",
+        "coverage",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "statement": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "category": {
+          "enum": [
+            "prohibition",
+            "analyst_choice",
+            "interpretation_limit"
+          ]
+        },
+        "priority": {
+          "enum": [
+            "critical",
+            "high",
+            "standard"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "general_clinical",
+            "embed_general",
+            "profile_specific"
+          ]
+        },
+        "profiles": {
+          "$ref": "#/$defs/scope_profiles"
+        },
+        "objects": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "concepts": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "semantic_relationships": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "temporal_semantics": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "aggregations": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "coverage": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/$defs/profile_scope_rule"
+        }
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject_kind",
+        "subject",
+        "status",
+        "scope",
+        "profiles",
+        "summary",
+        "domains",
+        "search_terms",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "subject_kind": {
+          "enum": [
+            "clinical_object",
+            "concept",
+            "semantic_relationship",
+            "temporal_semantic",
+            "aggregation",
+            "guardrail",
+            "topic"
+          ]
+        },
+        "subject": {
+          "$ref": "#/$defs/identifier"
+        },
+        "status": {
+          "enum": [
+            "supported",
+            "unsupported",
+            "unresolved",
+            "not_cataloged"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "general_clinical",
+            "embed_general",
+            "profile_specific"
+          ]
+        },
+        "profiles": {
+          "$ref": "#/$defs/scope_profiles"
+        },
+        "summary": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/$defs/profile_scope_rule"
+        }
+      ]
+    },
+    "profile_scope_rule": {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "profile_specific"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "profiles": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "profiles": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    "vocabulary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "completeness",
+        "parsing",
+        "evidence",
+        "codes"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "completeness": {
+          "enum": [
+            "unknown",
+            "open",
+            "closed"
+          ]
+        },
+        "parsing": {
+          "enum": [
+            "atomic",
+            "comma_composed_undocumented",
+            "shared_slot_dictionary"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        },
+        "codes": {
+          "type": "object",
+          "minProperties": 1,
+          "patternProperties": {
+            "^(?!\\s)(?!.*\\s$).+$": {
+              "$ref": "#/$defs/nonblank_string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "context_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "kind",
+        "scope",
+        "locator_kind",
+        "locator",
+        "version_scope",
+        "profiles",
+        "notes"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "kind": {
+          "enum": [
+            "maintainer_confirmed",
+            "release_schema",
+            "release_legend",
+            "supporting_internal",
+            "public_documentation"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "general_clinical",
+            "embed_general",
+            "profile_specific"
+          ]
+        },
+        "locator_kind": {
+          "enum": [
+            "url",
+            "repository_path",
+            "logical_artifact"
+          ]
+        },
+        "locator": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "version_scope": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "profiles": {
+          "$ref": "#/$defs/scope_profiles"
+        },
+        "notes": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "release_schema",
+                  "release_legend"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "profiles": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/profile_scope_rule"
+        },
+        {
+          "if": {
+            "properties": {
+              "locator_kind": {
+                "const": "url"
+              }
+            },
+            "required": [
+              "locator_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "^https://"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "locator_kind": {
+                "const": "repository_path"
+              }
+            },
+            "required": [
+              "locator_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "context_table_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "table"
+      ],
+      "properties": {
+        "profile": {
+          "$ref": "#/$defs/identifier"
+        },
+        "table": {
+          "$ref": "#/$defs/physical_name"
+        }
+      }
+    },
+    "context_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "statement",
+        "status",
+        "sources",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "statement": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "reconciled",
+            "unverified",
+            "unresolved",
+            "contradicted"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "workflow_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "claims"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "label": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "clinical_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "kind",
+        "scope",
+        "profiles",
+        "summary",
+        "domains",
+        "search_terms",
+        "related_concepts",
+        "related_tables",
+        "related_relationships",
+        "claims",
+        "workflow_steps",
+        "caveats"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "kind": {
+          "enum": [
+            "clinical_workflow",
+            "data_representation",
+            "interpretation_guardrail",
+            "known_issue"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "general_clinical",
+            "embed_general",
+            "profile_specific"
+          ]
+        },
+        "profiles": {
+          "$ref": "#/$defs/scope_profiles"
+        },
+        "summary": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "domains": {
+          "$ref": "#/$defs/domains_list"
+        },
+        "search_terms": {
+          "$ref": "#/$defs/search_terms"
+        },
+        "related_concepts": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "related_tables": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/context_table_reference"
+          }
+        },
+        "related_relationships": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/context_claim"
+          }
+        },
+        "workflow_steps": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workflow_step"
+          }
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/$defs/profile_scope_rule"
+        },
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "profile_specific"
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          },
+          "else": {
+            "properties": {
+              "related_tables": {
+                "maxItems": 0
+              },
+              "related_relationships": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "clinical_workflow"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "workflow_steps": {
+                "minItems": 2
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "workflow_steps": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "binding_parameters": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "required": [
+        "slot"
+      ],
+      "properties": {
+        "slot": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "occurrence_interpretation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation",
+        "meaning",
+        "status",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "representation": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "meaning": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "reconciled",
+            "unverified",
+            "unresolved",
+            "contradicted"
+          ]
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "feature_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "concept": {
+                "const": "pathology.diagnosis_code_slot"
+              }
+            },
+            "required": [
+              "concept"
+            ]
+          },
+          "then": {
+            "required": [
+              "parameters"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "parameters"
+              ]
+            }
+          }
+        }
+      ],
+      "required": [
+        "id",
+        "table",
+        "column",
+        "concept",
+        "grain",
+        "role",
+        "physical_type",
+        "nullable"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "table": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "column": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "concept": {
+          "$ref": "#/$defs/identifier"
+        },
+        "grain": {
+          "$ref": "#/$defs/binding_grain"
+        },
+        "role": {
+          "enum": [
+            "canonical",
+            "reference",
+            "wide_projection",
+            "technical"
+          ]
+        },
+        "physical_type": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "$ref": "#/$defs/binding_parameters"
+        },
+        "notes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonblank_string"
+          }
+        },
+        "occurrence_interpretations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/occurrence_interpretation"
+          }
+        },
+        "vocabulary": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "reserved_identity_exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "representation",
+        "meaning",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "column": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "representation": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "meaning": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "instance_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "columns",
+        "scope",
+        "reserved_exceptions",
+        "rows_per_instance",
+        "longitudinal_identity"
+      ],
+      "properties": {
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/physical_name"
+          }
+        },
+        "scope": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "reserved_exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reserved_identity_exception"
+          }
+        },
+        "rows_per_instance": {
+          "enum": [
+            "exactly_one",
+            "one_or_more",
+            "unknown"
+          ]
+        },
+        "longitudinal_identity": {
+          "type": "boolean"
+        }
+      }
+    },
+    "object_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "object",
+        "table",
+        "columns",
+        "representation",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "object": {
+          "$ref": "#/$defs/identifier"
+        },
+        "table": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "columns": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/physical_name"
+          }
+        },
+        "representation": {
+          "enum": [
+            "canonical",
+            "partial",
+            "co_located",
+            "projection",
+            "reference"
+          ]
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        },
+        "instance_identity": {
+          "$ref": "#/$defs/instance_identity"
+        }
+      }
+    },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "columns",
+        "kind",
+        "uniqueness",
+        "completeness",
+        "evidence",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/physical_name"
+          }
+        },
+        "kind": {
+          "enum": [
+            "natural",
+            "technical"
+          ]
+        },
+        "uniqueness": {
+          "enum": [
+            "unique",
+            "not_unique",
+            "unknown"
+          ]
+        },
+        "completeness": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "table",
+        "grain",
+        "keys",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "table": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "grain": {
+          "$ref": "#/$defs/binding_grain"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/key"
+          }
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "source_endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "columns",
+        "completeness"
+      ],
+      "properties": {
+        "table": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/physical_name"
+          }
+        },
+        "completeness": {
+          "enum": [
+            "required",
+            "optional",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "target_endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "columns"
+      ],
+      "properties": {
+        "table": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/physical_name"
+          }
+        }
+      }
+    },
+    "relationship_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "source",
+        "target",
+        "cardinality",
+        "evidence",
+        "caveats",
+        "join_hazards",
+        "semantic_relationships",
+        "claim_refs"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "enum": [
+            "hierarchy",
+            "reference",
+            "projection"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/source_endpoint"
+        },
+        "target": {
+          "$ref": "#/$defs/target_endpoint"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/cardinality"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        },
+        "join_hazards": {
+          "$ref": "#/$defs/nonblank_strings"
+        },
+        "semantic_relationships": {
+          "$ref": "#/$defs/identifiers"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        }
+      }
+    },
+    "relationship_binding_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "semantic_relationship",
+        "relationship_bindings",
+        "description",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "semantic_relationship": {
+          "$ref": "#/$defs/identifier"
+        },
+        "relationship_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "description": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "profile_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_bindings",
+        "object_bindings",
+        "tables",
+        "relationship_bindings",
+        "relationship_binding_paths"
+      ],
+      "properties": {
+        "feature_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/feature_binding"
+          }
+        },
+        "object_bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/object_binding"
+          }
+        },
+        "tables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/table"
+          }
+        },
+        "relationship_bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship_binding"
+          }
+        },
+        "relationship_binding_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship_binding_path"
+          }
+        }
+      }
+    },
+    "qualification_subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "clinical_object",
+            "concept",
+            "semantic_relationship",
+            "temporal_semantic",
+            "aggregation",
+            "guardrail"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "subject",
+        "applicability",
+        "summary",
+        "claim_refs",
+        "caveats"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "subject": {
+          "$ref": "#/$defs/qualification_subject"
+        },
+        "applicability": {
+          "enum": [
+            "supported",
+            "unsupported",
+            "unresolved",
+            "interpretation_limit"
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "claim_refs": {
+          "$ref": "#/$defs/claim_refs"
+        },
+        "caveats": {
+          "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    }
+  }
+}
