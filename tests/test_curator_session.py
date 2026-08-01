@@ -172,6 +172,42 @@ class CuratorSessionTests(unittest.TestCase):
         choice_ids = {choice["id"] for choice in claim_refs["choices"]}
         self.assertIn(record["authored"]["claim_refs"][0], choice_ids)
 
+    def test_table_reference_choice_uses_serialized_physical_value(self) -> None:
+        session = self.session()
+        identifier = (
+            "open-v2.binding.feature.exam.accession_identifier."
+            "pathology_findings_anon.acc_anon"
+        )
+        binding = session.get_record("feature_binding", identifier)
+        table_field = next(
+            field
+            for field in binding["form_spec"]["fields"]
+            if field["name"] == "table"
+        )
+        choice = next(
+            choice
+            for choice in table_field["choices"]
+            if choice["id"] == binding["authored"]["table"]
+        )
+
+        self.assertEqual(choice["id"], "pathology_findings_anon")
+        self.assertIn(
+            "open-v2.binding.table.pathology_findings_anon", choice["label"]
+        )
+        self.assertNotIn(
+            "open-v2.binding.table.pathology_findings_anon",
+            {item["id"] for item in table_field["choices"]},
+        )
+
+        replacement = dict(binding["authored"])
+        replacement["table"] = choice["id"]
+        result = session.replace_record(
+            "feature_binding",
+            identifier,
+            {"revision": 0, "record": replacement},
+        )
+        self.assertTrue(result["valid"])
+
     def test_qualification_and_revision_origins_use_contribution_registries(self) -> None:
         qualification = self.session(editable=False).get_record(
             "qualification", QUALIFICATION

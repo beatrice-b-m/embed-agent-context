@@ -646,8 +646,16 @@ class CuratorSession:
         references: dict[str, list[dict[str, str]]] = {}
         for item in self._current_index():
             reference_kind = "concept" if item.kind == "feature" else item.kind
+            reference_value = item.identifier
+            reference_label = item.identifier
+            if item.kind == "table":
+                document = self._document_for_entry(item)
+                table = record_at(document.mapping, item).get("table")
+                if isinstance(table, str):
+                    reference_value = table
+                    reference_label = f"{table} ({item.identifier})"
             references.setdefault(reference_kind, []).append(
-                {"id": item.identifier, "label": item.identifier}
+                {"id": reference_value, "label": reference_label}
             )
             if item.kind != "context":
                 continue
