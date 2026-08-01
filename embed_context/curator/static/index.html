@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EMBED catalog curator</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Skip to record workspace</a>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Local metadata workbench</p>
+        <h1>EMBED catalog curator</h1>
+      </div>
+      <div id="session-state" class="status-cluster" aria-live="polite"></div>
+    </header>
+
+    <main class="workbench">
+      <aside class="pane navigator" aria-labelledby="navigator-title">
+        <div class="pane-heading">
+          <h2 id="navigator-title">Navigator</h2>
+          <span id="record-total" class="badge">0</span>
+        </div>
+        <form id="filters" class="filter-stack">
+          <label>Search records <input id="filter-text" name="text" type="search" autocomplete="off"></label>
+          <label>Kind <select id="filter-kind" name="kind"><option value="">All kinds</option></select></label>
+          <button type="submit">Apply filters</button>
+        </form>
+        <button id="new-record" class="secondary" type="button">Create record</button>
+        <ol id="record-list" class="record-list" aria-label="Catalog records"></ol>
+      </aside>
+
+      <section id="workspace" class="pane workspace" aria-labelledby="record-title" tabindex="-1">
+        <div class="pane-heading">
+          <div>
+            <p id="record-kind" class="eyebrow">No record selected</p>
+            <h2 id="record-title">Choose a record</h2>
+          </div>
+          <span id="record-state" class="badge"></span>
+        </div>
+        <div id="record-notice" class="notice" hidden></div>
+        <div id="record-summary" class="summary-grid"></div>
+        <section aria-labelledby="authored-title">
+          <h3 id="authored-title">Authored contribution</h3>
+          <pre id="authored-record" class="json-view" tabindex="0"></pre>
+        </section>
+        <section id="editor-section" aria-labelledby="editor-title" hidden>
+          <div class="section-heading">
+            <h3 id="editor-title">Edit authored record</h3>
+            <span>Complete record JSON</span>
+          </div>
+          <label class="sr-only" for="record-editor">Complete authored record JSON</label>
+          <div id="enhanced-fields" class="enhanced-fields"></div>
+          <textarea id="record-editor" class="json-editor" spellcheck="false"></textarea>
+          <div class="button-row">
+            <button id="apply-record" type="button">Apply to draft</button>
+            <button id="restore-record" class="secondary" type="button">Restore editor</button>
+            <button id="delete-record" class="danger" type="button">Delete record</button>
+          </div>
+          <ul id="editor-errors" class="diagnostics" aria-live="polite"></ul>
+        </section>
+        <section aria-labelledby="layered-title">
+          <h3 id="layered-title">Effective and layered view</h3>
+          <pre id="layered-record" class="json-view" tabindex="0"></pre>
+        </section>
+      </section>
+
+      <aside class="pane connections" aria-labelledby="connections-title">
+        <div class="pane-heading"><h2 id="connections-title">Connections</h2></div>
+        <p id="connection-help" class="muted">Select a record to inspect its typed neighborhood.</p>
+        <div id="connection-groups"></div>
+      </aside>
+    </main>
+
+    <section class="query-drawer" aria-labelledby="query-title">
+      <details open>
+        <summary><span id="query-title">Query lab</span><span class="muted">Deterministic catalog discovery</span></summary>
+        <div class="query-content">
+          <form id="query-form" class="query-form">
+            <label>Clinical-language query <input id="query-text" name="query" required></label>
+            <label>Profile <input id="query-profile" name="profile" placeholder="open-v2"></label>
+            <label>Limit <input id="query-limit" name="limit" type="number" min="1" max="100" value="10"></label>
+            <button type="submit">Run query</button>
+          </form>
+          <div id="query-notice" class="notice" hidden></div>
+          <ol id="query-results" class="query-results"></ol>
+        </div>
+      </details>
+    </section>
+
+    <footer>
+      <button id="show-diff" class="secondary" type="button">Inspect draft diff</button>
+      <button id="validate-draft" class="secondary" type="button">Validate draft</button>
+      <button id="reset-draft" class="secondary" type="button">Reset draft</button>
+      <button id="save-draft" type="button">Save editable module</button>
+      <button id="shutdown" class="danger" type="button">Shut down</button>
+    </footer>
+    <dialog id="data-dialog">
+      <div class="dialog-heading"><h2 id="dialog-title">Details</h2><button id="close-dialog" class="secondary" type="button">Close</button></div>
+      <pre id="dialog-data" class="json-view"></pre>
+    </dialog>
+    <dialog id="create-dialog">
+      <form id="create-form" method="dialog" class="filter-stack">
+        <div class="dialog-heading"><h2>Create authored record</h2><button id="cancel-create" class="secondary" type="button">Cancel</button></div>
+        <label>Record kind <input id="create-kind" required placeholder="qualification"></label>
+        <label>Stable ID <input id="create-id" required></label>
+        <label>Complete record JSON <textarea id="create-json" class="json-editor" required>{}</textarea></label>
+        <ul id="create-errors" class="diagnostics" aria-live="polite"></ul>
+        <button type="submit">Apply complete record to draft</button>
+      </form>
+    </dialog>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

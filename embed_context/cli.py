@@ -223,6 +223,26 @@ def build_parser(
         help="match bindings linked to this portable semantic relationship ID",
     )
     relationships_parser.add_argument("--limit", type=int, default=50)
+    curate_parser = subparsers.add_parser(
+        "curate",
+        help="open the temporary local catalog curation workbench",
+    )
+    curate_parser.add_argument(
+        "--edit-module",
+        type=Path,
+        help="one loaded filesystem-backed schema-v7 module to edit",
+    )
+    curate_parser.add_argument(
+        "--port",
+        type=int,
+        default=0,
+        help="loopback port (default: 0, automatically allocated)",
+    )
+    curate_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the system browser after startup",
+    )
     _set_usage_error_mode(parser, json_errors)
     return parser
 
@@ -262,6 +282,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             exc,
         )
         return 2
+    if args.command == "curate":
+        if args.format == "json":
+            _emit_error(
+                "json",
+                "curate",
+                UsageError("--format json is not supported for curate"),
+            )
+            return 2
+        return _run_curator_command(args)
     try:
         catalog = load_catalog(
             args.catalog,
@@ -285,6 +314,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     else:
         print(_format_text(args.command, data))
+    return 0
+
+
+def _run_curator_command(args: argparse.Namespace) -> int:
+    """Run the curator's distinct long-lived lifecycle."""
+
+    if args.port < 0 or args.port > 65535:
+        _emit_error("text", "curate", ValueError("--port must be between 0 and 65535"))
+        return 2
+    try:
+        from .curator import CuratorSession, serve_curator
+
+        session = CuratorSession(
+            args.catalog,
+            profile_paths=tuple(args.profile_file),
+            extension_paths=tuple(args.extension_file),
+            include_default_profiles=not args.no_default_profiles,
+            include_default_extensions=args.include_default_extensions,
+            edit_module=args.edit_module,
+        )
+        serve_curator(
+            session,
+            port=args.port,
+            open_browser=not args.no_open,
+        )
+    except (CatalogError, OSError, ValueError) as exc:
+        _emit_error("text", "curate", exc)
+        return 2
     return 0
 
 

@@ -58,6 +58,9 @@ packages = ["embed_context"]
 "catalog/profiles/open-v2.json" = "embed_context/_data/profiles/open-v2.json"
 "catalog/profiles/profile.schema.json" = "embed_context/_data/profiles/profile.schema.json"
 "catalog/extensions/extension.schema.json" = "embed_context/_data/extensions/extension.schema.json"
+"embed_context/curator/static/index.html" = "embed_context/curator/static/index.html"
+"embed_context/curator/static/app.js" = "embed_context/curator/static/app.js"
+"embed_context/curator/static/styles.css" = "embed_context/curator/static/styles.css"
 
 [tool.uv]
 package = true

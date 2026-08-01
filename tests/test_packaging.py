@@ -92,8 +92,27 @@ class PackagingContractTests(unittest.TestCase):
                 "catalog/extensions/extension.schema.json": (
                     "embed_context/_data/extensions/extension.schema.json"
                 ),
+                "embed_context/curator/static/index.html": (
+                    "embed_context/curator/static/index.html"
+                ),
+                "embed_context/curator/static/app.js": (
+                    "embed_context/curator/static/app.js"
+                ),
+                "embed_context/curator/static/styles.css": (
+                    "embed_context/curator/static/styles.css"
+                ),
             },
         )
+
+    def test_curator_static_shell_is_packaged(self) -> None:
+        force_include = self.configuration["tool"]["hatch"]["build"][
+            "targets"
+        ]["wheel"]["force-include"]
+        for name in ("index.html", "app.js", "styles.css"):
+            source = f"embed_context/curator/static/{name}"
+            with self.subTest(source=source):
+                self.assertEqual(force_include[source], source)
+                self.assertTrue((REPOSITORY_ROOT / source).is_file())
 
     def test_every_bundled_manifest_target_is_packaged(self) -> None:
         import json
