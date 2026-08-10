@@ -15,7 +15,6 @@ from typing import Any, Literal, Protocol
 from . import __version__, catalog as _catalog
 
 
-BINDING_GRAINS = tuple(_catalog.BINDING_GRAINS)
 FEATURE_KINDS = tuple(_catalog.FEATURE_KINDS)
 DOMAINS = tuple(_catalog.DOMAINS)
 SEMANTIC_RELATIONSHIP_KINDS = tuple(
@@ -192,8 +191,7 @@ def build_server(catalog: CatalogProtocol) -> Any:
         f"{', '.join(SEMANTIC_RELATIONSHIP_KINDS)}; temporal kinds: "
         f"{', '.join(TEMPORAL_KINDS)}; aggregation statuses: "
         f"{', '.join(AGGREGATION_STATUSES)}; coverage statuses: "
-        f"{', '.join(COVERAGE_STATUSES)}; binding grains: "
-        f"{', '.join(BINDING_GRAINS)}; feature kinds: "
+        f"{', '.join(COVERAGE_STATUSES)}; feature kinds: "
         f"{', '.join(FEATURE_KINDS)}"
     )
     server = MCPServer(
@@ -464,8 +462,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--catalog",
         type=Path,
         help=(
-            "catalog-set manifest or legacy schema-v6 catalog JSON path; "
-            "defaults to the bundled catalog set"
+            "schema-v8 catalog-set manifest or semantic catalog JSON path; "
+            "defaults to the bundled catalog set; outdated modules are fatal"
         ),
     )
     parser.add_argument(

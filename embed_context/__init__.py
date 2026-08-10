@@ -1,6 +1,6 @@
 """Dependency-free access to the EMBED clinical-semantic catalog."""
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 from .catalog import (
     AGGREGATION_STATUSES,
@@ -43,7 +43,6 @@ from .catalog import (
     OccurrenceInterpretation,
     ProfileBinding,
     Qualification,
-    Revision,
     RelationshipBinding,
     RelationshipBindingPath,
     RelationshipEndpoint,
@@ -99,7 +98,6 @@ __all__ = [
     "OccurrenceInterpretation",
     "ProfileBinding",
     "Qualification",
-    "Revision",
     "RelationshipBinding",
     "RelationshipBindingPath",
     "RelationshipEndpoint",

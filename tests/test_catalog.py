@@ -1,4 +1,4 @@
-"""Unit tests for schema-v6 loading, validation, and semantic discovery."""
+"""Unit tests for schema-v8 loading, validation, and semantic discovery."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from pathlib import Path
 
 from embed_context import (
     AGGREGATION_STATUSES,
-    BINDING_GRAINS,
     COVERAGE_STATUSES,
     DISCOVERY_KINDS,
     RELATIONSHIP_BINDING_KINDS,
@@ -24,7 +23,7 @@ from embed_context import (
     load_catalog,
 )
 from embed_context.catalog import GUARDRAIL_CATEGORIES, GUARDRAIL_PRIORITIES
-from tests.catalog_fixture import cloned_catalog, synthetic_catalog, write_catalog
+from tests.catalog_fixture import cloned_catalog, synthetic_catalog
 
 
 class CatalogLoaderTests(unittest.TestCase):
@@ -34,8 +33,8 @@ class CatalogLoaderTests(unittest.TestCase):
         self.directory = Path(self.temporary.name)
 
     def load(self, data: dict | None = None) -> Catalog:
-        return load_catalog(
-            write_catalog(self.directory / "catalog.json", data)
+        return Catalog.from_mapping(
+            synthetic_catalog() if data is None else data
         )
 
     def assert_invalid(self, data: dict, message: str) -> None:
@@ -45,13 +44,13 @@ class CatalogLoaderTests(unittest.TestCase):
     def test_loads_and_freezes_two_profile_catalog(self) -> None:
         catalog = self.load()
 
-        self.assertEqual(catalog.schema_version, 6)
+        self.assertEqual(catalog.schema_version, 8)
         self.assertEqual(catalog.profiles, ("profile-a", "profile-b"))
         self.assertEqual(len(catalog.clinical_objects), 3)
         self.assertEqual(len(catalog.concepts), 4)
         self.assertEqual(len(catalog.feature_bindings), 8)
         self.assertEqual(len(catalog.object_bindings), 6)
-        self.assertEqual(len(catalog.relationship_bindings), 1)
+        self.assertEqual(len(catalog.relationship_bindings), 2)
         self.assertEqual(len(catalog.relationship_binding_paths), 1)
         self.assertNotIn("analysis_patterns", catalog.summary())
         self.assertFalse(hasattr(catalog, "grains"))
@@ -60,12 +59,12 @@ class CatalogLoaderTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             catalog.feature_bindings[0].profile = "changed"
         with self.assertRaises(AttributeError):
-            catalog._schema_version = 6
+            catalog._schema_version = 8
 
-    def test_summary_exposes_v6_facets_and_layer_counts(self) -> None:
+    def test_summary_exposes_v8_facets_and_derived_grains(self) -> None:
         summary = self.load().summary()
 
-        self.assertEqual(summary["binding_grains"], list(BINDING_GRAINS))
+        self.assertNotIn("binding_grains", summary)
         self.assertEqual(
             summary["semantic_relationship_kinds"],
             list(SEMANTIC_RELATIONSHIP_KINDS),
@@ -91,13 +90,13 @@ class CatalogLoaderTests(unittest.TestCase):
         self.assertEqual(summary["profile_bindings"], 2)
 
     def test_wrong_schema_version_and_schema_reference_are_rejected(self) -> None:
-        for version in (5, 7):
+        for version in (6, 7, 9):
             with self.subTest(version=version):
                 data = cloned_catalog()
                 data["schema_version"] = version
                 self.assert_invalid(
                     data,
-                    "unsupported catalog schema_version",
+                    "unsupported catalog schema_version.*expected integer 8",
                 )
 
         data = cloned_catalog()
@@ -133,7 +132,7 @@ class CatalogLoaderTests(unittest.TestCase):
     ) -> None:
         duplicate_path = self.directory / "duplicate.json"
         duplicate_path.write_text(
-            '{"schema_version": 6, "schema_version": 6}',
+            '{"schema_version": 8, "schema_version": 8}',
             encoding="utf-8",
         )
         with self.assertRaisesRegex(
@@ -350,14 +349,27 @@ class CatalogLoaderTests(unittest.TestCase):
                 binding["concept"] = "technical.row_index"
         self.assert_invalid(data, "supported coverage.*no feature binding")
 
-    def test_every_physical_column_requires_one_feature_binding(self) -> None:
+    def test_physical_inventory_allows_unmapped_columns_and_keys_use_inventory(
+        self,
+    ) -> None:
+        catalog = Catalog.from_mapping(cloned_catalog())
+        table = catalog.get_profile_table("profile-a", "clinical_a")
+        self.assertIn(
+            "unmapped_note",
+            {column["name"] for column in table["table"]["columns"]},
+        )
+        self.assertNotIn(
+            "unmapped_note",
+            {binding.column for binding in catalog.feature_bindings},
+        )
+
         data = cloned_catalog()
         data["profile_bindings"]["profile-a"]["tables"][0]["keys"][0][
             "columns"
         ] = ["unbound_column"]
         self.assert_invalid(data, "references unknown columns: unbound_column")
 
-    def test_binding_table_grain_and_concept_are_validated(self) -> None:
+    def test_mapping_concept_status_and_generic_qualifiers_are_validated(self) -> None:
         data = cloned_catalog()
         data["profile_bindings"]["profile-a"]["feature_bindings"][0][
             "concept"
@@ -366,9 +378,15 @@ class CatalogLoaderTests(unittest.TestCase):
 
         data = cloned_catalog()
         data["profile_bindings"]["profile-a"]["feature_bindings"][0][
-            "grain"
-        ] = "patient"
-        self.assert_invalid(data, "does not match feature-binding grains")
+            "status"
+        ] = "canonical"
+        self.assert_invalid(data, "status has unknown value")
+
+        data = cloned_catalog()
+        data["profile_bindings"]["profile-a"]["feature_bindings"][0][
+            "qualifiers"
+        ] = {"nested": {"not": "scalar"}}
+        self.assert_invalid(data, "must be a scalar descriptive value")
 
     def test_object_binding_can_be_table_level_but_must_resolve(self) -> None:
         data = cloned_catalog()
@@ -382,6 +400,22 @@ class CatalogLoaderTests(unittest.TestCase):
             "object"
         ] = "unknown.object"
         self.assert_invalid(data, "unknown clinical object")
+
+    def test_object_axes_are_independent_and_co_location_is_derived(self) -> None:
+        catalog = Catalog.from_mapping(cloned_catalog())
+        result = catalog.get_clinical_object("patient")
+        profile_a = next(
+            item
+            for item in result["related"]["object_bindings"]
+            if item["profile"] == "profile-a"
+        )
+        self.assertEqual(profile_a["completeness"], "complete")
+        self.assertEqual(profile_a["authority"], "preferred")
+        self.assertEqual(profile_a["derivation"], "source")
+        self.assertEqual(
+            profile_a["co_located_objects"],
+            ["imaging_exam", "pathology_diagnosis"],
+        )
 
     def test_binding_claims_must_apply_to_the_containing_profile(self) -> None:
         data = cloned_catalog()
@@ -539,6 +573,20 @@ class CatalogLoaderTests(unittest.TestCase):
         }
         self.assert_invalid(data, "non-adjacent steps")
 
+    def test_same_table_relationships_are_valid_navigation(self) -> None:
+        catalog = Catalog.from_mapping(cloned_catalog())
+        relationship = catalog.get_relationship_binding(
+            "profile-a.patient-exam-colocated"
+        )
+        self.assertEqual(
+            relationship["relationship_binding"]["source"]["table"],
+            "clinical_a",
+        )
+        self.assertEqual(
+            relationship["relationship_binding"]["target"]["table"],
+            "clinical_a",
+        )
+
     def test_relationship_binding_semantics_columns_types_and_keys_are_validated(
         self,
     ) -> None:
@@ -567,16 +615,32 @@ class CatalogLoaderTests(unittest.TestCase):
         ] = "unknown"
         self.assert_invalid(data, "source completeness must be required")
 
-    def test_duplicate_binding_and_relationship_ids_are_rejected(self) -> None:
+    def test_many_to_many_occurrences_are_allowed_but_ids_are_unique(self) -> None:
         data = cloned_catalog()
         binding = dict(
             data["profile_bindings"]["profile-a"]["feature_bindings"][0]
         )
         binding["concept"] = "technical.row_index"
+        binding["id"] = "profile-a.feature.patient-id-alternative"
+        binding["status"] = "ambiguous"
         data["profile_bindings"]["profile-a"]["feature_bindings"].append(
             binding
         )
-        self.assert_invalid(data, "duplicate physical binding")
+        catalog = Catalog.from_mapping(data)
+        same_occurrence = [
+            item
+            for item in catalog.feature_bindings
+            if item.profile == "profile-a"
+            and item.table == "clinical_a"
+            and item.column == "person_id"
+        ]
+        self.assertEqual(len(same_occurrence), 2)
+        self.assertEqual(
+            {item.status for item in same_occurrence}, {"direct", "ambiguous"}
+        )
+
+        binding["id"] = "profile-a.feature.patient-id"
+        self.assert_invalid(data, "duplicate or missing feature mapping ID")
 
         data = cloned_catalog()
         relationship = dict(
@@ -624,14 +688,14 @@ class CatalogQueryTests(unittest.TestCase):
         self,
     ) -> None:
         semantic = self.catalog.get_feature(
-            "pathology.severity", include_codes=True
+            "pathology.severity", include_codes=True, profile="profile-a"
         )
         physical = self.catalog.get_feature(
             "profile-a:clinical_a.severity_code"
         )
 
         self.assertEqual(semantic["kind"], "feature")
-        self.assertEqual(len(semantic["bindings"]), 2)
+        self.assertEqual(len(semantic["bindings"]), 1)
         self.assertEqual(
             semantic["vocabulary"]["codes"]["0"],
             "Invasive breast cancer",
@@ -653,14 +717,24 @@ class CatalogQueryTests(unittest.TestCase):
         duplicate = dict(
             data["profile_bindings"]["profile-a"]["feature_bindings"][1]
         )
+        duplicate["id"] = "profile-b.feature.ambiguous-study-date"
         duplicate["concept"] = "pathology.severity"
+        duplicate["status"] = "ambiguous"
         data["profile_bindings"]["profile-b"]["feature_bindings"].append(
             duplicate
         )
         data["profile_bindings"]["profile-b"]["tables"].append(
             {
+                "id": "profile-b.table.clinical-a",
                 "table": "clinical_a",
                 "grain": "wide_row",
+                "columns": [
+                    {
+                        "name": "study_when",
+                        "physical_type": "timestamp[ns]",
+                        "nullable": True,
+                    }
+                ],
                 "keys": [],
                 "caveats": [],
             }
@@ -721,7 +795,7 @@ class CatalogQueryTests(unittest.TestCase):
     def test_exact_getters_return_six_derived_constraint_groups(self) -> None:
         results = (
             self.catalog.get_clinical_object("imaging_exam"),
-            self.catalog.get_feature("pathology.severity"),
+            self.catalog.get_feature("pathology.severity", profile="profile-a"),
             self.catalog.get_semantic_relationship("patient.has_exam"),
             self.catalog.get_temporal_semantic("exam.event_time"),
             self.catalog.get_aggregation(
@@ -793,7 +867,7 @@ class CatalogQueryTests(unittest.TestCase):
         )
         catalog = Catalog.from_mapping(data)
 
-        result = catalog.get_feature("pathology.severity")
+        result = catalog.get_feature("pathology.severity", profile="profile-a")
 
         self.assertIn(
             "profiles.synthetic#unresolved-interpretation",
@@ -836,7 +910,7 @@ class CatalogQueryTests(unittest.TestCase):
         catalog = Catalog.from_mapping(data)
 
         object_result = catalog.get_clinical_object("imaging_exam")
-        feature_result = catalog.get_feature("exam.study_date")
+        feature_result = catalog.get_feature("exam.study_date", profile="profile-a")
 
         self.assertNotIn(
             "profiles.synthetic#feature-only-uncertainty",
@@ -923,7 +997,7 @@ class CatalogQueryTests(unittest.TestCase):
         ] = ["specimen-time.profile-support"]
         catalog = Catalog.from_mapping(data)
 
-        result = catalog.get_feature("pathology.severity")
+        result = catalog.get_feature("pathology.severity", profile="profile-a")
 
         self.assertIn(
             "specimen-time.profile-support",
@@ -1036,19 +1110,23 @@ class CatalogQueryTests(unittest.TestCase):
     def test_code_lookup_accepts_feature_and_physical_binding(
         self,
     ) -> None:
-        for identifier in (
-            "pathology.severity",
-            "profile-b:exams_b.path_group",
+        for identifier, profile in (
+            ("pathology.severity", "profile-a"),
+            ("profile-b:exams_b.path_group", None),
         ):
             with self.subTest(identifier=identifier):
-                result = self.catalog.lookup_code(identifier, "0")
+                result = self.catalog.lookup_code(
+                    identifier, "0", profile=profile
+                )
                 self.assertEqual(
                     result["meaning"], "Invasive breast cancer"
                 )
                 self.assertEqual(result["vocabulary"], "pathology.severity")
 
         with self.assertRaises(CatalogNotFoundError):
-            self.catalog.lookup_code("pathology.severity", "99")
+            self.catalog.lookup_code(
+                "pathology.severity", "99", profile="profile-a"
+            )
 
     def test_profile_table_surfaces_secondary_binding_layer(self) -> None:
         result = self.catalog.get_profile_table("profile-b", "exams_b")
@@ -1213,6 +1291,7 @@ class CatalogQueryTests(unittest.TestCase):
         profile = data["profile_bindings"]["profile-a"]
         profile["feature_bindings"][1]["column"] = "procdate_anon"
         profile["object_bindings"][1]["columns"] = ["procdate_anon"]
+        profile["tables"][0]["columns"][1]["name"] = "procdate_anon"
         profile["tables"][0]["keys"][0]["columns"] = [
             "person_id",
             "procdate_anon",

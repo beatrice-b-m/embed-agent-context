@@ -16,7 +16,6 @@ import pyarrow.parquet as pq
 
 from embed_context.catalog import (
     AGGREGATION_STATUSES,
-    BINDING_GRAINS,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
@@ -41,7 +40,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
-        self.catalog_path = self.root / "catalog.json"
+        self.catalog_path = self.root / "catalog-set.json"
+        self.semantic_path = self.root / "semantic.json"
         self.table_directory = self.root / "tables"
         self.table_directory.mkdir()
 
@@ -49,9 +49,9 @@ class SourceProfileVerifierTests(unittest.TestCase):
         self.temporary_directory.cleanup()
 
     @staticmethod
-    def binding(
+    def column(
         table: str,
-        column: str,
+        name: str,
         physical_type: str,
         nullable: bool,
         *,
@@ -60,56 +60,98 @@ class SourceProfileVerifierTests(unittest.TestCase):
         return {
             "profile": profile,
             "table": table,
-            "column": column,
-            "concept": "synthetic.feature",
-            "grain": "exam",
-            "role": "canonical",
+            "name": name,
             "physical_type": physical_type,
             "nullable": nullable,
         }
 
     def write_catalog(
         self,
-        bindings: list[dict[str, Any]],
+        columns: list[dict[str, Any]],
         *,
         profiles: list[str] | None = None,
+        mappings: list[dict[str, Any]] | None = None,
     ) -> None:
         selected_profiles = profiles or ["sample"]
-        profile_bindings = {}
+        profile_locators = []
         for profile in selected_profiles:
-            profile_features = [
-                {
-                    key: value
-                    for key, value in binding.items()
-                    if key != "profile"
-                }
-                for binding in bindings
-                if binding["profile"] == profile
+            profile_columns = [
+                column for column in columns if column["profile"] == profile
             ]
-            profile_bindings[profile] = {
-                "feature_bindings": profile_features,
-                "object_bindings": [],
-                "tables": [
+            profile_mappings = mappings
+            if profile_mappings is None:
+                profile_mappings = [
                     {
+                        "id": f"{profile}.binding.feature.{index}",
+                        "table": column["table"],
+                        "column": column["name"],
+                        "concept": "synthetic.feature",
+                        "status": "direct",
+                    }
+                    for index, column in enumerate(profile_columns)
+                ]
+            tables = []
+            for table_index, table in enumerate(
+                sorted({column["table"] for column in profile_columns})
+            ):
+                physical_columns = [
+                    {
+                        key: value
+                        for key, value in column.items()
+                        if key in {"name", "physical_type", "nullable"}
+                    }
+                    for column in profile_columns
+                    if column["table"] == table
+                ]
+                tables.append(
+                    {
+                        "id": f"{profile}.binding.table.{table_index}",
                         "table": table,
-                        "grain": "exam",
+                        "grain": "one synthetic exam row",
+                        "columns": physical_columns,
                         "keys": [],
                         "caveats": [],
                     }
-                    for table in sorted(
-                        {binding["table"] for binding in profile_features}
-                    )
-                ],
-                "relationship_bindings": [],
-                "relationship_binding_paths": [],
-            }
-        self.catalog_path.write_text(
+                )
+            profile_path = self.root / f"{profile}.json"
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "$schema": "./profile.schema.json",
+                        "profile_schema_version": 2,
+                        "profile": {"id": profile, "label": profile.title()},
+                        "requires": {"semantic_schema_version": 8},
+                        "contributions": {
+                            "clinical_objects": {},
+                            "concepts": {},
+                            "semantic_relationships": {},
+                            "temporal_semantics": {},
+                            "aggregations": {},
+                            "guardrails": {},
+                            "coverage": {},
+                        },
+                        "sources": {},
+                        "contexts": {},
+                        "qualifications": {},
+                        "vocabularies": {},
+                        "profile_binding": {
+                            "feature_bindings": profile_mappings,
+                            "object_bindings": [],
+                            "tables": tables,
+                            "relationship_bindings": [],
+                            "relationship_binding_paths": [],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            profile_locators.append({"kind": "file", "path": profile_path.name})
+
+        self.semantic_path.write_text(
             json.dumps(
                 {
                     "$schema": "./catalog.schema.json",
-                    "schema_version": 6,
-                    "profiles": selected_profiles,
-                    "binding_grains": list(BINDING_GRAINS),
+                    "semantic_schema_version": 8,
                     "feature_kinds": list(FEATURE_KINDS),
                     "domains": list(DOMAINS),
                     "context_kinds": list(CONTEXT_KINDS),
@@ -154,7 +196,21 @@ class SourceProfileVerifierTests(unittest.TestCase):
                     "vocabularies": {},
                     "sources": {},
                     "contexts": {},
-                    "profile_bindings": profile_bindings,
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.catalog_path.write_text(
+            json.dumps(
+                {
+                    "$schema": "./catalog-set.schema.json",
+                    "catalog_set_schema_version": 1,
+                    "semantic_catalog": {
+                        "kind": "file",
+                        "path": self.semantic_path.name,
+                    },
+                    "profiles": profile_locators,
+                    "extensions": [],
                 }
             ),
             encoding="utf-8",
@@ -178,11 +234,11 @@ class SourceProfileVerifierTests(unittest.TestCase):
         pq.write_metadata(schema, path)
         return path
 
-    def valid_bindings(self) -> list[dict[str, Any]]:
+    def valid_columns(self) -> list[dict[str, Any]]:
         return [
-            self.binding("alpha", "identifier", "int64", False),
-            self.binding("alpha", "label", "string", True),
-            self.binding("beta", "event_time", "timestamp[ns]", True),
+            self.column("alpha", "identifier", "int64", False),
+            self.column("alpha", "label", "string", True),
+            self.column("beta", "event_time", "timestamp[ns]", True),
         ]
 
     def test_default_catalog_is_the_canonical_catalog_set_manifest(self) -> None:
@@ -207,7 +263,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
         )
 
     def test_success_uses_count_free_message(self) -> None:
-        self.write_catalog(self.valid_bindings())
+        self.write_catalog(self.valid_columns())
         self.write_valid_tables()
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -233,7 +289,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
         self.assertFalse(any(character.isdigit() for character in stdout.getvalue()))
 
     def test_missing_table_is_rejected(self) -> None:
-        self.write_catalog(self.valid_bindings())
+        self.write_catalog(self.valid_columns())
         self.write_schema(
             "alpha",
             [
@@ -250,7 +306,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
             )
 
     def test_extra_table_is_rejected(self) -> None:
-        self.write_catalog(self.valid_bindings())
+        self.write_catalog(self.valid_columns())
         self.write_valid_tables()
         self.write_schema("extra", [("value", pa.int8(), True)])
 
@@ -262,8 +318,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
             )
 
     def test_physical_type_mismatch_is_rejected(self) -> None:
-        bindings = [self.binding("alpha", "value", "int64", True)]
-        self.write_catalog(bindings)
+        columns = [self.column("alpha", "value", "int64", True)]
+        self.write_catalog(columns)
         self.write_schema("alpha", [("value", pa.string(), True)])
 
         with self.assertRaisesRegex(
@@ -274,8 +330,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
             )
 
     def test_column_manifest_mismatch_is_rejected(self) -> None:
-        bindings = [self.binding("alpha", "expected", "string", True)]
-        self.write_catalog(bindings)
+        columns = [self.column("alpha", "expected", "string", True)]
+        self.write_catalog(columns)
         self.write_schema("alpha", [("unexpected", pa.string(), True)])
 
         with self.assertRaisesRegex(
@@ -286,8 +342,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
             )
 
     def test_nullable_mismatch_is_rejected(self) -> None:
-        bindings = [self.binding("alpha", "value", "int64", False)]
-        self.write_catalog(bindings)
+        columns = [self.column("alpha", "value", "int64", False)]
+        self.write_catalog(columns)
         self.write_schema("alpha", [("value", pa.int64(), True)])
 
         with self.assertRaisesRegex(ProfileValidationError, "nullable mismatch"):
@@ -295,22 +351,42 @@ class SourceProfileVerifierTests(unittest.TestCase):
                 self.catalog_path, self.table_directory, "sample"
             )
 
-    def test_duplicate_binding_is_rejected(self) -> None:
-        duplicate = self.binding("alpha", "value", "int64", True)
-        self.write_catalog([duplicate, dict(duplicate)])
+    def test_unmapped_and_multiply_mapped_columns_are_verified_once(self) -> None:
+        columns = [
+            self.column("alpha", "unmapped", "string", True),
+            self.column("alpha", "shared", "int64", False),
+        ]
+        self.write_catalog(
+            columns,
+            mappings=[
+                {
+                    "id": "sample.binding.feature.shared.direct",
+                    "table": "alpha",
+                    "column": "shared",
+                    "concept": "synthetic.feature",
+                    "status": "direct",
+                },
+                {
+                    "id": "sample.binding.feature.shared.conditional",
+                    "table": "alpha",
+                    "column": "shared",
+                    "concept": "synthetic.feature",
+                    "status": "conditional",
+                },
+            ],
+        )
+        self.write_schema(
+            "alpha",
+            [("unmapped", pa.string(), True), ("shared", pa.int64(), False)],
+        )
 
-        with self.assertRaisesRegex(
-            ProfileValidationError, "duplicate physical binding"
-        ):
-            validate_source_profile(
-                self.catalog_path, self.table_directory, "sample"
-            )
+        validate_source_profile(self.catalog_path, self.table_directory, "sample")
 
     def test_invalid_catalog_is_rejected_before_footer_comparison(self) -> None:
-        self.write_catalog(self.valid_bindings())
-        document = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        self.write_catalog(self.valid_columns())
+        document = json.loads(self.semantic_path.read_text(encoding="utf-8"))
         document["concepts"]["synthetic.feature"]["row_count"] = 1
-        self.catalog_path.write_text(json.dumps(document), encoding="utf-8")
+        self.semantic_path.write_text(json.dumps(document), encoding="utf-8")
 
         with self.assertRaisesRegex(
             ProfileValidationError,
@@ -321,7 +397,7 @@ class SourceProfileVerifierTests(unittest.TestCase):
             )
 
     def test_unknown_profile_is_rejected(self) -> None:
-        self.write_catalog(self.valid_bindings())
+        self.write_catalog(self.valid_columns())
 
         with self.assertRaisesRegex(
             ProfileValidationError, "unknown catalog profile"
@@ -331,18 +407,18 @@ class SourceProfileVerifierTests(unittest.TestCase):
             )
 
     def test_profile_without_bindings_is_rejected(self) -> None:
-        self.write_catalog(self.valid_bindings(), profiles=["sample", "empty"])
+        self.write_catalog(self.valid_columns(), profiles=["sample", "empty"])
 
         with self.assertRaisesRegex(
-            ProfileValidationError, "invalid catalog.*should be non-empty"
+            ProfileValidationError, "has no physical tables to verify"
         ):
             validate_source_profile(
                 self.catalog_path, self.table_directory, "empty"
             )
 
     def test_unsafe_catalog_table_name_is_rejected(self) -> None:
-        bindings = [self.binding("../escape", "value", "int64", True)]
-        self.write_catalog(bindings)
+        columns = [self.column("../escape", "value", "int64", True)]
+        self.write_catalog(columns)
 
         with self.assertRaisesRegex(ProfileValidationError, "unsafe table name"):
             validate_source_profile(
@@ -351,8 +427,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are unavailable")
     def test_symlinked_table_is_rejected(self) -> None:
-        bindings = [self.binding("alpha", "value", "int64", True)]
-        self.write_catalog(bindings)
+        columns = [self.column("alpha", "value", "int64", True)]
+        self.write_catalog(columns)
         outside = self.write_schema(
             "outside",
             [("value", pa.int64(), True)],
@@ -366,8 +442,8 @@ class SourceProfileVerifierTests(unittest.TestCase):
             )
 
     def test_parquet_named_directory_is_rejected(self) -> None:
-        bindings = [self.binding("alpha", "value", "int64", True)]
-        self.write_catalog(bindings)
+        columns = [self.column("alpha", "value", "int64", True)]
+        self.write_catalog(columns)
         (self.table_directory / "alpha.parquet").mkdir()
 
         with self.assertRaisesRegex(ProfileValidationError, "not a regular file"):

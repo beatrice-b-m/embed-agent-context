@@ -44,7 +44,7 @@ class CuratorGraphTests(unittest.TestCase):
         binding = next(
             item
             for item in self.catalog.feature_bindings
-            if item.concept == "pathology.severity" and item.role == "canonical"
+            if item.concept == "pathology.severity" and item.status == "direct"
         )
         outgoing = self.graph.outgoing("feature_binding", binding.id)
 
@@ -57,6 +57,21 @@ class CuratorGraphTests(unittest.TestCase):
             f"/@id={binding.id}/table", table_edge.source_pointer
         )
         self.assertEqual(table_edge.origin["target_profile"], "open-v2")
+        column_edge = next(
+            edge for edge in outgoing if edge.type == "maps_column"
+        )
+        self.assertTrue(column_edge.target.startswith("physical_column:"))
+        column_id = column_edge.target.split(":", 1)[1]
+        column_node = self.graph.get_node("physical_column", column_id)
+        self.assertIsNotNone(column_node)
+        self.assertEqual(column_node.origin["target_profile"], "open-v2")
+        self.assertIn(
+            table_edge.target,
+            {
+                edge.target
+                for edge in self.graph.outgoing("physical_column", column_id)
+            },
+        )
 
     def test_claim_provenance_connects_context_claim_and_source(self) -> None:
         context = self.catalog.contexts["clinical.screening-diagnostic-pathway"]

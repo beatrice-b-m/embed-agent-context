@@ -579,11 +579,10 @@ function renderQueryResults(data) {
       origin: result.origin,
       qualifications: result.qualifications,
       profile_coverage: result.profile_coverage,
-      active_revisions: result.active_revisions,
       implementation_bindings: result.implementation_bindings,
     };
     const metadata = element("details", { className: "result-metadata" }, [
-      element("summary", { text: "Match, provenance, coverage, revisions, and bindings" }),
+      element("summary", { text: "Match, provenance, coverage, and bindings" }),
       element("pre", { className: "json-view", text: jsonText(details) }),
     ]);
     list.append(element("li", {}, [

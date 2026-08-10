@@ -1,16 +1,74 @@
-"""Contract tests for the schema-v7 composable clinical-semantic CLI."""
+"""Contract tests for the schema-v8 composable clinical-semantic CLI."""
 
 from __future__ import annotations
 
 import io
 import json
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
+from pathlib import Path
 from unittest.mock import patch
 
 from embed_context import __version__
 from embed_context.cli import _format_text, build_parser, main
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_json(path: Path, value: dict[str, Any]) -> Path:
+    path.write_text(json.dumps(value), encoding="utf-8")
+    return path
+
+
+def _outdated_module_arguments(directory: Path) -> list[tuple[str, tuple[str, ...]]]:
+    semantic = json.loads(
+        (ROOT / "catalog/semantic/catalog.json").read_text(encoding="utf-8")
+    )
+    semantic["semantic_schema_version"] = 7
+    semantic_path = _write_json(directory / "semantic-v7.json", semantic)
+
+    profile = json.loads(
+        (ROOT / "catalog/profiles/open-v2.json").read_text(encoding="utf-8")
+    )
+    profile["profile_schema_version"] = 1
+    profile_path = _write_json(directory / "profile-v1.json", profile)
+
+    extension = {
+        "$schema": "./extension.schema.json",
+        "extension_schema_version": 1,
+        "extension": {
+            "id": "project.outdated", "version": "0.1.0",
+            "label": "Outdated extension", "lifecycle_status": "work_in_progress",
+        },
+        "applies_to": {"profile": "open-v2"},
+        "requires": {
+            "semantic_schema_version": 8, "profile_schema_version": 2,
+            "extensions": [],
+        },
+        "contributions": {
+            "clinical_objects": {}, "concepts": {},
+            "semantic_relationships": {}, "temporal_semantics": {},
+            "aggregations": {}, "guardrails": {}, "coverage": {},
+        },
+        "qualifications": {}, "feature_lineage": {}, "sources": {},
+        "contexts": {}, "vocabularies": {},
+        "profile_binding": {
+            "feature_bindings": [], "object_bindings": [], "tables": [],
+            "relationship_bindings": [], "relationship_binding_paths": [],
+        },
+    }
+    extension_path = _write_json(directory / "extension-v1.json", extension)
+    return [
+        ("semantic", ("--catalog", str(semantic_path), "validate")),
+        (
+            "profile",
+            ("--no-default-profiles", "--profile-file", str(profile_path), "validate"),
+        ),
+        ("extension", ("--extension-file", str(extension_path), "validate")),
+    ]
 
 
 class FakeCatalog:
@@ -20,15 +78,15 @@ class FakeCatalog:
     def summary(self) -> dict[str, Any]:
         self.calls.append(("summary", {}))
         return {
-            "semantic_schema_version": 7,
-            "schema_version": 7,
+            "semantic_schema_version": 8,
+            "schema_version": 8,
             "manifest": "bundled:catalog-set.json",
-            "profile_schema_versions": {"open-v2": 1},
+            "profile_schema_versions": {"open-v2": 2},
             "extension_schema_versions": {},
             "extensions": [],
             "configuration_fingerprint": "sha256:synthetic",
             "profiles": ["open-v2"],
-            "binding_grains": ["patient", "exam", "imaging_finding"],
+            "mapping_statuses": ["direct", "derived"],
             "feature_kinds": ["date", "coded"],
             "domains": ["exam", "pathology"],
             "semantic_relationship_kinds": ["hierarchy", "attribution"],
@@ -48,6 +106,7 @@ class FakeCatalog:
             "contexts": 1,
             "profile_bindings": 1,
             "feature_bindings": 3,
+            "physical_columns": 5,
             "tables": 2,
             "relationship_bindings": 1,
         }
@@ -460,6 +519,26 @@ class CatalogCLITests(unittest.TestCase):
             status = main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
 
+    def test_outdated_modules_fail_before_command_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_directory:
+            for kind, arguments in _outdated_module_arguments(
+                Path(raw_directory)
+            ):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with (
+                    self.subTest(kind=kind),
+                    patch("embed_context.cli._run_command") as dispatch,
+                    redirect_stdout(stdout),
+                    redirect_stderr(stderr),
+                ):
+                    status = main(arguments)
+
+                self.assertEqual(status, 2)
+                self.assertEqual(stdout.getvalue(), "")
+                self.assertIn("error:", stderr.getvalue())
+                dispatch.assert_not_called()
+
     def test_version_uses_package_version(self) -> None:
         stdout = io.StringIO()
         with redirect_stdout(stdout), self.assertRaises(SystemExit) as raised:
@@ -490,7 +569,8 @@ class CatalogCLITests(unittest.TestCase):
             "https://github.com/beatrice-b-m/embedv2-agent-context",
             help_text,
         )
-        self.assertIn("catalog-set manifest or legacy schema-v6", help_text)
+        self.assertIn("schema-v8 catalog-set manifest", help_text)
+        self.assertIn("outdated modules are fatal", help_text)
         self.assertIn("--profile-file", help_text)
         self.assertIn("--extension-file", help_text)
         self.assertIn("--no-default-profiles", help_text)
@@ -533,9 +613,10 @@ class CatalogCLITests(unittest.TestCase):
         envelope = json.loads(stdout)
         self.assertEqual(envelope["ok"], True)
         self.assertEqual(envelope["command"], "validate")
-        self.assertEqual(envelope["data"]["semantic_schema_version"], 7)
+        self.assertEqual(envelope["data"]["semantic_schema_version"], 8)
         self.assertEqual(envelope["data"]["clinical_objects"], 3)
         self.assertEqual(envelope["data"]["relationship_bindings"], 1)
+        self.assertEqual(envelope["data"]["physical_columns"], 5)
 
     def test_validate_text_exposes_semantic_and_binding_facets(self) -> None:
         status, stdout, stderr = self.run_cli("validate")
@@ -546,8 +627,10 @@ class CatalogCLITests(unittest.TestCase):
         self.assertIn("2 semantic relationships", stdout)
         self.assertIn("1 relationship bindings", stdout)
         self.assertIn("temporal kinds: event_time, documentation_time", stdout)
-        self.assertIn("valid: semantic schema v7", stdout)
-        self.assertIn("profile module schema versions: open-v2=1", stdout)
+        self.assertIn("5 physical columns", stdout)
+        self.assertIn("mapping statuses: direct, derived", stdout)
+        self.assertIn("valid: semantic schema v8", stdout)
+        self.assertIn("profile module schema versions: open-v2=2", stdout)
         self.assertIn("configuration fingerprint: sha256:synthetic", stdout)
 
     def test_discover_passes_clinical_filters_and_explains_matches(self) -> None:

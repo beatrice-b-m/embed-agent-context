@@ -1,5 +1,9 @@
 # Architecture v7: composable catalog sets
 
+> Historical decision. Schema v8 replaced this ownership and binding contract.
+> See [architecture v8](architecture-v8.md) for current behavior. Version
+> numbers and compatibility statements below describe the former v7 release.
+
 ## Decision
 
 The current catalog is a deterministic composition of one portable semantic

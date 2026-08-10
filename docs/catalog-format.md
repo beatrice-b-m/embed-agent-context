@@ -1,178 +1,198 @@
 # Catalog-set format
 
-## Design
+## Documents and versions
 
-Schema version 7 is a composable catalog set. Portable clinical meaning, a
-released dataset representation, and project-owned changes are separate
-documents:
+The current catalog is a deterministic composition of:
 
 ```text
-catalog-set manifest
-├── semantic catalog (portable meaning)
-├── zero or more profile modules (released representation)
-└── zero or more extension modules (project-owned additions/revisions)
+catalog-set manifest (schema 1)
+├── semantic catalog (schema 8)
+├── zero or more profile modules (schema 2)
+└── zero or more extension modules (schema 2)
 ```
 
-The checked-in public manifest selects the portable semantic catalog and the
-`open-v2` profile, with no project extensions enabled by default. The catalog
-remains closed, count-free, and non-executable: modules contain no SQL,
-dataframe expressions, cohort predicates, clinical rows, empirical counts, or
-feature values.
+The public manifest selects `catalog/semantic/catalog.json` and the `open-v2`
+profile. `internal-v2` is bundled as a scaffold but is not selected by default.
+All schemas use JSON Schema Draft 2020-12 and close authored objects with
+`additionalProperties: false`.
 
-See [architecture v7](architecture-v7.md) for the current architecture and
-[profile-module migration](profile-module-migration.md) for the complete design
-and migration decisions. [Architecture v6](architecture-v6.md) is retained as
-history for the preceding monolithic format.
+Schema v8 has no legacy input mode. A schema-v6 monolith, semantic schema 7,
+profile schema 1, extension schema 1, wrong discriminator, or unknown version
+causes a fatal startup error. The loader does not silently migrate or ignore
+fields.
 
-## Documents and schemas
+## Catalog-set manifest
 
-The canonical public resources are:
-
-- `catalog/catalog-set.json` and `catalog/catalog-set.schema.json`;
-- `catalog/semantic/catalog.json` and
-  `catalog/semantic/catalog.schema.json`;
-- `catalog/profiles/open-v2.json` and
-  `catalog/profiles/profile.schema.json`; and
-- `catalog/extensions/extension.schema.json`.
-
-All schemas use JSON Schema Draft 2020-12 and close authored object shapes with
-`additionalProperties: false`. Runtime loading rejects duplicate JSON keys and
-non-finite numbers before JSON Schema validation, then enforces graph closure,
-provenance scope, ownership, profile isolation, identity, physical occurrence,
-dependency, and revision invariants.
-
-### Catalog-set manifest
-
-The manifest declares one `semantic_catalog` locator, default `profiles`, and
-default `extensions`. A locator is a closed union:
+The manifest names one semantic catalog plus default profile and extension
+locators. Locators are closed unions:
 
 ```json
 {"kind": "bundled", "resource": "semantic/catalog.json"}
 ```
 
 ```json
-{"kind": "file", "path": "../shared/semantic/catalog.json"}
+{"kind": "file", "path": "../shared/catalog.json"}
 ```
 
-Bundled locators resolve through package resources. File locators resolve
-relative to their containing manifest. The loader never expands environment
-variables or searches the working directory, user home, or module directories.
-Explicit `profile_paths` and `extension_paths` are caller-supplied filesystem
-paths.
+Bundled resources resolve through package data. File paths resolve relative to
+the containing manifest. The resolver does not scan directories, expand
+environment variables, or search the working directory or home directory.
 
-### Semantic catalog
+## Semantic catalog
 
-The semantic catalog has `semantic_schema_version: 7` and contains the portable
-controlled values plus these ID-keyed registries:
+The semantic catalog contains controlled values and ID-keyed registries for
+clinical objects, concepts, semantic relationships, temporal semantics,
+aggregations, guardrails, coverage, vocabularies, sources, and contexts.
 
-- `clinical_objects` and `concepts`;
-- `semantic_relationships`, `temporal_semantics`, and `aggregations`;
-- reusable `guardrails`;
-- portable `coverage` statements;
-- portable `vocabularies`; and
-- portable `sources` and `contexts`.
+Objects define clinical instance meaning and descriptive grain independently
+of storage. Concepts define reusable meaning and object ownership.
+Relationships retain direction, cardinality, optionality, attribution limits,
+and temporal qualification. Claims cite exact `context-id#claim-id` records.
 
-It contains no physical profiles or profile coverage. It validates and supports
-portable semantic queries with no profile selected. Clinical object grain is a
-descriptive meaning; physical row grains remain controlled binding metadata.
+The shared catalog includes the `image` object and `clinical.exam-image`
+relationship. Their presence expresses shared meaning; it does not assert that
+every profile supplies an image table, file layout, or verified physical key.
 
-Concepts define one stable meaning and clinical ownership. Missing states stay
-field-specific. Relationships keep direction, cardinality, optionality,
-attribution limits, and temporal qualification separate. Temporal semantics
-distinguish event, documentation, and availability time and never designate a
-universal diagnosis date. Aggregations distinguish supplied, analyst-defined,
-unsupported, and unresolved grain transitions. Guardrails constrain
-interpretation without defining a cohort or analysis policy.
+## Contributions and availability
 
-Substantive assertions cite a precise `context-id#claim-id`. Each claim retains
-review status, sources, and caveats. Source locators are typed HTTPS,
-repository-relative, or logical artifact references; absolute paths and parent
-traversal are invalid.
+Profiles and extensions have a closed `contributions` object with all semantic
+families:
 
-### Profile module
+```json
+{
+  "clinical_objects": {},
+  "concepts": {},
+  "semantic_relationships": {},
+  "temporal_semantics": {},
+  "aggregations": {},
+  "guardrails": {},
+  "coverage": {}
+}
+```
 
-A profile document has `profile_schema_version: 1`, exactly one `profile`, and
-a `requires.semantic_schema_version` value. It owns:
+Any module may introduce new meaning. Contributions do not need to exist in
+the shared semantic catalog first. An optional availability record is either:
 
-- release-specific `sources`, `contexts`, `coverage`, and `vocabularies`;
-- `qualifications` that connect profile evidence or applicability to portable
-  records; and
-- one `profile_binding` containing feature, object, table, relationship, and
-  relationship-path bindings.
+```json
+{"scope": "portable"}
+```
 
-Every binding has an authored stable ID. A feature binding names its concept,
-physical table and column, type, nullability, row grain, role, optional profile
-vocabulary, and occurrence-specific interpretations. Object bindings describe
-partial, co-located, projected, reference, or canonical representations and
-may state bounded instance identity. Table keys are descriptive candidates,
-not database constraints. Relationship bindings and ordered binding paths are
-descriptive physical routes, never executable joins.
+or:
 
-Profile-owned vocabulary IDs are module-qualified (for example,
-`open-v2.pathology.severity`). Bindings select those IDs explicitly, so two
-profiles can attach different code sets to the same portable concept without a
-global vocabulary collision.
+```json
+{"scope": "profiles", "profiles": ["internal-v2"]}
+```
 
-A profile cannot add or redefine portable clinical meaning. When a release
-changes meaning, it binds a different portable concept. A qualification may
-add evidence, applicability, or caveats to an existing portable subject; it
-cannot replace the subject's definition, ownership, grain, cardinality, time
-meaning, aggregation behavior, or guardrail statement.
+When omitted, semantic-catalog records default to portable availability and a
+profile or extension contribution defaults to its target profile. Runtime
+validation checks availability against loaded profiles and provenance scope.
 
-### Extension module
+The `internal-v2` profile demonstrates this mechanism with a
+`region_of_interest` object and the
+`clinical.image-region-of-interest` relationship. Its explicit `not_cataloged`
+coverage says that ROI tables, columns, identifiers, geometry, coordinate
+system, and physical linkage are still unknown.
 
-An extension has `extension_schema_version: 1`, an ID, semantic version,
-lifecycle status, exactly one target profile, and explicit extension
-dependencies. Initial lifecycle values are `work_in_progress`, `candidate`,
-`adopted`, and `deprecated`.
+## Profile modules
 
-An extension may contribute namespaced project concepts, qualifications,
-coverage, evidence, vocabularies, descriptive feature lineage, and additive
-bindings. Every extension-owned stable ID begins with the full extension ID.
-Feature lineage explains inputs, output meaning, limitations, evidence, and an
-optional separately governed source locator; it contains no transformation
-code or clinical values.
+A profile document has `profile_schema_version: 2`, one profile identity, a
+requirement for semantic schema 8, semantic contributions, sources, contexts,
+qualifications, vocabularies, and one physical `profile_binding`.
 
-Two typed revisions are supported:
+### Physical table inventory
 
-- `reinterprets_concept` keeps the original concept addressable and names an
-  extension-owned replacement preferred only in the active project view.
-- `replaces_binding` keeps the original binding addressable and names an
-  extension-owned replacement for the applicable view.
+Tables declare physical columns independently of mappings:
 
-Extensions form a dependency graph, not an ordered patch list. Composition
-rejects missing dependencies, cycles, target-profile mismatches, namespace
-violations, unauthorized revisions, and undeclared ambiguity. Independent
-extensions compose identically in every file order.
+```json
+{
+  "id": "open-v2.binding.table.patients_anon",
+  "table": "patients_anon",
+  "grain": "one exported patient row",
+  "columns": [
+    {"name": "empi_anon", "physical_type": "int64", "nullable": true}
+  ],
+  "keys": [],
+  "caveats": []
+}
+```
 
-## Contribution origin and effective view
+`grain` is optional descriptive text, not a closed global enum. Physical type
+and schema nullability occur once on the table-owned column. Columns may remain
+unmapped while their semantics are unresolved. Keys, object identity, and
+relationship endpoints must reference declared columns.
 
-Every returned or referenceable contribution retains its document kind,
-module ID, module version and lifecycle when applicable, target profile when
-applicable, and whether it is portable, released-profile, or project content.
-Original records are never mutated by qualifications or revisions.
+### Feature mappings
 
-Loading produces one immutable effective view. With no profile loaded,
-semantic getters return portable meaning. With one applicable profile,
-profile-dependent queries may infer it. With several loaded profiles, callers
-must select a profile whenever vocabularies, qualifications, or bindings differ;
-otherwise the operation returns a structured ambiguity error.
+A feature binding maps one physical occurrence to one concept:
 
-`get_feature`, `lookup_code`, discovery vocabulary indexing and diagnostics,
-and code inclusion use the same profile-aware vocabulary policy. Exact results
-surface portable entities, qualifications, contribution origins, applicable
-constraints, lineage, and active revisions in distinct sections rather than
-merging module-owned assertions into the portable record.
+```json
+{
+  "id": "open-v2.binding.feature.patient-id",
+  "table": "patients_anon",
+  "column": "empi_anon",
+  "concept": "identity.patient_identifier",
+  "status": "direct"
+}
+```
 
-`lookup_code` reports the resolved vocabulary contribution as `origin`. When
-the lookup also resolves through a semantic feature or physical bindings, it
-reports `feature_origin` and ID-associated `binding_origins` so callers retain
-the ownership, target-profile, and lifecycle boundaries used to interpret the
-code.
+Status is `direct`, `derived`, `conditional`, `ambiguous`, or `unresolved`.
+Mappings are identified by their authored IDs, not by `profile:table.column`,
+so one column may have several mappings and one concept may map to many
+columns. Downstream renamed columns simply map to the same stable concept.
+Callers must inspect status and handle multiple applicable mappings rather than
+assuming equivalence.
 
-## Python, CLI, and MCP
+Optional `qualifiers` are a closed scalar-valued map. They preserve descriptive
+metadata such as `{"slot": 1}` without reserving parameters for one pathology
+concept. Optional occurrence interpretations retain value/null meaning,
+evidence status, claims, and caveats. Vocabulary selection remains
+mapping-specific.
 
-The Python composition interface is:
+### Object mappings and co-location
+
+Object bindings name an object, table, relevant columns, evidence, and optional
+instance identity. Three optional independent axes replace the former mixed
+representation enum:
+
+- `completeness`: `complete`, `partial`, or `unknown`;
+- `authority`: `preferred`, `reference`, `alternative`, or `unspecified`; and
+- `derivation`: `source`, `projected`, `derived`, or `unknown`.
+
+Co-location is never authored as a role. It is computed when multiple object
+bindings select the same table. Physical relationships may also have the same
+source and target table; this records within-row navigation and is not a
+table-graph cycle.
+
+Relationship bindings and ordered binding paths remain descriptive physical
+routes. They are not executable joins and do not promote matching tuples into
+clinical attribution guarantees.
+
+## Extension modules
+
+An extension has `extension_schema_version: 2`, identity, semantic version,
+lifecycle, one target profile, explicit extension dependencies, all-family
+contributions, evidence records, optional lineage, and a `profile_binding` with
+the same physical shapes used by profiles. Empty physical collections are
+valid for semantic-only extensions.
+
+There is no revision array and no `reinterprets_concept`, `replaces_binding`,
+or `coexists_with` mechanism. Extensions add scoped records and mappings with
+new stable IDs. Competing or conditional interpretations remain simultaneously
+addressable and are surfaced as alternatives or ambiguity.
+
+## Composition and queries
+
+Loading retains origin, module, lifecycle, target profile, and availability
+for every contribution. Duplicate IDs, missing dependencies, dependency
+cycles, invalid scope, unresolved references, duplicate mapping IDs, and
+incompatible physical endpoints are errors. Independent extension input order
+does not change the effective view.
+
+Portable queries need no profile. Profile-dependent operations require an
+explicit profile when applicable contributions, qualifications, vocabularies,
+or mappings differ. Python, CLI, MCP, and the curator use the same resolver.
+
+The Python entry point is:
 
 ```python
 load_catalog(
@@ -185,54 +205,28 @@ load_catalog(
 )
 ```
 
-The no-argument form loads the bundled manifest and `open-v2`. During the
-transition, the positional path may also be a legacy schema-v6 monolith; the
-loader determines document type from closed discriminator fields.
+CLI and MCP startup accept repeatable `--profile-file` and `--extension-file`.
+`--no-default-profiles` omits manifest-selected profiles. Startup failures
+identify the document and JSON path without exposing file content.
 
-CLI and MCP startup accept repeatable `--profile-file PATH` and
-`--extension-file PATH`. `--no-default-profiles` omits manifest-selected
-profiles; `--include-default-extensions` explicitly opts into
-manifest-selected extensions. `--catalog` accepts a catalog-set manifest or a
-legacy schema-v6 document. Startup errors identify the file and JSON path
-without exposing file contents.
+## Footer verification
 
-CLI `feature` and `code`, and MCP `get_feature` and `lookup_code`, accept an
-optional profile. `discover` already accepts one. CLI JSON success and error
-envelopes remain stable, and MCP tools remain read-only with closed input
-schemas.
+`scripts/validate_source_profile.py` compares a selected profile's complete
+table and column inventory to direct-child Parquet footer schemas. It checks
+file/table presence, exact column names, physical types, and schema
+nullability. It reads no rows, values, statistics, counts, identifiers, dates,
+or report text.
 
-`validate` reports the manifest, semantic schema version, module schema
-versions, loaded profile IDs, loaded extension IDs and versions, controlled
-facets, contribution inventory, and content-based configuration fingerprint.
-The fingerprint never incorporates absolute paths or input ordering.
+Footer agreement does not validate key uniqueness, referential coverage,
+cardinality, clinical attribution, ROI geometry, outcome capture, or
+availability. The verifier is intentionally exact rather than a partial
+catalog-authoring scanner.
 
-## Authoring and evolution
+## Authoring rule
 
-The optional `embed-context curate` adapter is installed through the `curator`
-extra as the separate `embedv2-agent-context-curator` distribution. The base
-wheel retains only CLI discovery and dispatch for the command; the companion
-owns the implementation and browser assets. The adapter maintains two separate
-views. Its
-authored view retains validated source documents, exact bytes, module
-ownership, and record addresses; only one explicitly selected filesystem
-module can be changed. Its effective view is an immutable composed `Catalog`
-used for navigation, constraints, provenance, and discovery. Effective query
-results, qualifications, origins, and computed relationships are never
-serialized into an authored module.
-
-Draft validation substitutes the prospective authored mapping into the shared
-resolved composition and reruns the version-matched schema, composition, and
-domain validators. Saving writes exactly the canonical bytes shown in the
-viewer and atomically replaces only the selected module after all loaded file
-digests are checked.
-
-Search existing stable IDs before adding meaning. Put portable clinical meaning
-in the semantic catalog, released representation and evidence in one profile,
-and project-owned additions or intentional revisions in an explicitly selected
-extension. Do not copy semantics into modules or use qualifications as free-form
-overlays.
-
-Changes to required fields, controlled values, locator behavior, identity
-resolution, composition, or query semantics require a schema-version decision
-and synchronized schemas, validators, tests, interfaces, and documentation.
-Readers reject unsupported versions rather than ignoring fields.
+Search existing stable IDs before adding meaning. Reuse shared semantics when
+meaning is unchanged, but put legitimately profile-specific objects and
+concepts in that profile's contributions with correct availability. Keep
+physical columns in table inventories and semantic interpretation in mappings.
+Record uncertainty explicitly; do not manufacture physical details from a
+semantic scaffold.

@@ -155,7 +155,7 @@ wheels = [
 
 [[package]]
 name = "embedv2-agent-context"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
@@ -187,7 +187,7 @@ dev = [{ name = "pyarrow", specifier = "==20.0.0" }]
 
 [[package]]
 name = "embedv2-agent-context-curator"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/curator" }
 dependencies = [
     { name = "embedv2-agent-context" },

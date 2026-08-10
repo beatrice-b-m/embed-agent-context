@@ -10,17 +10,23 @@ from embed_context import load_catalog
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CATALOG_PATH = REPO_ROOT / "catalog" / "catalog.json"
+CATALOG_PATH = REPO_ROOT / "catalog" / "catalog-set.json"
+SEMANTIC_PATH = REPO_ROOT / "catalog" / "semantic" / "catalog.json"
+PROFILE_PATH = REPO_ROOT / "catalog" / "profiles" / "open-v2.json"
+INTERNAL_MANIFEST_PATH = REPO_ROOT / "catalog" / "internal-v2-catalog-set.json"
 
 
 class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.raw = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        cls.raw = json.loads(SEMANTIC_PATH.read_text(encoding="utf-8"))
+        cls.profile_raw = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))[
+            "profile_binding"
+        ]
         cls.catalog = load_catalog(CATALOG_PATH)
 
-    def test_v6_models_the_clinical_graph_without_analysis_patterns(self) -> None:
-        self.assertEqual(self.catalog.schema_version, 6)
+    def test_v8_models_the_clinical_graph_without_analysis_patterns(self) -> None:
+        self.assertEqual(self.catalog.schema_version, 8)
         self.assertNotIn("analysis_pattern_statuses", self.raw)
         self.assertNotIn("analysis_patterns", self.raw)
         self.assertFalse(hasattr(self.catalog, "analysis_patterns"))
@@ -35,6 +41,29 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         ):
             with self.subTest(legacy_api=legacy_name):
                 self.assertFalse(hasattr(self.catalog, legacy_name))
+
+    def test_internal_v2_contributes_scoped_roi_semantics_before_physical_mapping(
+        self,
+    ) -> None:
+        internal = load_catalog(INTERNAL_MANIFEST_PATH)
+        self.assertNotIn("region_of_interest", self.catalog.clinical_objects)
+        self.assertIn("image", self.catalog.clinical_objects)
+        self.assertIn("image", internal.clinical_objects)
+        self.assertIn("region_of_interest", internal.clinical_objects)
+        self.assertIn(
+            "clinical.image-region-of-interest",
+            internal.semantic_relationships,
+        )
+        roi = internal.discover(
+            "region of interest attached to image",
+            profile="internal-v2",
+            limit=10,
+        )
+        self.assertIn(
+            "region_of_interest",
+            {item["identifier"] for item in roi["matches"]},
+        )
+        self.assertEqual(internal.profile_bindings["internal-v2"].tables, ())
 
         expected_objects = {
             "patient",
@@ -368,9 +397,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
 
         binding = next(
             item
-            for item in self.raw["profile_bindings"]["open-v2"][
-                "relationship_bindings"
-            ]
+            for item in self.profile_raw["relationship_bindings"]
             if item["id"] == "open-v2.pathology_findings_anon.exam"
         )
         binding_text = json.dumps(binding)
@@ -380,9 +407,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "clinical.patient-pathology-observation",
             binding["semantic_relationships"],
         )
-        path = self.raw["profile_bindings"]["open-v2"][
-            "relationship_binding_paths"
-        ][0]
+        path = self.profile_raw["relationship_binding_paths"][0]
         self.assertEqual(
             path["semantic_relationship"],
             "clinical.patient-pathology-observation",
@@ -411,9 +436,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         )
         finding_bindings = [
             item
-            for item in self.raw["profile_bindings"]["open-v2"][
-                "object_bindings"
-            ]
+            for item in self.profile_raw["object_bindings"]
             if item["object"] == "imaging_finding"
         ]
         self.assertEqual(len(finding_bindings), 2)
@@ -433,9 +456,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
     def test_laterality_null_meaning_is_binding_specific(self) -> None:
         bindings = {
             (item["table"], item["column"]): item
-            for item in self.raw["profile_bindings"]["open-v2"][
-                "feature_bindings"
-            ]
+            for item in self.profile_raw["feature_bindings"]
             if item["column"] in {"side", "bside"}
         }
         finding = bindings[("imaging_findings_anon", "side")][
@@ -482,7 +503,6 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         guardrail_text = json.dumps(guardrail)
         self.assertEqual(guardrail["priority"], "critical")
         self.assertIn("Brier score", guardrail_text)
-        self.assertIn("-35", guardrail_text)
         self.assertIn("model version", guardrail_text)
         self.assertIn("Association or ranking", guardrail_text)
 
@@ -499,15 +519,9 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "guardrail.risk-probability-readiness",
             nci["related"]["guardrails"],
         )
-        self.assertIn(
-            "coverage.open-v2.risk-probability-calibration-readiness",
-            guardrail["coverage"],
-        )
         nci_binding = next(
             item
-            for item in self.raw["profile_bindings"]["open-v2"][
-                "feature_bindings"
-            ]
+            for item in self.profile_raw["feature_bindings"]
             if item["concept"] == "risk.nci_five_year"
         )
         self.assertEqual(
@@ -543,9 +557,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         )
         bindings_by_concept = {
             item["concept"]: item
-            for item in self.raw["profile_bindings"]["open-v2"][
-                "feature_bindings"
-            ]
+            for item in self.profile_raw["feature_bindings"]
             if item["concept"] in risk_outputs
         }
         self.assertEqual(set(bindings_by_concept), risk_outputs)
@@ -750,7 +762,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertTrue(
             {"bindings", "tables", "relationships"}.isdisjoint(self.raw)
         )
-        profile = self.raw["profile_bindings"]["open-v2"]
+        profile = self.profile_raw
         self.assertEqual(
             set(profile),
             {
@@ -768,7 +780,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         projected_objects = {
             item["object"]
             for item in combined["object_bindings"]
-            if item["representation"] == "projection"
+            if item.get("derivation") == "projected"
         }
         self.assertLessEqual(
             {
@@ -786,8 +798,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
     def test_physical_aliases_are_profile_scoped_discovery_metadata(self) -> None:
         physical_names = {
             value.casefold()
-            for profile in self.raw["profile_bindings"].values()
-            for binding in profile["feature_bindings"]
+            for binding in self.profile_raw["feature_bindings"]
             for value in (binding["table"], binding["column"])
         }
         for identifier, concept in self.raw["concepts"].items():
@@ -836,7 +847,10 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
     ) -> None:
         repository_sources = {
             identifier: source
-            for identifier, source in self.raw["sources"].items()
+            for identifier, source in {
+                **self.raw["sources"],
+                **json.loads(PROFILE_PATH.read_text(encoding="utf-8"))["sources"],
+            }.items()
             if source["locator_kind"] == "repository_path"
         }
         self.assertTrue(repository_sources)

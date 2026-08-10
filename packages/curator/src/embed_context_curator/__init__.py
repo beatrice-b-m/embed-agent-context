@@ -3,7 +3,7 @@
 from embed_context import __version__ as _core_version
 
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 
 def _require_compatible_core_version(core_version: str) -> None:

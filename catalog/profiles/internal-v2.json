@@ -1,0 +1,238 @@
+{
+  "$schema": "./profile.schema.json",
+  "profile_schema_version": 2,
+  "profile": {
+    "id": "internal-v2",
+    "label": "Internal EMBED V2 working profile"
+  },
+  "requires": {
+    "semantic_schema_version": 8
+  },
+  "contributions": {
+    "clinical_objects": {
+      "region_of_interest": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Image region of interest",
+        "definition": "One represented spatial region associated with a breast-imaging image.",
+        "grain": "one represented region of interest on one image",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "region of interest",
+          "ROI",
+          "image annotation",
+          "image region"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-attached-to-image"
+        ],
+        "caveats": [
+          "Geometry, coordinate system, annotation provenance, multiplicity, and physical storage are not yet cataloged.",
+          "A represented region of interest is not automatically equivalent to a clinical imaging finding."
+        ]
+      }
+    },
+    "concepts": {},
+    "semantic_relationships": {
+      "clinical.image-region-of-interest": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Image has region of interest",
+        "kind": "association",
+        "source_object": "image",
+        "target_object": "region_of_interest",
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "exactly_one"
+        },
+        "optionality": {
+          "source": "optional",
+          "target": "required"
+        },
+        "attribution": "A represented region of interest is attached to one represented image.",
+        "attribution_limitations": [
+          "The relationship does not establish equivalence between an ROI and a clinical finding.",
+          "The physical image and ROI identifiers are not yet cataloged."
+        ],
+        "temporal_qualification": "No independent ROI event or availability time is currently asserted.",
+        "temporal_semantics": [],
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "image ROI",
+          "ROI attached to image",
+          "image annotation relationship"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-attached-to-image"
+        ],
+        "caveats": [
+          "Profile-specific evidence is still needed for physical linkage, identity, and cardinality verification."
+        ]
+      }
+    },
+    "temporal_semantics": {},
+    "aggregations": {},
+    "guardrails": {},
+    "coverage": {
+      "coverage.internal-v2.specimen-collection-time": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "temporal_semantic",
+        "subject": "time.specimen-collection",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "Support for specimen-collection time has not yet been assessed for the internal V2 working profile.",
+        "domains": [
+          "pathology",
+          "temporal"
+        ],
+        "search_terms": [
+          "internal V2 specimen collection time"
+        ],
+        "claim_refs": [],
+        "caveats": [
+          "No proxy or physical column is asserted."
+        ]
+      },
+      "coverage.internal-v2.downstream-availability-time": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "temporal_semantic",
+        "subject": "time.downstream-availability",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "Support for explicit downstream information-availability time has not yet been assessed for the internal V2 working profile.",
+        "domains": [
+          "temporal",
+          "workflow"
+        ],
+        "search_terms": [
+          "internal V2 downstream availability time"
+        ],
+        "claim_refs": [],
+        "caveats": [
+          "Physical co-location must not be treated as evidence of contemporaneous availability."
+        ]
+      },
+      "coverage.internal-v2.roi-physical-binding": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "topic",
+        "subject": "internal-v2.roi-context",
+        "status": "not_cataloged",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "The internal V2 semantic model includes image-attached regions of interest, but their tables, columns, geometry, identifiers, and physical relationships have not yet been cataloged.",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "internal V2 ROI binding",
+          "ROI table",
+          "ROI columns"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-attached-to-image"
+        ],
+        "caveats": [
+          "Do not infer a table name, image key, coordinate system, or geometry representation from this semantic record."
+        ]
+      }
+    }
+  },
+  "sources": {
+    "internal-v2.roi-maintainer-confirmation": {
+      "title": "Internal V2 ROI model maintainer confirmation",
+      "kind": "maintainer_confirmed",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "maintainer-confirmed:internal-v2-roi-model",
+      "version_scope": "Internal EMBED V2 working profile; semantic existence and image attachment only.",
+      "profiles": [
+        "internal-v2"
+      ],
+      "notes": [
+        "Does not establish physical table, column, geometry, identity, or cardinality details."
+      ]
+    }
+  },
+  "contexts": {
+    "internal-v2.roi-context": {
+      "title": "Internal V2 image regions of interest",
+      "kind": "data_representation",
+      "scope": "profile_specific",
+      "profiles": [
+        "internal-v2"
+      ],
+      "summary": "Internal V2 represents regions of interest attached to images; detailed physical representation remains to be cataloged.",
+      "domains": [
+        "imaging"
+      ],
+      "search_terms": [
+        "internal V2 ROI",
+        "image region of interest"
+      ],
+      "related_concepts": [],
+      "related_tables": [],
+      "related_relationships": [],
+      "claims": [
+        {
+          "id": "roi-attached-to-image",
+          "statement": "The internal V2 working representation includes regions of interest attached to images.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.roi-maintainer-confirmation"
+          ],
+          "caveats": [
+            "No physical representation or geometry semantics are asserted."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "This context records the initial semantic boundary, not a complete ROI data dictionary."
+      ]
+    }
+  },
+  "qualifications": {},
+  "vocabularies": {},
+  "profile_binding": {
+    "feature_bindings": [],
+    "object_bindings": [],
+    "tables": [],
+    "relationship_bindings": [],
+    "relationship_binding_paths": []
+  }
+}

@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from embed_context_curator.session import CuratorError, CuratorSession
-from tests.test_catalog_composition import representative_extension
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -253,7 +252,100 @@ class CuratorSessionTests(unittest.TestCase):
         )
         self.assertTrue(result["valid"])
 
-    def test_qualification_and_revision_origins_use_contribution_registries(self) -> None:
+    def test_physical_column_edits_are_independent_from_parent_table(self) -> None:
+        session = self.session()
+        authored = json.loads(self.profile.read_text(encoding="utf-8"))
+        table = authored["profile_binding"]["tables"][0]
+        column = table["columns"][0]
+        identifier = f"{table['id']}::{column['name']}"
+        record = session.get_record("physical_column", identifier)
+
+        self.assertEqual(
+            record["source"]["json_pointer"],
+            "/profile_binding/tables/0/columns/0",
+        )
+        replacement = dict(record["authored"])
+        replacement["nullable"] = not replacement["nullable"]
+        result = session.replace_record(
+            "physical_column",
+            identifier,
+            {"revision": 0, "record": replacement},
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(
+            session.diff()["changed_records"],
+            [{
+                "kind": "physical_column",
+                "identifier": identifier,
+                "state": "modified",
+            }],
+        )
+        saved = session.save(expected_revision=1)
+        self.assertTrue(saved["saved"])
+        current = json.loads(self.profile.read_text(encoding="utf-8"))
+        self.assertEqual(
+            current["profile_binding"]["tables"][0]["columns"][0]["nullable"],
+            replacement["nullable"],
+        )
+
+    def test_unmapped_physical_column_can_be_created_under_a_table(self) -> None:
+        session = self.session()
+        authored = json.loads(self.profile.read_text(encoding="utf-8"))
+        table_id = authored["profile_binding"]["tables"][0]["id"]
+        identifier = f"{table_id}::synthetic_unmapped"
+
+        result = session.create_record({
+            "revision": 0,
+            "kind": "physical_column",
+            "identifier": identifier,
+            "record": {
+                "name": "synthetic_unmapped",
+                "physical_type": "string",
+                "nullable": True,
+            },
+        })
+
+        self.assertTrue(result["valid"])
+        record = session.get_record("physical_column", identifier)
+        self.assertEqual(record["authored"]["name"], "synthetic_unmapped")
+        self.assertEqual(record["draft_state"], "new")
+        self.assertEqual(
+            session.diff()["changed_records"],
+            [{
+                "kind": "physical_column",
+                "identifier": identifier,
+                "state": "new",
+            }],
+        )
+
+    def test_profile_can_create_profile_owned_semantic_object(self) -> None:
+        session = self.session()
+        identifier = "project.synthetic_roi"
+        result = session.create_record({
+            "revision": 0,
+            "kind": "clinical_object",
+            "identifier": identifier,
+            "record": {
+                "label": "Synthetic region",
+                "definition": "A synthetic object for curator testing.",
+                "grain": "one synthetic region",
+                "domains": ["imaging"],
+                "search_terms": ["synthetic region"],
+                "claim_refs": [],
+                "caveats": ["This test record asserts no dataset facts."],
+            },
+        })
+
+        self.assertTrue(result["valid"])
+        record = session.get_record("clinical_object", identifier)
+        self.assertEqual(
+            record["source"]["json_pointer"],
+            f"/contributions/clinical_objects/{identifier}",
+        )
+        self.assertEqual(record["origin"]["target_profile"], "open-v2")
+
+    def test_profile_and_extension_origins_use_contribution_registries(self) -> None:
         qualification = self.session(editable=False).get_record(
             "qualification", QUALIFICATION
         )
@@ -263,20 +355,54 @@ class CuratorSessionTests(unittest.TestCase):
         self.assertEqual(qualification["origin"]["module_id"], "open-v2")
 
         extension = Path(self.temporary.name) / "extension.json"
-        extension.write_text(
-            json.dumps(representative_extension(), indent=2) + "\n",
-            encoding="utf-8",
-        )
-        revision_id = "project.alpha.revision.race-concept"
-        revision = CuratorSession(
+        concept_id = "project.alpha.cleaned_race"
+        extension.write_text(json.dumps({
+            "$schema": "./extension.schema.json",
+            "extension_schema_version": 2,
+            "extension": {
+                "id": "project.alpha", "version": "0.1.0",
+                "label": "Synthetic extension",
+                "lifecycle_status": "work_in_progress",
+            },
+            "applies_to": {"profile": "open-v2"},
+            "requires": {
+                "semantic_schema_version": 8,
+                "profile_schema_version": 2,
+                "extensions": [],
+            },
+            "contributions": {
+                "clinical_objects": {},
+                "concepts": {concept_id: {
+                    "label": "Project-cleaned race",
+                    "definition": "A project-owned race interpretation.",
+                    "feature_kind": "categorical",
+                    "domains": ["demographics"],
+                    "search_terms": ["project cleaned race"],
+                    "caveats": ["Synthetic curator metadata only."],
+                    "evidence": ["inference"],
+                    "objects": ["patient"],
+                }},
+                "semantic_relationships": {}, "temporal_semantics": {},
+                "aggregations": {}, "guardrails": {}, "coverage": {},
+            },
+            "qualifications": {}, "feature_lineage": {}, "sources": {},
+            "contexts": {}, "vocabularies": {},
+            "profile_binding": {
+                "feature_bindings": [], "object_bindings": [], "tables": [],
+                "relationship_bindings": [],
+                "relationship_binding_paths": [],
+            },
+        }, indent=2) + "\n", encoding="utf-8")
+        concept = CuratorSession(
             self.semantic,
             profile_paths=[self.profile],
             extension_paths=[extension],
             edit_module=extension,
-        ).get_record("revision", revision_id)
-        self.assertEqual(revision["origin"]["contribution_class"], "project")
-        self.assertEqual(revision["origin"]["module_id"], "project.alpha")
-        self.assertEqual(revision["origin"]["lifecycle_status"], "work_in_progress")
+        ).get_record("feature", concept_id)
+        self.assertEqual(concept["source"]["json_pointer"], f"/contributions/concepts/{concept_id}")
+        self.assertEqual(concept["origin"]["contribution_class"], "project")
+        self.assertEqual(concept["origin"]["module_id"], "project.alpha")
+        self.assertEqual(concept["origin"]["lifecycle_status"], "work_in_progress")
 
     def test_invalid_draft_graph_uses_current_broken_reference(self) -> None:
         session = self.session()

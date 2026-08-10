@@ -1,8 +1,9 @@
 # Contributing
 
 Contributions should make the catalog easier to trust without turning it into
-an analysis recipe. Portable clinical semantics are primary; release-specific
-tables, columns, and physical associations remain secondary profile bindings.
+an analysis recipe. Shared semantics remain reusable, while profiles and
+extensions may add availability-scoped meaning as well as secondary physical
+schemas and mappings.
 
 ## Development setup
 
@@ -27,9 +28,12 @@ This setup and the baseline test suite need no EMBED data. Read
 
 ## Canonical sources
 
-- `catalog/semantic/catalog.json` is the canonical portable semantic content.
+- `catalog/semantic/catalog.json` is the canonical shared semantic content.
 - `catalog/profiles/open-v2.json` is the canonical Open V2 evidence, coverage,
   vocabulary, qualification, and physical-binding inventory.
+- `catalog/profiles/internal-v2.json` is a non-default working scaffold for
+  internal-only semantics, currently including image-attached ROIs without
+  invented physical details.
 - `catalog/catalog-set.json` selects bundled defaults; each document type has
   a standalone version-matched JSON Schema shape contract.
 - `embed_context/catalog.py` adds strict semantic, cross-reference, scope, and
@@ -53,7 +57,8 @@ Suppose a review establishes a new timestamp meaning.
    existing object when its clinical grain is unchanged.
 2. Check whether an existing concept already has the same meaning. Create a
    new concept only when meaning changes, not merely because another profile
-   uses a different column.
+   uses a different column. Put profile-specific meaning in that module's
+   `contributions` with the narrowest correct availability.
 3. Add or reuse a `temporal_semantic` record that states whether the value is
    event, documentation, or availability time. Do not designate a universal
    diagnosis date, coalesce different time meanings, or substitute an
@@ -61,11 +66,12 @@ Suppose a review establishes a new timestamp meaning.
    when another time is genuinely part of the question.
 4. Add the narrowest reviewed `context-id#claim-id` and applicable source.
    Preserve unresolved or contradicted status instead of smoothing it away.
-5. Add profile feature/object/relationship bindings only when verified
-   physical metadata supports them. Use occurrence interpretations for
-   binding-specific value or null meaning, instance identity for bounded
-   clinical identity, and relationship-binding paths for supported multi-edge
-   routes. Record join hazards and unsupported coverage explicitly.
+5. Declare physical columns once on their table, then add feature mappings only
+   when their meaning is supported. Use mapping status and scalar qualifiers
+   for direct, derived, conditional, ambiguous, or unresolved interpretations.
+   Keep object completeness, authority, and derivation independent; co-location
+   is inferred from shared tables. Use occurrence interpretations, instance
+   identity, and relationship-binding paths where applicable.
 6. Change the applicable semantic, profile, extension, or manifest schema only
    when its serialized shape or an expressible invariant changes. Keep runtime
    and schema validators in parity.
@@ -92,9 +98,11 @@ uv run --locked --package embedv2-agent-context-curator python -m unittest \
   discover -s packages/curator/tests -v
 ```
 
-`tests/test_catalog_schema.py` checks the canonical and synthetic catalogs
-against Draft 2020-12 JSON Schema and tests schema/runtime parity. The core
-loader additionally enforces reference closure and semantic invariants.
+`tests/test_catalog_schema.py` checks the current semantic and profile modules
+against Draft 2020-12 JSON Schema. Synthetic runtime tests cover independent
+column inventories, many-to-many mappings, inferred co-location, and same-table
+relationships. The core loader additionally enforces reference closure and
+semantic invariants.
 
 Use focused checks while iterating:
 
@@ -128,7 +136,7 @@ curator tests cover each extra separately. It also checks that base-only
 The viewer lives in the `packages/curator` workspace member and is not included
 in the base wheel. After the workspace setup above, launch read-only review
 with `uv run --locked embed-context curate`. To curate, load and select exactly
-one source-tree or external schema-v7 module, for example:
+one source-tree or external schema-v8 module, for example:
 
 ```bash
 uv run --locked embed-context \
@@ -160,8 +168,10 @@ uv run --locked python scripts/validate_source_profile.py
 
 The verifier reads Parquet footer schemas only. It must never inspect or copy
 rows, clinical values, identifiers, anonymized dates, report text, statistics,
-or counts. `reference_files/` is not required for a fresh clone and must never
-be committed.
+or counts. It checks the selected profile's exact table-owned column inventory,
+types, and schema nullability; it does not validate keys, joins, cardinality,
+clinical meaning, or ROI geometry. `reference_files/` is not required for a
+fresh clone and must never be committed.
 
 ## Continuous integration
 
@@ -185,7 +195,9 @@ EMBED data or `reference_files/`.
   identity.
 - Guardrails have the correct category and priority; exact-result constraints
   and discovery intent boosts preserve stable IDs and explain their basis.
-- Physical metadata remains under `profile_bindings`.
+- Tables own complete physical column metadata; semantic mappings do not repeat
+  type, nullability, or grain.
+- Profile/extension contributions have explicit or module-default availability.
 - JSON Schema and strict runtime validation agree where their responsibilities
   overlap.
 - Examples, command counts, version axes, and cross-references are current.

@@ -1,16 +1,6 @@
 {
   "$schema": "./catalog.schema.json",
-  "semantic_schema_version": 7,
-  "binding_grains": [
-    "patient",
-    "exam",
-    "breast_side",
-    "imaging_finding",
-    "pathology_finding",
-    "report",
-    "risk_assessment",
-    "wide_row"
-  ],
+  "semantic_schema_version": 8,
   "feature_kinds": [
     "identifier",
     "date",
@@ -177,6 +167,25 @@
       "caveats": [
         "A null side on a finding can represent bilateral involvement, while null procedure side generally means unknown.",
         "The semantic object must not inherit one catalog-wide null-laterality rule."
+      ]
+    },
+    "image": {
+      "label": "Breast-imaging image",
+      "definition": "One represented image acquired as part of a breast-imaging exam.",
+      "grain": "one acquired image instance",
+      "domains": [
+        "imaging"
+      ],
+      "search_terms": [
+        "image",
+        "breast image",
+        "imaging instance",
+        "mammography image"
+      ],
+      "claim_refs": [],
+      "caveats": [
+        "Image identity, file representation, series membership, and availability are profile-specific.",
+        "Catalog coverage of an image object does not imply that a selected profile has an image table or file binding."
       ]
     },
     "imaging_finding": {
@@ -3778,6 +3787,41 @@
       "claim_refs": [],
       "caveats": [
         "Finding laterality and procedure laterality have different null semantics."
+      ]
+    },
+    "clinical.exam-image": {
+      "label": "Exam contains image",
+      "kind": "hierarchy",
+      "source_object": "imaging_exam",
+      "target_object": "image",
+      "cardinality": {
+        "targets_per_source": "unknown",
+        "sources_per_target": "unknown"
+      },
+      "optionality": {
+        "source": "unknown",
+        "target": "unknown"
+      },
+      "attribution": "An image can be represented as part of an imaging exam.",
+      "attribution_limitations": [
+        "The catalog does not define a portable physical identifier or file-layout rule for associating images with exams."
+      ],
+      "temporal_qualification": "Image acquisition belongs to the imaging-exam context, but profile-specific acquisition timestamps and availability require separate evidence.",
+      "temporal_semantics": [
+        "time.exam-event"
+      ],
+      "domains": [
+        "exam",
+        "imaging"
+      ],
+      "search_terms": [
+        "exam images",
+        "images in study",
+        "image accession"
+      ],
+      "claim_refs": [],
+      "caveats": [
+        "Cardinality and physical linkage remain profile-specific."
       ]
     },
     "clinical.exam-finding": {

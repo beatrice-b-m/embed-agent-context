@@ -9,21 +9,23 @@ Read these in order before changing behavior or catalog meaning:
 3. `docs/project-scope.md` for normative clinical, evidence, portability, and
    safety boundaries.
 4. `CONTRIBUTING.md` for the worked change flow and validation matrix.
-5. `docs/catalog-format.md` and `docs/architecture-v7.md` when changing the
+5. `docs/catalog-format.md` and `docs/architecture-v8.md` when changing the
    serialized model or query behavior.
 
-The current version axes are independent: software `0.9.0`, semantic catalog
-schema version `7`, profile-module schema version `1`, extension-module schema
-version `1`, registered physical profile `open-v2`, and optional MCP SDK
+The current version axes are independent: software `0.10.0`, semantic catalog
+schema version `8`, profile-module schema version `2`, extension-module schema
+version `2`, registered public profile `open-v2`, and optional MCP SDK
 dependency `2.0.0`. The optional `embedv2-agent-context-curator` companion is
 versioned in lockstep with the core distribution.
 
 ## Canonical-source hierarchy
 
-- `catalog/semantic/catalog.json` is the source of truth for portable clinical
+- `catalog/semantic/catalog.json` is the source of truth for shared clinical
   semantics, provenance, controlled values, and vocabularies.
 - `catalog/profiles/open-v2.json` is the source of truth for the released Open
   V2 profile, its qualifications, evidence, coverage, and physical bindings.
+- `catalog/profiles/internal-v2.json` is the non-default working scaffold for
+  internal-only contributions such as image-attached regions of interest.
 - `catalog/catalog-set.json` selects the bundled semantic and default profile
   modules; version-matched schemas are standalone structural contracts.
 - `embed_context/catalog.py` implements strict parsing, cross-reference,
@@ -34,9 +36,11 @@ versioned in lockstep with the core distribution.
   historical evidence records, not executable policy or general onboarding.
 
 Search for existing objects, concepts, claims, sources, and vocabularies before
-adding stable IDs. Keep portable semantics primary, released representation in
-its profile module, and project-owned additions or revisions in explicitly
-selected extension modules.
+adding stable IDs. Reuse shared semantics when meaning is unchanged. Profiles
+and extensions may add every semantic family with explicit or module-default
+availability; keep physical columns in table inventories and interpretations
+in stable-ID mappings. Typed revisions and legacy catalog loading are not part
+of schema v8.
 
 ## Clinical-data safety boundary
 

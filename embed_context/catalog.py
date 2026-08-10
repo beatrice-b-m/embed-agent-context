@@ -20,8 +20,8 @@ import jsonschema
 
 
 SCHEMA_REFERENCE = "./catalog.schema.json"
-SCHEMA_VERSION = 6
-SEMANTIC_SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
+SEMANTIC_SCHEMA_VERSION = 8
 
 BINDING_GRAINS = (
     "patient",
@@ -123,9 +123,6 @@ DISCOVERY_KINDS = (
 RELATIONSHIP_BINDING_KINDS = frozenset(
     {"hierarchy", "reference", "projection"}
 )
-OBJECT_BINDING_REPRESENTATIONS = frozenset(
-    {"canonical", "partial", "co_located", "projection", "reference"}
-)
 OPTIONALITY_VALUES = frozenset({"required", "optional", "unknown"})
 CARDINALITY_VALUES = frozenset(
     {"exactly_one", "zero_or_one", "one_or_more", "zero_or_more", "unknown"}
@@ -141,7 +138,18 @@ EVIDENCE_VALUES = frozenset(
         "unresolved",
     }
 )
-ROLES = frozenset({"canonical", "reference", "wide_projection", "technical"})
+MAPPING_STATUSES = (
+    "direct",
+    "derived",
+    "conditional",
+    "ambiguous",
+    "unresolved",
+)
+OBJECT_COMPLETENESS = frozenset({"complete", "partial", "unknown"})
+OBJECT_AUTHORITIES = frozenset(
+    {"preferred", "reference", "alternative", "unspecified"}
+)
+OBJECT_DERIVATIONS = frozenset({"projected", "derived", "source", "unknown"})
 VOCABULARY_COMPLETENESS = frozenset({"unknown", "open", "closed"})
 VOCABULARY_PARSING = frozenset(
     {"atomic", "comma_composed_undocumented", "shared_slot_dictionary"}
@@ -161,9 +169,6 @@ COVERAGE_SUBJECT_KINDS = frozenset(
         "topic",
     }
 )
-
-BINDING_PARAMETER_KEYS = frozenset({"slot"})
-_SLOT_PARAMETER_CONCEPT = "pathology.diagnosis_code_slot"
 
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]*$")
 _TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
@@ -301,7 +306,6 @@ _TOP_LEVEL_KEYS = frozenset(
         "$schema",
         "schema_version",
         "profiles",
-        "binding_grains",
         "feature_kinds",
         "domains",
         "context_kinds",
@@ -500,25 +504,14 @@ _BINDING_KEYS = frozenset(
         "table",
         "column",
         "concept",
-        "grain",
-        "role",
-        "physical_type",
-        "nullable",
-        "parameters",
         "notes",
         "occurrence_interpretations",
         "vocabulary",
-        "coexists_with",
+        "status",
+        "qualifiers",
     }
 )
-_BINDING_REQUIRED_KEYS = _BINDING_KEYS - {
-    "id",
-    "parameters",
-    "notes",
-    "occurrence_interpretations",
-    "vocabulary",
-    "coexists_with",
-}
+_BINDING_REQUIRED_KEYS = frozenset({"id", "table", "column", "concept", "status"})
 _OCCURRENCE_INTERPRETATION_KEYS = frozenset(
     {"representation", "meaning", "status", "claim_refs", "caveats"}
 )
@@ -528,13 +521,17 @@ _OBJECT_BINDING_KEYS = frozenset(
         "object",
         "table",
         "columns",
-        "representation",
         "claim_refs",
         "caveats",
         "instance_identity",
+        "completeness",
+        "authority",
+        "derivation",
     }
 )
-_OBJECT_BINDING_REQUIRED_KEYS = _OBJECT_BINDING_KEYS - {"id", "instance_identity"}
+_OBJECT_BINDING_REQUIRED_KEYS = frozenset(
+    {"id", "object", "table", "columns", "claim_refs", "caveats"}
+)
 _INSTANCE_IDENTITY_KEYS = frozenset(
     {
         "columns",
@@ -550,8 +547,10 @@ _RESERVED_IDENTITY_EXCEPTION_KEYS = frozenset(
 _ROWS_PER_INSTANCE_VALUES = frozenset(
     {"exactly_one", "one_or_more", "unknown"}
 )
-_TABLE_KEYS = frozenset({"id", "table", "grain", "keys", "caveats"})
-_TABLE_REQUIRED_KEYS = _TABLE_KEYS - {"id"}
+_TABLE_KEYS = frozenset({"id", "table", "grain", "columns", "keys", "caveats"})
+_TABLE_REQUIRED_KEYS = frozenset({"id", "table", "columns", "keys", "caveats"})
+_PHYSICAL_COLUMN_KEYS = frozenset({"name", "physical_type", "nullable"})
+_PHYSICAL_COLUMN_REQUIRED_KEYS = frozenset({"name", "physical_type", "nullable"})
 _KEY_KEYS = frozenset(
     {
         "id",
@@ -615,7 +614,7 @@ class CatalogLoadError(CatalogError):
 
 
 class CatalogValidationError(CatalogError):
-    """The decoded catalog violates schema-v6 semantics."""
+    """The decoded catalog violates semantic-v8 catalog rules."""
 
 
 class CatalogNotFoundError(CatalogError):
@@ -634,6 +633,7 @@ class ContributionOrigin:
     lifecycle_status: str | None = None
     target_profile: str | None = None
     contribution_class: str = "portable"
+    availability_profiles: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -645,6 +645,11 @@ class ContributionOrigin:
                 "lifecycle_status": self.lifecycle_status,
                 "target_profile": self.target_profile,
                 "contribution_class": self.contribution_class,
+                "availability": (
+                    {"scope": "profiles", "profiles": list(self.availability_profiles)}
+                    if self.availability_profiles
+                    else {"scope": "portable"}
+                ),
             }.items()
             if value is not None
         }
@@ -671,36 +676,6 @@ class Qualification:
             "caveats": list(self.caveats),
             "origin": self.origin.to_dict(),
         }
-
-
-@dataclass(frozen=True, slots=True)
-class Revision:
-    id: str
-    kind: str
-    original_id: str
-    replacement_id: str
-    semantic_difference: str | None
-    reason: str
-    claim_refs: tuple[str, ...]
-    limitations: tuple[str, ...]
-    original_remains_alternative: bool
-    origin: ContributionOrigin
-
-    def to_dict(self) -> dict[str, Any]:
-        result = {
-            "id": self.id,
-            "kind": self.kind,
-            "original_id": self.original_id,
-            "replacement_id": self.replacement_id,
-            "reason": self.reason,
-            "claim_refs": list(self.claim_refs),
-            "limitations": list(self.limitations),
-            "original_remains_alternative": self.original_remains_alternative,
-            "origin": self.origin.to_dict(),
-        }
-        if self.semantic_difference is not None:
-            result["semantic_difference"] = self.semantic_difference
-        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -1120,16 +1095,12 @@ class Binding:
     table: str
     column: str
     concept: str
-    grain: str
-    role: str
-    physical_type: str
-    nullable: bool
-    parameters: tuple[tuple[str, int], ...] = ()
+    status: str
+    qualifiers: tuple[tuple[str, str | int | float | bool], ...] = ()
     notes: tuple[str, ...] = ()
     occurrence_interpretations: tuple[OccurrenceInterpretation, ...] = ()
     id: str | None = None
     vocabulary: str | None = None
-    coexists_with: tuple[str, ...] = ()
 
     @property
     def identifier(self) -> str:
@@ -1147,19 +1118,14 @@ class Binding:
             "table": self.table,
             "column": self.column,
             "concept": self.concept,
-            "grain": self.grain,
-            "role": self.role,
-            "physical_type": self.physical_type,
-            "nullable": self.nullable,
+            "status": self.status,
         }
         if self.id is not None:
             result["id"] = self.id
+        if self.qualifiers:
+            result["qualifiers"] = dict(self.qualifiers)
         if self.vocabulary is not None:
             result["vocabulary"] = self.vocabulary
-        if self.coexists_with:
-            result["coexists_with"] = list(self.coexists_with)
-        if self.parameters:
-            result["parameters"] = dict(self.parameters)
         if self.notes:
             result["notes"] = list(self.notes)
         if self.occurrence_interpretations:
@@ -1213,9 +1179,11 @@ class ObjectBinding:
     object: str
     table: str
     columns: tuple[str, ...]
-    representation: str
     claim_refs: tuple[str, ...]
     caveats: tuple[str, ...]
+    completeness: str | None = None
+    authority: str | None = None
+    derivation: str | None = None
     instance_identity: InstanceIdentity | None = None
     id: str | None = None
 
@@ -1225,10 +1193,15 @@ class ObjectBinding:
             "object": self.object,
             "table": self.table,
             "columns": list(self.columns),
-            "representation": self.representation,
             "claim_refs": list(self.claim_refs),
             "caveats": list(self.caveats),
         }
+        if self.completeness is not None:
+            result["completeness"] = self.completeness
+        if self.authority is not None:
+            result["authority"] = self.authority
+        if self.derivation is not None:
+            result["derivation"] = self.derivation
         if self.instance_identity is not None:
             result["instance_identity"] = self.instance_identity.to_dict()
         if self.id is not None:
@@ -1259,10 +1232,25 @@ class KeyCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class PhysicalColumn:
+    name: str
+    physical_type: str
+    nullable: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "physical_type": self.physical_type,
+            "nullable": self.nullable,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class TableSpec:
     profile: str
     table: str
-    grain: str
+    grain: str | None
+    columns: tuple[PhysicalColumn, ...]
     keys: tuple[KeyCandidate, ...]
     caveats: tuple[str, ...]
     id: str | None = None
@@ -1276,12 +1264,14 @@ class TableSpec:
             "identifier": self.identifier,
             "profile": self.profile,
             "table": self.table,
-            "grain": self.grain,
+            "columns": [column.to_dict() for column in self.columns],
             "keys": [key.to_dict() for key in self.keys],
             "caveats": list(self.caveats),
         }
         if self.id is not None:
             result["id"] = self.id
+        if self.grain is not None:
+            result["grain"] = self.grain
         return result
 
 
@@ -1395,7 +1385,7 @@ class _DiscoveryDocument:
 
 
 class Catalog:
-    """Validated immutable schema-v6 catalog with deterministic indexes."""
+    """Validated immutable semantic-v8 catalog with deterministic indexes."""
 
     __slots__ = (
         "_schema_version",
@@ -1425,7 +1415,6 @@ class Catalog:
         "_discovery_documents",
         "_origins",
         "_qualifications",
-        "_revisions",
         "_configuration",
         "_feature_lineage",
         "_sealed",
@@ -1448,12 +1437,10 @@ class Catalog:
         schema_version: int = SCHEMA_VERSION,
         origins: Mapping[str, ContributionOrigin] | None = None,
         qualifications: Mapping[str, Qualification] | None = None,
-        revisions: Mapping[str, Revision] | None = None,
         configuration: Mapping[str, Any] | None = None,
         feature_lineage: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> None:
         object.__setattr__(self, "_schema_version", schema_version)
-        revision_map = revisions or {}
         for slot, values in (
             ("_clinical_objects", clinical_objects),
             ("_concepts", concepts),
@@ -1484,6 +1471,7 @@ class Catalog:
                     item.table,
                     item.column,
                     item.concept,
+                    item.id or "",
                 ),
             )
         )
@@ -1557,20 +1545,13 @@ class Catalog:
         grouped_concepts: defaultdict[str, list[Binding]] = defaultdict(list)
         grouped_physical: defaultdict[str, list[Binding]] = defaultdict(list)
         bindings_by_id: dict[str, Binding] = {}
-        qualified: dict[str, Binding] = {}
+        grouped_qualified: defaultdict[str, list[Binding]] = defaultdict(list)
         for binding in bindings:
             grouped_concepts[binding.concept].append(binding)
             grouped_physical[binding.identifier].append(binding)
             if binding.id is not None:
                 bindings_by_id[binding.id] = binding
-            previous = qualified.get(binding.qualified_identifier)
-            preferred_ids = {
-                item.replacement_id
-                for item in revision_map.values()
-                if item.kind == "replaces_binding"
-            }
-            if previous is None or binding.id in preferred_ids:
-                qualified[binding.qualified_identifier] = binding
+            grouped_qualified[binding.qualified_identifier].append(binding)
         object.__setattr__(
             self,
             "_bindings_by_concept",
@@ -1599,7 +1580,14 @@ class Catalog:
             ),
         )
         object.__setattr__(
-            self, "_bindings_by_qualified", MappingProxyType(qualified)
+            self,
+            "_bindings_by_qualified",
+            MappingProxyType(
+                {
+                    key: tuple(sorted(value, key=lambda item: item.id or ""))
+                    for key, value in sorted(grouped_qualified.items())
+                }
+            ),
         )
         claims_by_ref = {
             f"{context.id}#{claim.id}": claim
@@ -1611,7 +1599,6 @@ class Catalog:
         )
         object.__setattr__(self, "_origins", MappingProxyType(dict(origins or {})))
         object.__setattr__(self, "_qualifications", MappingProxyType(dict(qualifications or {})))
-        object.__setattr__(self, "_revisions", MappingProxyType(dict(revision_map)))
         object.__setattr__(self, "_configuration", MappingProxyType(dict(configuration or {})))
         object.__setattr__(self, "_feature_lineage", MappingProxyType({key: MappingProxyType(dict(value)) for key, value in (feature_lineage or {}).items()}))
         object.__setattr__(
@@ -1641,10 +1628,6 @@ class Catalog:
         return self._qualifications
 
     @property
-    def revisions(self) -> Mapping[str, Revision]:
-        return self._revisions
-
-    @property
     def configuration(self) -> Mapping[str, Any]:
         return self._configuration
 
@@ -1658,8 +1641,14 @@ class Catalog:
         return self._feature_lineage
 
     @property
-    def binding_grains(self) -> tuple[str, ...]:
-        return BINDING_GRAINS
+    def table_grains(self) -> tuple[str, ...]:
+        """Descriptive table grains present in the selected profiles."""
+
+        return tuple(sorted({table.grain for table in self.profile_tables if table.grain}))
+
+    @property
+    def mapping_statuses(self) -> tuple[str, ...]:
+        return MAPPING_STATUSES
 
     @property
     def feature_kinds(self) -> tuple[str, ...]:
@@ -1805,9 +1794,6 @@ class Catalog:
             )
         _require_exact_keys(data, _TOP_LEVEL_KEYS, _TOP_LEVEL_KEYS, "$")
         _require_constant_array(
-            data["binding_grains"], BINDING_GRAINS, "$.binding_grains"
-        )
-        _require_constant_array(
             data["feature_kinds"], FEATURE_KINDS, "$.feature_kinds"
         )
         _require_constant_array(data["domains"], DOMAINS, "$.domains")
@@ -1949,7 +1935,11 @@ class Catalog:
         result = {
             "schema_version": self.schema_version,
             "profiles": list(self.profiles),
-            "binding_grains": list(self.binding_grains),
+            "table_grains": list(self.table_grains),
+            "mapping_statuses": list(self.mapping_statuses),
+            "observed_mapping_statuses": sorted(
+                {binding.status for binding in self.feature_bindings}
+            ),
             "feature_kinds": list(self.feature_kinds),
             "domains": list(self.domains),
             "context_kinds": list(self.context_kinds),
@@ -1981,8 +1971,12 @@ class Catalog:
             "contexts": len(self.contexts),
             "profile_bindings": len(self.profile_bindings),
             "feature_bindings": len(self.feature_bindings),
+            "feature_mappings": len(self.feature_bindings),
             "object_bindings": len(self.object_bindings),
             "tables": len(self.profile_tables),
+            "physical_columns": sum(
+                len(table.columns) for table in self.profile_tables
+            ),
             "relationship_bindings": len(self.relationship_bindings),
             "relationship_binding_paths": len(
                 self.relationship_binding_paths
@@ -2049,6 +2043,7 @@ class Catalog:
         if feature is not None:
             bindings = self._bindings_by_concept.get(feature.id, ())
             selected_profile = self._resolve_profile(profile, bindings)
+            self._ensure_available("concept", feature.id, selected_profile)
             if selected_profile is not None:
                 bindings = tuple(item for item in bindings if item.profile == selected_profile)
             vocabulary = self._vocabulary_for_feature(feature, bindings, selected_profile)
@@ -2756,6 +2751,7 @@ class Catalog:
             feature_id = feature.id
             bindings = self._bindings_by_concept.get(feature.id, ())
             selected_profile = self._resolve_profile(profile, bindings)
+            self._ensure_available("concept", feature.id, selected_profile)
             vocabulary = self._vocabulary_for_feature(feature, bindings, selected_profile)
             if vocabulary is None:
                 raise CatalogNotFoundError(
@@ -2770,11 +2766,7 @@ class Catalog:
                         f"profile {selected_profile!r} was not found"
                     )
                 origin = self.origins.get(f"vocabulary:{target}")
-                if (
-                    origin is not None
-                    and origin.target_profile is not None
-                    and origin.target_profile != selected_profile
-                ):
+                if origin is not None and origin.availability_profiles and selected_profile not in origin.availability_profiles:
                     raise CatalogNotFoundError(
                         f"vocabulary {target!r} does not apply to profile "
                         f"{selected_profile!r}"
@@ -3001,6 +2993,15 @@ class Catalog:
 
         return {
             **self._binding_contribution_result(binding),
+            "co_located_objects": sorted(
+                {
+                    item.object
+                    for item in self.object_bindings
+                    if item.profile == binding.profile
+                    and item.table == binding.table
+                    and item.object != binding.object
+                }
+            ),
             "provenance": self._provenance(binding.claim_refs),
         }
 
@@ -3380,40 +3381,25 @@ class Catalog:
         if authored is not None:
             return (authored,)
         if ":" in identifier:
-            binding = self._bindings_by_qualified.get(identifier)
-            if binding is None:
+            bindings = self._bindings_by_qualified.get(identifier)
+            if bindings is None:
                 raise CatalogNotFoundError(
                     f"feature binding {identifier!r} was not found"
                 )
-            return (binding,)
-        bindings = self._bindings_by_physical.get(identifier)
-        if not bindings:
-            raise CatalogNotFoundError(
-                f"feature or vocabulary {identifier!r} was not found"
-            )
-        preferred = {
-            revision.replacement_id
-            for binding in bindings
-            for revision in self._applicable_revisions(binding.profile)
-            if revision.kind == "replaces_binding"
-        }
-        superseded = {
-            revision.original_id
-            for binding in bindings
-            for revision in self._applicable_revisions(binding.profile)
-            if revision.kind == "replaces_binding"
-        }
-        if any(item.id in preferred for item in bindings):
-            bindings = tuple(
-                item for item in bindings if item.id not in superseded
-            )
+        else:
+            bindings = self._bindings_by_physical.get(identifier)
+            if not bindings:
+                raise CatalogNotFoundError(
+                    f"feature or vocabulary {identifier!r} was not found"
+                )
         concepts = {item.concept for item in bindings}
         if len(concepts) > 1:
             choices = ", ".join(
-                item.qualified_identifier for item in bindings
+                item.id or item.qualified_identifier for item in bindings
             )
             raise CatalogAmbiguousError(
-                f"feature {identifier!r} is ambiguous; use one of: {choices}"
+                f"feature {identifier!r} has multiple semantic mappings; "
+                f"use a mapping ID: {choices}"
             )
         return bindings
 
@@ -3444,15 +3430,7 @@ class Catalog:
         self, bindings: Sequence[Binding]
     ) -> list[dict[str, Any]]:
         ordered = sorted(
-            bindings,
-            key=lambda item: (
-                not any(
-                    revision.replacement_id == item.id
-                    for revision in self._applicable_revisions(item.profile)
-                    if revision.kind == "replaces_binding"
-                ),
-                item.qualified_identifier,
-            ),
+            bindings, key=lambda item: (item.qualified_identifier, item.id or "")
         )
         return [self._effective_binding_result(item) for item in ordered]
 
@@ -3463,45 +3441,6 @@ class Catalog:
         origin = self.origins.get(f"binding:{binding.id}")
         if origin is not None:
             result["origin"] = origin.to_dict()
-        revisions = tuple(
-            revision
-            for revision in self._applicable_revisions(binding.profile)
-            if revision.kind == "replaces_binding"
-            and binding.id in {revision.original_id, revision.replacement_id}
-        )
-        if revisions:
-            result["active_revisions"] = [
-                self._revision_result(revision) for revision in revisions
-            ]
-        original_revision = next(
-            (
-                revision
-                for revision in revisions
-                if revision.original_id == binding.id
-            ),
-            None,
-        )
-        replacement_revision = next(
-            (
-                revision
-                for revision in revisions
-                if revision.replacement_id == binding.id
-            ),
-            None,
-        )
-        if original_revision is not None:
-            result["effective_view"] = {
-                "superseded_in_view": True,
-                "replacement_id": original_revision.replacement_id,
-                "remains_alternative": (
-                    original_revision.original_remains_alternative
-                ),
-            }
-        elif replacement_revision is not None:
-            result["effective_view"] = {
-                "preferred_in_view": True,
-                "replaces_id": replacement_revision.original_id,
-            }
         return result
 
     def _decorate_effective(self, result: dict[str, Any], kind: str, identifier: str, profile: str | None) -> dict[str, Any]:
@@ -3511,62 +3450,10 @@ class Catalog:
         if key in self.origins:
             result["origin"] = self.origins[key].to_dict()
         result["qualifications"] = [q.to_dict() for q in self.qualifications.values() if q.subject_kind == kind and q.subject_id == identifier and (profile is None or q.origin.target_profile in {None, profile})]
-        revisions = tuple(
-            revision
-            for revision in self._applicable_revisions(profile)
-            if revision.kind == "reinterprets_concept"
-            and identifier in {revision.original_id, revision.replacement_id}
-        )
-        result["active_revisions"] = [
-            self._revision_result(revision) for revision in revisions
-        ]
-        original_revision = next(
-            (
-                revision
-                for revision in revisions
-                if revision.original_id == identifier
-            ),
-            None,
-        )
-        replacement_revision = next(
-            (
-                revision
-                for revision in revisions
-                if revision.replacement_id == identifier
-            ),
-            None,
-        )
-        if original_revision is not None:
-            result["effective_view"] = {
-                "superseded_in_view": True,
-                "replacement_id": original_revision.replacement_id,
-            }
-        elif replacement_revision is not None:
-            result["effective_view"] = {
-                "preferred_in_view": True,
-                "replaces_id": replacement_revision.original_id,
-            }
         lineage = [dict(item) for item in self.feature_lineage.values() if item.get("output_concept") == identifier]
         if lineage:
             result["feature_lineage"] = lineage
         return result
-
-    def _applicable_revisions(self, profile: str | None) -> tuple[Revision, ...]:
-        return tuple(
-            self.revisions[identifier]
-            for identifier in sorted(self.revisions)
-            if (
-                profile is None
-                or self.revisions[identifier].origin.target_profile
-                in {None, profile}
-            )
-        )
-
-    def _revision_result(self, revision: Revision) -> dict[str, Any]:
-        return {
-            **revision.to_dict(),
-            "provenance": self._provenance(revision.claim_refs),
-        }
 
     def _claim_text(self, claim_refs: Sequence[str]) -> str:
         parts: list[str] = []
@@ -3952,11 +3839,7 @@ class Catalog:
     ) -> tuple[bool, bool]:
         origin_kind = "concept" if document.kind == "feature" else document.kind
         origin = self.origins.get(f"{origin_kind}:{document.identifier}")
-        if (
-            origin is not None
-            and origin.target_profile is not None
-            and origin.target_profile != profile
-        ):
+        if origin is not None and origin.availability_profiles and profile not in origin.availability_profiles:
             return False, False
         if document.kind in {"guardrail", "coverage", "context"}:
             entity_scope = getattr(document.entity, "scope", None)
@@ -3986,6 +3869,17 @@ class Catalog:
             for record in self.coverage.values()
         )
         return True, unsupported
+
+    def _ensure_available(
+        self, kind: str, identifier: str, profile: str | None
+    ) -> None:
+        if profile is None:
+            return
+        origin = self.origins.get(f"{kind}:{identifier}")
+        if origin is not None and origin.availability_profiles and profile not in origin.availability_profiles:
+            raise CatalogNotFoundError(
+                f"{kind} {identifier!r} does not apply to profile {profile!r}"
+            )
 
     def _discovery_match(
         self,
@@ -4809,37 +4703,17 @@ def _parse_binding(profile: str, value: object, path: str) -> Binding:
     data = _expect_mapping(value, path)
     _require_exact_keys(data, _BINDING_REQUIRED_KEYS, _BINDING_KEYS, path)
     concept = _identifier(data["concept"], f"{path}.concept")
-    has_parameters = "parameters" in data
-    if concept == _SLOT_PARAMETER_CONCEPT and not has_parameters:
-        raise CatalogValidationError(
-            f"{path}.parameters.slot is required for concept "
-            f"{_SLOT_PARAMETER_CONCEPT!r}"
-        )
-    if concept != _SLOT_PARAMETER_CONCEPT and has_parameters:
-        raise CatalogValidationError(
-            f"{path}.parameters is only allowed for concept "
-            f"{_SLOT_PARAMETER_CONCEPT!r}"
-        )
-    raw_parameters = data.get("parameters", {})
-    parameters_data = _expect_mapping(
-        raw_parameters, f"{path}.parameters"
-    )
-    unexpected = sorted(set(parameters_data) - BINDING_PARAMETER_KEYS)
-    if unexpected:
-        raise CatalogValidationError(
-            f"{path}.parameters has unexpected fields: "
-            + ", ".join(unexpected)
-        )
-    parameters: list[tuple[str, int]] = []
-    for key, raw in parameters_data.items():
-        if not isinstance(raw, int) or isinstance(raw, bool) or raw < 1:
+    qualifiers_data = _expect_mapping(data.get("qualifiers", {}), f"{path}.qualifiers")
+    qualifiers: list[tuple[str, str | int | float | bool]] = []
+    for key, raw in qualifiers_data.items():
+        _identifier(key, f"{path}.qualifiers key")
+        if not isinstance(raw, str | int | float | bool) or (
+            isinstance(raw, str) and (not raw.strip() or raw != raw.strip())
+        ):
             raise CatalogValidationError(
-                f"{path}.parameters.{key} must be a positive integer"
+                f"{path}.qualifiers.{key} must be a scalar descriptive value"
             )
-        parameters.append((key, raw))
-    nullable = data["nullable"]
-    if not isinstance(nullable, bool):
-        raise CatalogValidationError(f"{path}.nullable must be a boolean")
+        qualifiers.append((key, raw))
     notes = (
         _string_array(data["notes"], f"{path}.notes", minimum=1)
         if "notes" in data
@@ -4869,20 +4743,12 @@ def _parse_binding(profile: str, value: object, path: str) -> Binding:
         table=_physical_component(data["table"], f"{path}.table"),
         column=_physical_component(data["column"], f"{path}.column"),
         concept=concept,
-        grain=_controlled_string(
-            data["grain"], f"{path}.grain", BINDING_GRAINS
-        ),
-        role=_controlled_string(data["role"], f"{path}.role", ROLES),
-        physical_type=_nonempty_string(
-            data["physical_type"], f"{path}.physical_type"
-        ),
-        nullable=nullable,
-        parameters=tuple(sorted(parameters)),
+        status=_controlled_string(data["status"], f"{path}.status", MAPPING_STATUSES),
+        qualifiers=tuple(sorted(qualifiers)),
         notes=notes,
         occurrence_interpretations=occurrence_interpretations,
-        id=(_identifier(data["id"], f"{path}.id") if "id" in data else None),
+        id=_identifier(data["id"], f"{path}.id"),
         vocabulary=(_identifier(data["vocabulary"], f"{path}.vocabulary") if "vocabulary" in data else None),
-        coexists_with=_identifier_array(data.get("coexists_with", []), f"{path}.coexists_with"),
     )
 
 
@@ -4935,17 +4801,24 @@ def _parse_object_binding(
         columns=_physical_component_array(
             data["columns"], f"{path}.columns", minimum=0
         ),
-        representation=_controlled_string(
-            data["representation"],
-            f"{path}.representation",
-            OBJECT_BINDING_REPRESENTATIONS,
-        ),
         claim_refs=_claim_ref_array(
             data["claim_refs"], f"{path}.claim_refs"
         ),
         caveats=_string_array(data["caveats"], f"{path}.caveats"),
         instance_identity=instance_identity,
-        id=(_identifier(data["id"], f"{path}.id") if "id" in data else None),
+        id=_identifier(data["id"], f"{path}.id"),
+        completeness=(
+            _controlled_string(data["completeness"], f"{path}.completeness", OBJECT_COMPLETENESS)
+            if "completeness" in data else None
+        ),
+        authority=(
+            _controlled_string(data["authority"], f"{path}.authority", OBJECT_AUTHORITIES)
+            if "authority" in data else None
+        ),
+        derivation=(
+            _controlled_string(data["derivation"], f"{path}.derivation", OBJECT_DERIVATIONS)
+            if "derivation" in data else None
+        ),
     )
 
 
@@ -5029,12 +4902,30 @@ def _parse_table(profile: str, value: object, path: str) -> TableSpec:
     return TableSpec(
         profile=profile,
         table=_physical_component(data["table"], f"{path}.table"),
-        grain=_controlled_string(
-            data["grain"], f"{path}.grain", BINDING_GRAINS
+        grain=(
+            _nonempty_string(data["grain"], f"{path}.grain")
+            if "grain" in data else None
+        ),
+        columns=tuple(
+            _parse_physical_column(raw, f"{path}.columns[{index}]")
+            for index, raw in enumerate(_expect_list(data["columns"], f"{path}.columns"))
         ),
         keys=keys,
         caveats=_string_array(data["caveats"], f"{path}.caveats"),
-        id=(_identifier(data["id"], f"{path}.id") if "id" in data else None),
+        id=_identifier(data["id"], f"{path}.id"),
+    )
+
+
+def _parse_physical_column(value: object, path: str) -> PhysicalColumn:
+    data = _expect_mapping(value, path)
+    _require_exact_keys(data, _PHYSICAL_COLUMN_REQUIRED_KEYS, _PHYSICAL_COLUMN_KEYS, path)
+    nullable = data["nullable"]
+    if not isinstance(nullable, bool):
+        raise CatalogValidationError(f"{path}.nullable must be a boolean")
+    return PhysicalColumn(
+        name=_physical_component(data["name"], f"{path}.name"),
+        physical_type=_nonempty_string(data["physical_type"], f"{path}.physical_type"),
+        nullable=nullable,
     )
 
 
@@ -5653,23 +5544,54 @@ def _validate_profile_bindings(
     semantic_relationships: Mapping[str, SemanticRelationship],
     claims: Mapping[str, tuple[ClinicalContext, ContextClaim]],
 ) -> None:
-    empty_profiles = sorted(
-        profile_id
-        for profile_id, profile in profile_bindings.items()
-        if not profile.feature_bindings
-    )
-    if empty_profiles:
-        raise CatalogValidationError(
-            "catalog profiles have no physical bindings: "
-            + ", ".join(empty_profiles)
-        )
     global_relationship_ids: set[str] = set()
     global_relationship_path_ids: set[str] = set()
-    qualified_bindings: dict[str, Binding] = {}
+    global_binding_ids: set[str] = set()
     for profile_id, profile in profile_bindings.items():
-        columns_by_table: defaultdict[str, dict[str, Binding]] = defaultdict(dict)
-        grains_by_table: defaultdict[str, set[str]] = defaultdict(set)
+        tables_by_name: dict[str, TableSpec] = {}
+        columns_by_table: dict[str, dict[str, PhysicalColumn]] = {}
+        for table in profile.tables:
+            if table.table in tables_by_name:
+                raise CatalogValidationError(
+                    f"duplicate table specification {table.identifier!r}"
+                )
+            tables_by_name[table.table] = table
+            column_names = [column.name for column in table.columns]
+            if len(column_names) != len(set(column_names)):
+                raise CatalogValidationError(
+                    f"table {table.identifier!r} has duplicate physical columns"
+                )
+            columns_by_table[table.table] = {
+                column.name: column for column in table.columns
+            }
+            seen_key_ids: set[str] = set()
+            key_declarations: dict[tuple[str, ...], tuple[str, str, str]] = {}
+            for key in table.keys:
+                if key.id in seen_key_ids:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} has duplicate key ID {key.id!r}"
+                    )
+                seen_key_ids.add(key.id)
+                missing = sorted(set(key.columns) - set(column_names))
+                if missing:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} key {key.id!r} references "
+                        "unknown columns: " + ", ".join(missing)
+                    )
+                declaration = (key.kind, key.uniqueness, key.completeness)
+                previous = key_declarations.setdefault(key.columns, declaration)
+                if previous != declaration:
+                    raise CatalogValidationError(
+                        f"table {table.identifier!r} has conflicting key "
+                        f"declarations for columns {list(key.columns)!r}"
+                    )
+
         for binding in profile.feature_bindings:
+            if binding.id is None or binding.id in global_binding_ids:
+                raise CatalogValidationError(
+                    f"duplicate or missing feature mapping ID {binding.id!r}"
+                )
+            global_binding_ids.add(binding.id)
             if binding.concept not in concepts:
                 raise CatalogValidationError(
                     f"feature binding {binding.qualified_identifier!r} "
@@ -5683,33 +5605,16 @@ def _validate_profile_bindings(
                     f"feature binding {binding.qualified_identifier!r} "
                     f"references unknown vocabulary {binding.vocabulary!r}"
                 )
-            previous = qualified_bindings.get(binding.qualified_identifier)
-            if previous is not None:
-                declared_coexistence = (
-                    previous.id is not None
-                    and binding.id is not None
-                    and (
-                        previous.id in binding.coexists_with
-                        or binding.id in previous.coexists_with
-                    )
+            if binding.table not in tables_by_name:
+                raise CatalogValidationError(
+                    f"feature mapping {binding.id!r} references unknown table "
+                    f"{profile_id}:{binding.table}"
                 )
-                if not declared_coexistence:
-                    raise CatalogValidationError(
-                        f"duplicate physical binding "
-                        f"{binding.qualified_identifier!r}"
-                    )
-                if (
-                    previous.physical_type != binding.physical_type
-                    or previous.nullable != binding.nullable
-                ):
-                    raise CatalogValidationError(
-                        f"coexisting physical binding "
-                        f"{binding.qualified_identifier!r} has incompatible "
-                        "physical metadata"
-                    )
-            qualified_bindings[binding.qualified_identifier] = binding
-            columns_by_table[binding.table][binding.column] = binding
-            grains_by_table[binding.table].add(binding.grain)
+            if binding.column not in columns_by_table[binding.table]:
+                raise CatalogValidationError(
+                    f"feature mapping {binding.id!r} references unknown column "
+                    f"{profile_id}:{binding.table}.{binding.column}"
+                )
             for interpretation in binding.occurrence_interpretations:
                 _validate_scoped_claim_refs(
                     scope="profile_specific",
@@ -5722,61 +5627,6 @@ def _validate_profile_bindings(
                         f"{interpretation.representation!r}"
                     ),
                 )
-
-        tables_by_name: dict[str, TableSpec] = {}
-        for table in profile.tables:
-            if table.table in tables_by_name:
-                raise CatalogValidationError(
-                    f"duplicate table specification {table.identifier!r}"
-                )
-            tables_by_name[table.table] = table
-            columns = columns_by_table.get(table.table)
-            if not columns:
-                raise CatalogValidationError(
-                    f"table specification {table.identifier!r} has no "
-                    "feature bindings"
-                )
-            if grains_by_table[table.table] != {table.grain}:
-                raise CatalogValidationError(
-                    f"table {table.identifier!r} grain {table.grain!r} "
-                    "does not match feature-binding grains"
-                )
-            seen_key_ids: set[str] = set()
-            key_declarations: dict[
-                tuple[str, ...], tuple[str, str, str]
-            ] = {}
-            for key in table.keys:
-                if key.id in seen_key_ids:
-                    raise CatalogValidationError(
-                        f"table {table.identifier!r} has duplicate key ID "
-                        f"{key.id!r}"
-                    )
-                seen_key_ids.add(key.id)
-                missing = sorted(set(key.columns) - set(columns))
-                if missing:
-                    raise CatalogValidationError(
-                        f"table {table.identifier!r} key {key.id!r} "
-                        "references unknown columns: " + ", ".join(missing)
-                    )
-                declaration = (
-                    key.kind,
-                    key.uniqueness,
-                    key.completeness,
-                )
-                previous = key_declarations.setdefault(
-                    key.columns, declaration
-                )
-                if previous != declaration:
-                    raise CatalogValidationError(
-                        f"table {table.identifier!r} has conflicting key "
-                        f"declarations for columns {list(key.columns)!r}"
-                    )
-        missing_tables = sorted(set(columns_by_table) - set(tables_by_name))
-        if missing_tables:
-            raise CatalogValidationError(
-                f"profile {profile_id!r} feature bindings lack table "
-                "specifications: " + ", ".join(missing_tables)
-            )
 
         seen_object_bindings: set[tuple[str, str, tuple[str, ...]]] = set()
         for binding in profile.object_bindings:
@@ -5919,7 +5769,7 @@ def _validate_profile_bindings(
 
 def _validate_physical_relationship(
     relationship: RelationshipBinding,
-    columns_by_table: Mapping[str, Mapping[str, Binding]],
+    columns_by_table: Mapping[str, Mapping[str, PhysicalColumn]],
     tables_by_name: Mapping[str, TableSpec],
 ) -> None:
     source_columns = columns_by_table.get(relationship.source.table)
@@ -6035,6 +5885,10 @@ def _validate_physical_hierarchy_acyclic(
     for item in relationships:
         if item.kind != "hierarchy":
             continue
+        # A same-table relationship describes co-located object topology, not
+        # a recursive physical dependency between tables.
+        if item.source.table == item.target.table:
+            continue
         graph[item.source.table].add(item.target.table)
         nodes.update((item.source.table, item.target.table))
     _validate_acyclic(graph, nodes, "physical hierarchy")
@@ -6068,8 +5922,7 @@ def default_catalog_path() -> Path:
     source_catalog = package_directory.parent / "catalog" / "catalog-set.json"
     if source_catalog.is_file():
         return source_catalog
-    installed_manifest = package_directory / "_data" / "catalog-set.json"
-    return installed_manifest if installed_manifest.is_file() else package_directory / "_data" / "catalog.json"
+    return package_directory / "_data" / "catalog-set.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -6127,7 +5980,7 @@ def load_catalog(
     include_default_profiles: bool = True,
     include_default_extensions: bool = False,
 ) -> Catalog:
-    """Read a legacy v6 catalog or compose a schema-v7 catalog set.
+    """Compose a semantic-v8 catalog set.
 
     JSON duplicate keys and the non-standard ``NaN``/``Infinity`` constants
     are rejected before semantic validation so the resulting catalog has one
@@ -6158,26 +6011,12 @@ def _resolve_catalog(
     value, source_bytes = _read_json_document_with_bytes(catalog_path)
     documents: list[_ResolvedDocument] = []
     if "schema_version" in value:
-        if profile_paths or extension_paths:
-            raise CatalogValidationError(
-                "legacy schema-v6 catalogs cannot be composed with module files",
-                stage="composition",
-                document=catalog_path,
-            )
-        _validate_json_schema(value, catalog_path, _schema_path_for("catalog.schema.json"))
-        document = _resolved_document(
-            "legacy", root_locator_kind, catalog_path, source_bytes, value,
-            "catalog.schema.json",
+        raise CatalogValidationError(
+            "legacy monolithic catalogs are no longer supported; migrate to "
+            "semantic schema v8 and profile schema v2 modules",
+            stage="composition",
+            document=catalog_path,
         )
-        try:
-            catalog = Catalog.from_mapping(value)
-        except CatalogValidationError as exc:
-            if exc.stage is None:
-                exc.stage = "domain"
-            if exc.document is None:
-                exc.document = str(catalog_path)
-            raise
-        return _ResolvedComposition((document,), catalog, None)
     if "semantic_schema_version" in value:
         _validate_json_schema(
             value,
@@ -6465,7 +6304,7 @@ def _schema_contribution_key(
         "feature_lineage": "feature_lineage",
     }
     offset = 0
-    if len(parts) >= 1 and parts[0] == "semantic_additions":
+    if len(parts) >= 1 and parts[0] == "contributions":
         offset = 1
     if len(parts) >= offset + 2:
         collection = parts[offset]
@@ -6473,7 +6312,7 @@ def _schema_contribution_key(
         if collection in registry_kinds and isinstance(identifier, str):
             return f"{registry_kinds[str(collection)]}:{identifier}"
     binding_offset = 0
-    if parts[:1] in (("profile_binding",), ("binding_additions",)):
+    if parts[:1] == ("profile_binding",):
         binding_offset = 1
     if len(parts) >= binding_offset + 2:
         collection = parts[binding_offset]
@@ -6497,12 +6336,6 @@ def _schema_contribution_key(
             except (KeyError, IndexError, TypeError, AttributeError):
                 return None
             return f"binding:{identifier}" if identifier else None
-    if len(parts) >= 2 and parts[0] == "revisions" and isinstance(parts[1], int):
-        try:
-            identifier = document["revisions"][parts[1]].get("id")
-        except (KeyError, IndexError, TypeError, AttributeError):
-            return None
-        return f"revision:{identifier}" if identifier else None
     return None
 
 
@@ -6633,79 +6466,95 @@ def _compose_resolved_inputs(
 
 def _compose_catalog(semantic: Mapping[str, Any], profile_docs: Sequence[Mapping[str, Any]], extension_docs: Sequence[Mapping[str, Any]], manifest: Mapping[str, Any] | None) -> Catalog:
     if semantic.get("semantic_schema_version") != SEMANTIC_SCHEMA_VERSION:
-        raise CatalogValidationError("semantic_schema_version must equal 7")
+        raise CatalogValidationError("semantic_schema_version must equal 8")
     profile_by_id: dict[str, Mapping[str, Any]] = {}
     for doc in profile_docs:
         profile_id = str(doc["profile"]["id"])
         if profile_id in profile_by_id:
             raise CatalogValidationError(f"duplicate profile module ID {profile_id!r}")
-        if doc["requires"]["semantic_schema_version"] != 7:
-            raise CatalogValidationError(f"profile {profile_id!r} requires an incompatible semantic schema")
+        if doc.get("profile_schema_version") != 2 or doc["requires"]["semantic_schema_version"] != 8:
+            raise CatalogValidationError(f"profile {profile_id!r} uses an unsupported schema version")
         profile_by_id[profile_id] = doc
     extension_by_id: dict[str, Mapping[str, Any]] = {}
     for doc in extension_docs:
         extension_id = str(doc["extension"]["id"])
         if extension_id in extension_by_id:
             raise CatalogValidationError(f"duplicate extension module ID {extension_id!r}")
-        if not all(str(identifier).startswith(extension_id + ".") for identifier in _extension_contribution_ids(doc)):
-            raise CatalogValidationError(f"extension {extension_id!r} contributions must use its namespace")
         target = str(doc["applies_to"]["profile"])
         if target not in profile_by_id:
             raise CatalogValidationError(f"extension {extension_id!r} targets unloaded profile {target!r}")
-        if doc["requires"]["semantic_schema_version"] != 7:
-            raise CatalogValidationError(
-                f"extension {extension_id!r} requires an incompatible "
-                "semantic schema"
-            )
-        if (
-            doc["requires"]["profile_schema_version"]
-            != profile_by_id[target]["profile_schema_version"]
-        ):
-            raise CatalogValidationError(
-                f"extension {extension_id!r} requires an incompatible "
-                f"profile schema for {target!r}"
-            )
+        if doc.get("extension_schema_version") != 2 or doc["requires"]["semantic_schema_version"] != 8 or doc["requires"]["profile_schema_version"] != 2:
+            raise CatalogValidationError(f"extension {extension_id!r} uses an unsupported schema version")
         extension_by_id[extension_id] = doc
     order = _extension_order(extension_by_id)
-    _validate_contribution_id_uniqueness(
-        semantic, profile_by_id, extension_by_id
-    )
-    _validate_module_isolation(
-        semantic, profile_by_id, extension_by_id, order
-    )
-
-    merged = {key: json.loads(json.dumps(value)) for key, value in semantic.items() if key not in {"$schema", "semantic_schema_version"}}
-    merged.update({"$schema": SCHEMA_REFERENCE, "schema_version": 6, "profiles": sorted(profile_by_id), "profile_bindings": {}})
+    profile_ids = frozenset(profile_by_id)
+    registry_kinds = {
+        "clinical_objects": "clinical_object", "concepts": "concept",
+        "semantic_relationships": "semantic_relationship",
+        "temporal_semantics": "temporal_semantic", "aggregations": "aggregation",
+        "guardrails": "guardrail", "coverage": "coverage",
+        "vocabularies": "vocabulary", "sources": "source", "contexts": "context",
+    }
+    merged = {
+        key: _mutable_json(value)
+        for key, value in semantic.items()
+        if key not in {"$schema", "semantic_schema_version"} and key not in registry_kinds
+    }
+    merged.update({key: {} for key in registry_kinds})
+    merged.update({"$schema": SCHEMA_REFERENCE, "schema_version": 8, "profiles": sorted(profile_ids), "profile_bindings": {}})
     origins: dict[str, ContributionOrigin] = {}
-    for collection, kind in (("clinical_objects", "clinical_object"), ("concepts", "concept"), ("semantic_relationships", "semantic_relationship"), ("temporal_semantics", "temporal_semantic"), ("aggregations", "aggregation"), ("guardrails", "guardrail"), ("coverage", "coverage"), ("sources", "source"), ("contexts", "context"), ("vocabularies", "vocabulary")):
-        for identifier in merged.get(collection, {}):
-            origins[f"{kind}:{identifier}"] = ContributionOrigin("semantic_catalog", "semantic", contribution_class="portable")
+    contribution_owner: dict[str, str] = {}
+
+    def add_records(records: Mapping[str, Any], collection: str, origin_base: ContributionOrigin, default_profiles: tuple[str, ...]) -> None:
+        for identifier, authored in records.items():
+            previous_owner = contribution_owner.get(identifier)
+            if previous_owner is not None:
+                raise CatalogValidationError(
+                    f"duplicate contribution ID {identifier!r} in "
+                    f"{previous_owner!r} and {origin_base.module_id!r}"
+                )
+            contribution_owner[identifier] = origin_base.module_id
+            item = _mutable_json(authored)
+            availability = item.pop("availability", None)
+            selected = _availability_profiles(availability, default_profiles, profile_ids, f"{collection}.{identifier}")
+            merged[collection][identifier] = item
+            origins[f"{registry_kinds[collection]}:{identifier}"] = ContributionOrigin(
+                origin_base.document_kind, origin_base.module_id,
+                origin_base.module_version, origin_base.lifecycle_status,
+                selected[0] if len(selected) == 1 else None,
+                "portable" if not selected else origin_base.contribution_class,
+                selected,
+            )
+
+    semantic_origin = ContributionOrigin("semantic_catalog", "semantic")
+    for collection in registry_kinds:
+        add_records(semantic.get(collection, {}), collection, semantic_origin, ())
+
     qualifications: dict[str, Qualification] = {}
-    binding_owner: dict[str, str] = {}
+    binding_owner = contribution_owner
     for profile_id, doc in sorted(profile_by_id.items()):
-        _merge_module_registries(merged, doc, profile_id, "profile", origins)
-        binding = _copy_binding_layer(doc["profile_binding"], profile_id, "profile", origins, binding_owner, profile_id)
-        merged["profile_bindings"][profile_id] = binding
-        _collect_qualifications(doc, ContributionOrigin("profile", profile_id, target_profile=profile_id, contribution_class="released_profile"), qualifications, merged)
-    revisions: dict[str, Revision] = {}
+        metadata = doc["profile"]
+        origin = ContributionOrigin("profile", profile_id, str(metadata.get("version")) if metadata.get("version") is not None else None, str(metadata.get("lifecycle_status")) if metadata.get("lifecycle_status") is not None else None, profile_id, "released_profile", (profile_id,))
+        for collection, records in doc["contributions"].items():
+            add_records(records, collection, origin, (profile_id,))
+        for collection in ("sources", "contexts", "vocabularies"):
+            add_records(doc[collection], collection, origin, (profile_id,))
+        merged["profile_bindings"][profile_id] = _copy_binding_layer(doc["profile_binding"], profile_id, "profile", origins, binding_owner, profile_id)
+        _collect_qualifications(doc, origin, qualifications, merged)
+
     feature_lineage: dict[str, Mapping[str, Any]] = {}
     for extension_id in order:
         doc = extension_by_id[extension_id]
         metadata = doc["extension"]
         target = str(doc["applies_to"]["profile"])
-        origin = ContributionOrigin("extension", extension_id, str(metadata["version"]), str(metadata["lifecycle_status"]), target, "project")
-        concepts = doc["semantic_additions"]["concepts"]
-        for identifier, raw in concepts.items():
-            if identifier in merged["concepts"]:
-                raise CatalogValidationError(f"duplicate contribution ID {identifier!r}")
-            item = dict(raw); item.pop("lifecycle_status", None)
-            merged["concepts"][identifier] = item; origins[f"concept:{identifier}"] = origin
-        _merge_module_registries(merged, doc, extension_id, "extension", origins)
-        additions = _copy_binding_layer(doc["binding_additions"], extension_id, "extension", origins, binding_owner, target)
-        for collection in additions:
-            for binding in additions[collection]:
-                origins[f"binding:{binding['id']}"] = origin
-            merged["profile_bindings"][target][collection].extend(additions[collection])
+        origin = ContributionOrigin("extension", extension_id, str(metadata["version"]), str(metadata["lifecycle_status"]), target, "project", (target,))
+        for collection, records in doc["contributions"].items():
+            add_records(records, collection, origin, (target,))
+        for collection in ("sources", "contexts", "vocabularies"):
+            add_records(doc[collection], collection, origin, (target,))
+        additions = _copy_binding_layer(doc["profile_binding"], extension_id, "extension", origins, binding_owner, target)
+        for collection, values in additions.items():
+            merged["profile_bindings"][target][collection].extend(values)
         _collect_qualifications(doc, origin, qualifications, merged)
         for identifier, raw in doc["feature_lineage"].items():
             if identifier in feature_lineage:
@@ -6716,18 +6565,31 @@ def _compose_catalog(semantic: Mapping[str, Any], profile_docs: Sequence[Mapping
                 raise CatalogValidationError(f"feature lineage {identifier!r} references unknown bindings")
             feature_lineage[identifier] = {**raw, "origin": origin.to_dict(), "target_profile": target}
             origins[f"feature_lineage:{identifier}"] = origin
-        _collect_revisions(doc, origin, revisions, merged, binding_owner, set(doc["requires"]["extensions"]) | {"profile"})
-    _validate_revision_graph(revisions)
-    _prepare_binding_revisions(merged, revisions)
     try:
         catalog = Catalog.from_mapping(merged, _allow_empty_profiles=True)
     except CatalogValidationError as exc:
         if exc.stage is None:
             exc.stage = "domain"
         raise
-    fingerprint_content = {"semantic": semantic, "profiles": [profile_by_id[key] for key in sorted(profile_by_id)], "extensions": [extension_by_id[key] for key in sorted(extension_by_id)]}
+    for binding in catalog.feature_bindings:
+        origin = origins.get(f"concept:{binding.concept}")
+        if origin is not None and origin.availability_profiles and binding.profile not in origin.availability_profiles:
+            raise CatalogValidationError(f"feature mapping {binding.id!r} uses concept {binding.concept!r} outside its availability")
+        vocabulary_origin = origins.get(f"vocabulary:{binding.vocabulary}") if binding.vocabulary else None
+        if vocabulary_origin is not None and vocabulary_origin.availability_profiles and binding.profile not in vocabulary_origin.availability_profiles:
+            raise CatalogValidationError(f"feature mapping {binding.id!r} uses vocabulary {binding.vocabulary!r} outside its availability")
+    for binding in catalog.object_bindings:
+        origin = origins.get(f"clinical_object:{binding.object}")
+        if origin is not None and origin.availability_profiles and binding.profile not in origin.availability_profiles:
+            raise CatalogValidationError(f"object mapping {binding.id!r} uses object {binding.object!r} outside its availability")
+    for binding in catalog.relationship_bindings:
+        for identifier in binding.semantic_relationships:
+            origin = origins.get(f"semantic_relationship:{identifier}")
+            if origin is not None and origin.availability_profiles and binding.profile not in origin.availability_profiles:
+                raise CatalogValidationError(f"relationship mapping {binding.id!r} uses semantic relationship {identifier!r} outside its availability")
+    fingerprint_content = {"semantic": semantic, "profiles": [profile_by_id[key] for key in sorted(profile_by_id)], "extensions": [extension_by_id[key] for key in order]}
     fingerprint = hashlib.sha256(json.dumps(fingerprint_content, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
-    return Catalog(clinical_objects=catalog.clinical_objects, concepts=catalog.concepts, semantic_relationships=catalog.semantic_relationships, temporal_semantics=catalog.temporal_semantics, aggregations=catalog.aggregations, guardrails=catalog.guardrails, coverage=catalog.coverage, vocabularies=catalog.vocabularies, sources=catalog.sources, contexts=catalog.contexts, profile_bindings=catalog.profile_bindings, schema_version=7, origins=origins, qualifications=qualifications, revisions=revisions, feature_lineage=feature_lineage, configuration={"semantic_schema_version": 7, "profiles": sorted(profile_by_id), "profile_schema_versions": {key: profile_by_id[key]["profile_schema_version"] for key in sorted(profile_by_id)}, "extension_schema_versions": {key: extension_by_id[key]["extension_schema_version"] for key in order}, "extensions": [{"id": key, "version": extension_by_id[key]["extension"]["version"]} for key in order], "configuration_fingerprint": f"sha256:{fingerprint}", "manifest": "catalog-set" if manifest is not None else None})
+    return Catalog(clinical_objects=catalog.clinical_objects, concepts=catalog.concepts, semantic_relationships=catalog.semantic_relationships, temporal_semantics=catalog.temporal_semantics, aggregations=catalog.aggregations, guardrails=catalog.guardrails, coverage=catalog.coverage, vocabularies=catalog.vocabularies, sources=catalog.sources, contexts=catalog.contexts, profile_bindings=catalog.profile_bindings, schema_version=8, origins=origins, qualifications=qualifications, feature_lineage=feature_lineage, configuration={"semantic_schema_version": 8, "profiles": sorted(profile_by_id), "profile_schema_versions": {key: 2 for key in sorted(profile_by_id)}, "extension_schema_versions": {key: 2 for key in order}, "extensions": [{"id": key, "version": extension_by_id[key]["extension"]["version"]} for key in order], "configuration_fingerprint": f"sha256:{fingerprint}", "manifest": "catalog-set" if manifest is not None else None})
 
 
 def _object_without_duplicate_keys(
@@ -6741,90 +6603,34 @@ def _object_without_duplicate_keys(
     return result
 
 
-def _extension_contribution_ids(doc: Mapping[str, Any]) -> tuple[str, ...]:
-    identifiers = list(doc["semantic_additions"]["concepts"])
-    for collection in ("qualifications", "feature_lineage", "sources", "contexts", "coverage", "vocabularies"):
-        identifiers.extend(doc[collection])
-    identifiers.extend(str(item["id"]) for collection in doc["binding_additions"].values() for item in collection)
-    identifiers.extend(str(item["id"]) for item in doc["revisions"])
-    return tuple(identifiers)
+def _availability_profiles(
+    value: object | None,
+    default_profiles: tuple[str, ...],
+    loaded_profiles: frozenset[str],
+    path: str,
+) -> tuple[str, ...]:
+    """Return the profiles limiting a contribution; empty means portable."""
 
-
-def _validate_contribution_id_uniqueness(
-    semantic: Mapping[str, Any],
-    profiles: Mapping[str, Mapping[str, Any]],
-    extensions: Mapping[str, Mapping[str, Any]],
-) -> None:
-    """Reject reuse of an authored contribution ID across the catalog set.
-
-    Contribution identity is global even though semantic targets and physical
-    occurrences are not.  References such as a binding's ``concept`` and
-    ``table`` therefore do not participate here; only the IDs authored for
-    records contributed by each selected module do.
-    """
-
-    owners: dict[str, str] = {}
-
-    def register(identifier: object, location: str) -> None:
-        stable_id = str(identifier)
-        previous = owners.get(stable_id)
-        if previous is not None:
-            raise CatalogValidationError(
-                f"duplicate contribution ID {stable_id!r} in {previous} and "
-                f"{location}"
-            )
-        owners[stable_id] = location
-
-    semantic_collections = (
-        "clinical_objects",
-        "concepts",
-        "semantic_relationships",
-        "temporal_semantics",
-        "aggregations",
-        "guardrails",
-        "coverage",
-        "sources",
-        "contexts",
-        "vocabularies",
-    )
-    for collection in semantic_collections:
-        for identifier in semantic.get(collection, {}):
-            register(identifier, f"semantic_catalog.{collection}")
-
-    module_registries = (
-        "qualifications",
-        "sources",
-        "contexts",
-        "coverage",
-        "vocabularies",
-    )
-
-    def register_binding_layer(
-        layer: Mapping[str, Any], location: str
-    ) -> None:
-        for collection, records in layer.items():
-            for record in records:
-                register(record["id"], f"{location}.{collection}")
-
-    for profile_id, document in profiles.items():
-        prefix = f"profile[{profile_id}]"
-        for collection in module_registries:
-            for identifier in document.get(collection, {}):
-                register(identifier, f"{prefix}.{collection}")
-        register_binding_layer(document["profile_binding"], f"{prefix}.profile_binding")
-
-    for extension_id, document in extensions.items():
-        prefix = f"extension[{extension_id}]"
-        for identifier in document["semantic_additions"]["concepts"]:
-            register(identifier, f"{prefix}.semantic_additions.concepts")
-        for collection in module_registries + ("feature_lineage",):
-            for identifier in document.get(collection, {}):
-                register(identifier, f"{prefix}.{collection}")
-        register_binding_layer(
-            document["binding_additions"], f"{prefix}.binding_additions"
+    if value is None:
+        return default_profiles
+    data = _expect_mapping(value, f"{path}.availability")
+    scope = data.get("scope")
+    if scope == "portable" and set(data) == {"scope"}:
+        return ()
+    if scope == "profiles" and set(data) == {"scope", "profiles"}:
+        selected = _identifier_array(
+            data["profiles"], f"{path}.availability.profiles", minimum=1
         )
-        for revision in document["revisions"]:
-            register(revision["id"], f"{prefix}.revisions")
+        missing = sorted(set(selected) - loaded_profiles)
+        if missing:
+            raise CatalogValidationError(
+                f"{path}.availability references unloaded profiles: "
+                + ", ".join(missing)
+            )
+        return selected
+    raise CatalogValidationError(
+        f"{path}.availability must select portable or an explicit profile list"
+    )
 
 
 def _extension_order(docs: Mapping[str, Mapping[str, Any]]) -> tuple[str, ...]:
@@ -6844,310 +6650,6 @@ def _extension_order(docs: Mapping[str, Mapping[str, Any]]) -> tuple[str, ...]:
     return tuple(order)
 
 
-def _validate_module_isolation(
-    semantic: Mapping[str, Any],
-    profiles: Mapping[str, Mapping[str, Any]],
-    extensions: Mapping[str, Mapping[str, Any]],
-    extension_order: Sequence[str],
-) -> None:
-    """Reject references that borrow from an unrelated module."""
-
-    semantic_contexts = set(semantic["contexts"])
-    semantic_sources = set(semantic["sources"])
-    profile_context_owner = {
-        identifier: profile_id
-        for profile_id, document in profiles.items()
-        for identifier in document["contexts"]
-    }
-    profile_source_owner = {
-        identifier: profile_id
-        for profile_id, document in profiles.items()
-        for identifier in document["sources"]
-    }
-    extension_context_owner = {
-        identifier: extension_id
-        for extension_id, document in extensions.items()
-        for identifier in document["contexts"]
-    }
-    extension_source_owner = {
-        identifier: extension_id
-        for extension_id, document in extensions.items()
-        for identifier in document["sources"]
-    }
-    concept_owner = {
-        identifier: "semantic"
-        for identifier in semantic["concepts"]
-    }
-    concept_owner.update(
-        {
-            identifier: extension_id
-            for extension_id, document in extensions.items()
-            for identifier in document["semantic_additions"]["concepts"]
-        }
-    )
-    binding_owner = {
-        str(item["id"]): profile_id
-        for profile_id, document in profiles.items()
-        for collection in document["profile_binding"].values()
-        for item in collection
-    }
-    binding_owner.update(
-        {
-            str(item["id"]): extension_id
-            for extension_id, document in extensions.items()
-            for collection in document["binding_additions"].values()
-            for item in collection
-        }
-    )
-
-    for profile_id, document in profiles.items():
-        _validate_module_scopes(document, profile_id, f"profile {profile_id!r}")
-        allowed_contexts = semantic_contexts | set(document["contexts"])
-        allowed_sources = semantic_sources | set(document["sources"])
-        _validate_claim_ref_closure(document, allowed_contexts, f"profile {profile_id!r}")
-        _validate_context_source_closure(
-            document["contexts"], allowed_sources, f"profile {profile_id!r}"
-        )
-        own_relationships = {
-            str(item["id"])
-            for item in document["profile_binding"]["relationship_bindings"]
-        }
-        for context_id, context in document["contexts"].items():
-            if any(
-                item["profile"] != profile_id
-                for item in context["related_tables"]
-            ):
-                raise CatalogValidationError(
-                    f"profile {profile_id!r} context {context_id!r} "
-                    "references another profile table"
-                )
-            unknown = set(context["related_relationships"]) - own_relationships
-            if unknown:
-                raise CatalogValidationError(
-                    f"profile {profile_id!r} context {context_id!r} "
-                    "references another profile relationship"
-                )
-        for qualification_id, qualification in document["qualifications"].items():
-            subject = qualification["subject"]
-            collection = {
-                "clinical_object": "clinical_objects",
-                "concept": "concepts",
-                "semantic_relationship": "semantic_relationships",
-                "temporal_semantic": "temporal_semantics",
-                "aggregation": "aggregations",
-                "guardrail": "guardrails",
-            }[subject["kind"]]
-            if subject["id"] not in semantic[collection]:
-                raise CatalogValidationError(
-                    f"profile qualification {qualification_id!r} must "
-                    "target portable semantics"
-                )
-
-    dependencies = {
-        identifier: set(map(str, document["requires"]["extensions"]))
-        for identifier, document in extensions.items()
-    }
-
-    def dependency_closure(identifier: str) -> set[str]:
-        result: set[str] = set()
-        pending = list(dependencies[identifier])
-        while pending:
-            dependency = pending.pop()
-            if dependency in result:
-                continue
-            result.add(dependency)
-            pending.extend(dependencies[dependency])
-        return result
-
-    for extension_id in extension_order:
-        document = extensions[extension_id]
-        target = str(document["applies_to"]["profile"])
-        allowed_extensions = dependency_closure(extension_id)
-        if any(
-            extensions[dependency]["applies_to"]["profile"] != target
-            for dependency in allowed_extensions
-        ):
-            raise CatalogValidationError(
-                f"extension {extension_id!r} has a dependency for another "
-                "target profile"
-            )
-        allowed_modules = {"semantic", target, extension_id, *allowed_extensions}
-        _validate_module_scopes(
-            document, target, f"extension {extension_id!r}"
-        )
-        allowed_contexts = (
-            semantic_contexts
-            | {
-                identifier
-                for identifier, owner in profile_context_owner.items()
-                if owner == target
-            }
-            | {
-                identifier
-                for identifier, owner in extension_context_owner.items()
-                if owner in allowed_extensions | {extension_id}
-            }
-        )
-        allowed_sources = (
-            semantic_sources
-            | {
-                identifier
-                for identifier, owner in profile_source_owner.items()
-                if owner == target
-            }
-            | {
-                identifier
-                for identifier, owner in extension_source_owner.items()
-                if owner in allowed_extensions | {extension_id}
-            }
-        )
-        _validate_claim_ref_closure(
-            document, allowed_contexts, f"extension {extension_id!r}"
-        )
-        _validate_context_source_closure(
-            document["contexts"],
-            allowed_sources,
-            f"extension {extension_id!r}",
-        )
-        for context_id, context in document["contexts"].items():
-            if any(
-                item["profile"] != target
-                for item in context["related_tables"]
-            ):
-                raise CatalogValidationError(
-                    f"extension {extension_id!r} context {context_id!r} "
-                    "references another profile table"
-                )
-            if any(
-                binding_owner.get(identifier) not in allowed_modules
-                for identifier in context["related_relationships"]
-            ):
-                raise CatalogValidationError(
-                    f"extension {extension_id!r} context {context_id!r} "
-                    "references an undeclared relationship dependency"
-                )
-        for qualification_id, qualification in document["qualifications"].items():
-            subject = qualification["subject"]
-            if subject["kind"] == "concept":
-                owner = concept_owner.get(subject["id"])
-                if owner not in allowed_modules:
-                    raise CatalogValidationError(
-                        f"extension qualification {qualification_id!r} "
-                        "targets an undeclared dependency"
-                    )
-        for lineage_id, lineage in document["feature_lineage"].items():
-            referenced_concepts = {
-                lineage["output_concept"], *lineage["input_concepts"]
-            }
-            if any(
-                concept_owner.get(identifier) not in allowed_modules
-                for identifier in referenced_concepts
-            ):
-                raise CatalogValidationError(
-                    f"feature lineage {lineage_id!r} references an "
-                    "undeclared concept dependency"
-                )
-            if any(
-                binding_owner.get(identifier) not in allowed_modules
-                for identifier in lineage["input_bindings"]
-            ):
-                raise CatalogValidationError(
-                    f"feature lineage {lineage_id!r} references an "
-                    "undeclared binding dependency"
-                )
-        for revision in document["revisions"]:
-            if revision["kind"] == "reinterprets_concept":
-                if concept_owner.get(revision["original_concept"]) not in allowed_modules:
-                    raise CatalogValidationError(
-                        f"revision {revision['id']!r} references an "
-                        "undeclared concept dependency"
-                    )
-                if concept_owner.get(revision["replacement_concept"]) != extension_id:
-                    raise CatalogValidationError(
-                        f"revision {revision['id']!r} replacement is not "
-                        "owned by its extension"
-                    )
-            else:
-                if binding_owner.get(revision["original_binding"]) not in (
-                    {target} | allowed_extensions
-                ):
-                    raise CatalogValidationError(
-                        f"revision {revision['id']!r} references an "
-                        "undeclared binding dependency"
-                    )
-                if binding_owner.get(revision["replacement_binding"]) != extension_id:
-                    raise CatalogValidationError(
-                        f"revision {revision['id']!r} replacement is not "
-                        "owned by its extension"
-                    )
-
-
-def _validate_module_scopes(
-    document: Mapping[str, Any], target_profile: str, label: str
-) -> None:
-    for collection in ("sources", "contexts", "coverage"):
-        for identifier, record in document.get(collection, {}).items():
-            profiles = set(map(str, record.get("profiles", ())))
-            if profiles - {target_profile}:
-                raise CatalogValidationError(
-                    f"{label} {collection} record {identifier!r} applies "
-                    "to another profile"
-                )
-            if record.get("scope") == "profile_specific" and profiles != {
-                target_profile
-            }:
-                raise CatalogValidationError(
-                    f"{label} {collection} record {identifier!r} must "
-                    f"apply exactly to {target_profile!r}"
-                )
-
-
-def _validate_claim_ref_closure(
-    value: Any, allowed_contexts: set[str], label: str
-) -> None:
-    if isinstance(value, Mapping):
-        for key, nested in value.items():
-            if key == "claim_refs":
-                for reference in nested:
-                    context_id = str(reference).split("#", 1)[0]
-                    if context_id not in allowed_contexts:
-                        raise CatalogValidationError(
-                            f"{label} claim {reference!r} is outside its "
-                            "module dependency closure"
-                        )
-            else:
-                _validate_claim_ref_closure(nested, allowed_contexts, label)
-    elif isinstance(value, list):
-        for nested in value:
-            _validate_claim_ref_closure(nested, allowed_contexts, label)
-
-
-def _validate_context_source_closure(
-    contexts: Mapping[str, Any], allowed_sources: set[str], label: str
-) -> None:
-    for context_id, context in contexts.items():
-        for claim in context["claims"]:
-            unknown = set(map(str, claim["sources"])) - allowed_sources
-            if unknown:
-                raise CatalogValidationError(
-                    f"{label} context {context_id!r} references sources "
-                    "outside its module dependency closure"
-                )
-
-
-def _merge_module_registries(merged: dict[str, Any], doc: Mapping[str, Any], module_id: str, document_kind: str, origins: dict[str, ContributionOrigin]) -> None:
-    contribution = "released_profile" if document_kind == "profile" else "project"
-    target = module_id if document_kind == "profile" else str(doc["applies_to"]["profile"])
-    metadata = doc.get("extension", {})
-    origin = ContributionOrigin(document_kind, module_id, metadata.get("version"), metadata.get("lifecycle_status"), target, contribution)
-    for collection, kind in (("sources", "source"), ("contexts", "context"), ("coverage", "coverage"), ("vocabularies", "vocabulary")):
-        for identifier, raw in doc.get(collection, {}).items():
-            if identifier in merged[collection]:
-                raise CatalogValidationError(f"duplicate {collection} ID {identifier!r}")
-            merged[collection][identifier] = json.loads(json.dumps(raw))
-            origins[f"{kind}:{identifier}"] = origin
-
-
 def _copy_binding_layer(raw: Mapping[str, Any], module_id: str, document_kind: str, origins: dict[str, ContributionOrigin], owners: dict[str, str], target_profile: str) -> dict[str, list[Any]]:
     copied: dict[str, list[Any]] = {key: [] for key in _PROFILE_BINDING_KEYS}
     for collection in copied:
@@ -7156,7 +6658,15 @@ def _copy_binding_layer(raw: Mapping[str, Any], module_id: str, document_kind: s
             if not identifier or identifier in owners:
                 raise CatalogValidationError(f"duplicate or missing binding contribution ID {identifier!r}")
             owners[identifier] = module_id
-            origins[f"binding:{identifier}"] = ContributionOrigin(document_kind, module_id, target_profile=target_profile, contribution_class="released_profile" if document_kind == "profile" else "project")
+            origins[f"binding:{identifier}"] = ContributionOrigin(
+                document_kind,
+                module_id,
+                target_profile=target_profile,
+                contribution_class=(
+                    "released_profile" if document_kind == "profile" else "project"
+                ),
+                availability_profiles=(target_profile,),
+            )
             copied[collection].append(item)
     return copied
 
@@ -7169,100 +6679,6 @@ def _collect_qualifications(doc: Mapping[str, Any], origin: ContributionOrigin, 
         if kind not in subject_collections or subject_id not in merged[subject_collections[kind]]:
             raise CatalogValidationError(f"qualification {identifier!r} references unknown subject {kind}:{subject_id}")
         result[identifier] = Qualification(identifier, kind, subject_id, str(raw["applicability"]), str(raw["summary"]), tuple(raw["claim_refs"]), tuple(raw["caveats"]), origin)
-
-
-def _collect_revisions(doc: Mapping[str, Any], origin: ContributionOrigin, result: dict[str, Revision], merged: Mapping[str, Any], binding_owners: Mapping[str, str], allowed: set[str]) -> None:
-    extension_id = origin.module_id
-    dependencies = set(map(str, doc["requires"]["extensions"]))
-    for raw in doc["revisions"]:
-        identifier = str(raw["id"]); kind = str(raw["kind"])
-        if identifier in result: raise CatalogValidationError(f"duplicate revision ID {identifier!r}")
-        if kind == "reinterprets_concept":
-            original = str(raw["original_concept"]); replacement = str(raw["replacement_concept"])
-            if original not in merged["concepts"] or replacement not in merged["concepts"]: raise CatalogValidationError(f"revision {identifier!r} references unknown concept")
-            if not replacement.startswith(extension_id + "."): raise CatalogValidationError(f"revision {identifier!r} replacement must be owned by its extension")
-            owner = next((dep for dep in dependencies if original.startswith(dep + ".")), None)
-            if any(original.startswith(other + ".") for other in binding_owners.values()) and owner is None: raise CatalogValidationError(f"revision {identifier!r} lacks dependency authority")
-            remains = True
-        else:
-            original = str(raw["original_binding"]); replacement = str(raw["replacement_binding"])
-            if original not in binding_owners or replacement not in binding_owners: raise CatalogValidationError(f"revision {identifier!r} references unknown binding")
-            if binding_owners[replacement] != extension_id: raise CatalogValidationError(f"revision {identifier!r} replacement must be owned by its extension")
-            if binding_owners[original] not in dependencies and binding_owners[original] not in {origin.target_profile}: raise CatalogValidationError(f"revision {identifier!r} lacks dependency authority")
-            remains = bool(raw["original_remains_alternative"])
-        result[identifier] = Revision(
-            identifier,
-            kind,
-            original,
-            replacement,
-            (
-                str(raw["semantic_difference"])
-                if kind == "reinterprets_concept"
-                else None
-            ),
-            str(raw["reason"]),
-            tuple(raw["claim_refs"]),
-            tuple(raw["known_limitations"]),
-            remains,
-            origin,
-        )
-
-
-def _prepare_binding_revisions(
-    merged: Mapping[str, Any], revisions: Mapping[str, Revision]
-) -> None:
-    """Mark the two sides of a validated feature-binding replacement.
-
-    The marker is an internal composition detail added only after standalone
-    schema validation. It lets the effective graph retain both authored
-    contributions at one physical occurrence without permitting undeclared
-    duplicate bindings.
-    """
-
-    feature_bindings = {
-        str(item["id"]): item
-        for profile in merged["profile_bindings"].values()
-        for item in profile["feature_bindings"]
-        if item.get("id") is not None
-    }
-    for revision in revisions.values():
-        if revision.kind != "replaces_binding":
-            continue
-        original = feature_bindings.get(revision.original_id)
-        replacement = feature_bindings.get(revision.replacement_id)
-        if original is None or replacement is None:
-            raise CatalogValidationError(
-                f"revision {revision.id!r} must replace a feature binding"
-            )
-        if (
-            original["table"] != replacement["table"]
-            or original["column"] != replacement["column"]
-        ):
-            # A replacement may redirect to a new occurrence without needing
-            # duplicate-occurrence coexistence markers.
-            continue
-        original["coexists_with"] = [revision.replacement_id]
-        replacement["coexists_with"] = [revision.original_id]
-
-
-def _validate_revision_graph(revisions: Mapping[str, Revision]) -> None:
-    for kind in ("reinterprets_concept", "replaces_binding"):
-        selected = [item for item in revisions.values() if item.kind == kind]
-        originals = [item.original_id for item in selected]
-        if len(originals) != len(set(originals)):
-            raise CatalogValidationError(
-                f"{kind} revisions must not declare competing replacements"
-            )
-        graph = {item.original_id: {item.replacement_id} for item in selected}
-        if any(source in targets for source, targets in graph.items()):
-            raise CatalogValidationError(
-                f"{kind} revisions cannot replace a record with itself"
-            )
-        _validate_acyclic(
-            graph,
-            set(graph) | {target for targets in graph.values() for target in targets},
-            f"{kind} revision graph",
-        )
 
 
 def _reject_json_constant(value: str) -> None:

@@ -36,6 +36,10 @@ _BINDING_COLLECTIONS = {
     "relationship_binding_path": "relationship_binding_paths",
 }
 
+
+def _physical_column_id(table_id: str, column_name: str) -> str:
+    return f"{table_id}::{column_name}"
+
 _AUTHORED_REFERENCE_FIELDS = {
     "feature": (
         ("objects", "clinical_object", "owned_by", True),
@@ -317,9 +321,18 @@ class GraphIndex:
             )
         for table in catalog.profile_tables:
             identifier = table.id or table.identifier
+            table_origin = self._origin("table", identifier)
             self._add_node(
                 "table", identifier, table.table, profile=table.profile
             )
+            for column in table.columns:
+                self._add_node(
+                    "physical_column",
+                    _physical_column_id(identifier, column.name),
+                    f"{table.table}.{column.name}",
+                    origin=table_origin,
+                    profile=table.profile,
+                )
         for binding in catalog.relationship_bindings:
             self._add_node(
                 "relationship_binding",
@@ -352,10 +365,6 @@ class GraphIndex:
                 if lineage.get("lifecycle_status") is not None
                 else None,
             )
-        for revision in catalog.revisions.values():
-            self._add_node(
-                "revision", revision.id, revision.reason, origin=revision.origin
-            )
         for context in catalog.contexts.values():
             context_origin = self._origin("context", context.id)
             for claim in context.claims:
@@ -378,21 +387,23 @@ class GraphIndex:
             )
         if kind in _BINDING_COLLECTIONS:
             collection = _BINDING_COLLECTIONS[kind]
-            root = (
-                "binding_additions"
-                if origin and origin.document_kind == "extension"
-                else "profile_binding"
+            return f"/profile_binding/{collection}/@id={token}/{field}"
+        if kind == "physical_column":
+            table_id, column_name = identifier.split("::", 1)
+            return (
+                f"/profile_binding/tables/@id={_pointer_token(table_id)}"
+                f"/columns/@name={_pointer_token(column_name)}/{field}"
             )
-            return f"/{root}/{collection}/@id={token}/{field}"
         if kind == "qualification":
             return f"/qualifications/{token}/{field}"
         if kind == "feature_lineage":
             return f"/feature_lineage/{token}/{field}"
-        if kind == "revision":
-            return f"/revisions/@id={token}/{field}"
         collection = _SEMANTIC_COLLECTIONS.get(kind, f"{kind}s")
-        if kind == "concept" and origin and origin.document_kind == "extension":
-            return f"/semantic_additions/concepts/{token}/{field}"
+        if origin and origin.document_kind in {"profile", "extension"} and kind in {
+            "clinical_object", "concept", "semantic_relationship",
+            "temporal_semantic", "aggregation", "guardrail", "coverage",
+        }:
+            return f"/contributions/{collection}/{token}/{field}"
         return f"/{collection}/{token}/{field}"
 
     def _edge(
@@ -579,7 +590,7 @@ class GraphIndex:
                 self._authored_many(item, target_kind, record.get(field), edge_type, field)
             else:
                 self._authored_edge(item, target_kind, record.get(field), edge_type, field)
-        if item.kind not in {"source", "vocabulary", "table", "context"}:
+        if item.kind not in {"source", "vocabulary", "table", "physical_column", "context"}:
             self._authored_many(
                 item, "claim", record.get("claim_refs"),
                 "supported_by_claim", "claim_refs",
@@ -612,6 +623,20 @@ class GraphIndex:
                 item, "table", table_ids.get((item.profile, table), table),
                 "binds_table", "table",
             )
+            if item.kind == "feature_binding" and isinstance(table, str):
+                table_id = table_ids.get((item.profile, table))
+                column = record.get("column")
+                if isinstance(table_id, str) and isinstance(column, str):
+                    self._authored_edge(
+                        item, "physical_column",
+                        _physical_column_id(table_id, column),
+                        "maps_column", "column",
+                    )
+        if item.kind == "physical_column":
+            table_id = item.identifier.split("::", 1)[0]
+            self._authored_edge(
+                item, "table", table_id, "declared_by_table", "name"
+            )
         if item.kind == "relationship_binding":
             for field, edge_type in (("source", "source_table"), ("target", "target_table")):
                 endpoint = record.get(field)
@@ -620,13 +645,6 @@ class GraphIndex:
                     item, "table", table_ids.get((item.profile, table), table),
                     edge_type, f"{field}/table",
                 )
-        if item.kind == "revision":
-            concept_revision = record.get("kind") == "reinterprets_concept"
-            target_kind = "concept" if concept_revision else "feature_binding"
-            original = "original_concept" if concept_revision else "original_binding"
-            replacement_field = "replacement_concept" if concept_revision else "replacement_binding"
-            self._authored_edge(item, target_kind, record.get(original), "revises_original", original)
-            self._authored_edge(item, target_kind, record.get(replacement_field), "selects_replacement", replacement_field)
         if item.kind == "context":
             self._authored_many(item, "concept", record.get("related_concepts"), "related_concept", "related_concepts")
             self._authored_many(item, "semantic_relationship", record.get("related_relationships"), "related_relationship", "related_relationships")
@@ -735,6 +753,14 @@ class GraphIndex:
             self._edge("coverage", coverage.id, target_kind, coverage.subject, "covers_subject", "subject")
             self._claim_edges("coverage", coverage.id, coverage.claim_refs)
         table_ids = self._table_ids()
+        for table in catalog.profile_tables:
+            table_id = table.id or table.identifier
+            for column in table.columns:
+                column_id = _physical_column_id(table_id, column.name)
+                self._edge(
+                    "physical_column", column_id, "table", table_id,
+                    "declared_by_table", "name",
+                )
         for context in catalog.contexts.values():
             self._many("context", context.id, "concept", context.related_concepts, "related_concept", "related_concepts")
             self._many("context", context.id, "semantic_relationship", context.related_relationships, "related_relationship", "related_relationships")
@@ -752,8 +778,14 @@ class GraphIndex:
             self._claim_edges("qualification", qualification.id, qualification.claim_refs)
         for binding in catalog.feature_bindings:
             identifier = binding.id or binding.qualified_identifier
+            table_id = table_ids[(binding.profile, binding.table)]
             self._edge("feature_binding", identifier, "concept", binding.concept, "binds_concept", "concept")
-            self._edge("feature_binding", identifier, "table", table_ids[(binding.profile, binding.table)], "binds_table", "table")
+            self._edge("feature_binding", identifier, "table", table_id, "binds_table", "table")
+            self._edge(
+                "feature_binding", identifier, "physical_column",
+                _physical_column_id(table_id, binding.column),
+                "maps_column", "column",
+            )
             if binding.vocabulary:
                 self._edge("feature_binding", identifier, "vocabulary", binding.vocabulary, "uses_vocabulary", "vocabulary")
         for binding in catalog.object_bindings:
@@ -777,21 +809,6 @@ class GraphIndex:
             self._many("feature_lineage", identifier, "concept", lineage.get("input_concepts", ()), "input_concept", "input_concepts")
             self._many("feature_lineage", identifier, "feature_binding", lineage.get("input_bindings", ()), "input_binding", "input_bindings")
             self._claim_edges("feature_lineage", identifier, lineage.get("claim_refs", ()))
-        for revision in catalog.revisions.values():
-            target_kind = "concept" if revision.kind == "reinterprets_concept" else "feature_binding"
-            original_field = (
-                "original_concept"
-                if revision.kind == "reinterprets_concept"
-                else "original_binding"
-            )
-            replacement_field = (
-                "replacement_concept"
-                if revision.kind == "reinterprets_concept"
-                else "replacement_binding"
-            )
-            self._edge("revision", revision.id, target_kind, revision.original_id, "revises_original", original_field)
-            self._edge("revision", revision.id, target_kind, revision.replacement_id, "selects_replacement", replacement_field)
-            self._claim_edges("revision", revision.id, revision.claim_refs)
 
 
 def build_graph(

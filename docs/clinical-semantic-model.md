@@ -5,7 +5,7 @@
 Begin with a clinical object or question. Follow semantic relationships to
 adjacent objects, then inspect features, time meanings, aggregations,
 guardrails, and coverage. Consult a profile binding only after selecting the
-portable concepts needed for the analysis.
+shared or profile-available concepts needed for the analysis.
 
 A semantic relationship describes clinical meaning and attribution. A profile
 relationship binding describes how one release can approximate that
@@ -25,7 +25,7 @@ The initial graph distinguishes:
 1. a patient;
 2. a breast-imaging episode;
 3. an imaging exam or accession;
-4. breast side and imaging findings;
+4. breast side, acquired images, and imaging findings;
 5. the finding-level imaging interpretation, including separate assessment and
    recommendation features;
 6. a linked biopsy, surgery, or other procedure;
@@ -34,11 +34,19 @@ The initial graph distinguishes:
 9. radiology report versions; and
 10. clinical risk-assessment rows.
 
+The shared graph includes acquired images and their relationship to imaging
+exams. The non-default internal-v2 profile adds regions of interest attached to
+images. That scaffold deliberately does not equate an ROI with a clinical
+finding and does not yet claim ROI geometry, coordinates, identifiers, tables,
+or joins.
+
 An object does not imply a dedicated table. In open-v2, procedure, pathology
 observation, diagnosis, and report-date fields can be co-located on a
 pathology-finding row without acquiring a proven one-to-one clinical identity.
 Likewise, assessment and recommendation are co-located on an imaging-finding
 row without an independent interpretation identifier or timestamp.
+Co-location is derived from multiple object mappings selecting the same table;
+it is not an authored object role and can change in another representation.
 
 Open-v2 finding number identifies a clinical finding only within its accession
 after the documented reserved synthetic value is excluded. It does not persist

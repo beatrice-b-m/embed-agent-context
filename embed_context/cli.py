@@ -78,8 +78,8 @@ def build_parser(
         "--catalog",
         type=Path,
         help=(
-            "catalog-set manifest or legacy schema-v6 catalog JSON path; "
-            "defaults to the bundled catalog set"
+            "schema-v8 catalog-set manifest or semantic catalog JSON path; "
+            "defaults to the bundled catalog set; outdated modules are fatal"
         ),
     )
     parser.add_argument(
@@ -246,7 +246,7 @@ def build_parser(
     curate_parser.add_argument(
         "--edit-module",
         type=Path,
-        help="one loaded filesystem-backed schema-v7 module to edit",
+        help="one loaded filesystem-backed schema-v8/v2 module to edit",
     )
     curate_parser.add_argument(
         "--port",
@@ -579,6 +579,7 @@ def _format_summary(data: Mapping[str, Any]) -> str:
         ("profile_bindings", "profile bindings"),
         ("feature_bindings", "feature bindings"),
         ("bindings", "feature bindings"),
+        ("physical_columns", "physical columns"),
         ("tables", "profile tables"),
         ("relationship_bindings", "relationship bindings"),
     )
@@ -621,7 +622,7 @@ def _format_configuration(data: Mapping[str, Any]) -> list[str]:
 def _format_facets(data: Mapping[str, Any]) -> list[str]:
     facet_keys = (
         "profiles",
-        "binding_grains",
+        "mapping_statuses",
         "feature_kinds",
         "domains",
         "context_kinds",

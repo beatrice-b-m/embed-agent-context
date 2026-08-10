@@ -12,7 +12,6 @@ _MATCH_DETAIL_FIELDS = (
     "match_reasons",
     "profile_coverage",
     "qualifications",
-    "active_revisions",
 )
 
 

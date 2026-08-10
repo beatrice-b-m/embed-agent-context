@@ -1,0 +1,15 @@
+{
+  "$schema": "./catalog-set.schema.json",
+  "catalog_set_schema_version": 1,
+  "semantic_catalog": {
+    "kind": "file",
+    "path": "semantic/catalog.json"
+  },
+  "profiles": [
+    {
+      "kind": "file",
+      "path": "profiles/internal-v2.json"
+    }
+  ],
+  "extensions": []
+}

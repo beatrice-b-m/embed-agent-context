@@ -1,4 +1,4 @@
-"""Parity checks for the standalone JSON Schema and runtime validator."""
+"""Focused checks for the schema-v8 semantic and profile contracts."""
 
 from __future__ import annotations
 
@@ -11,70 +11,62 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
-from embed_context import Catalog, CatalogValidationError
-from tests.catalog_fixture import synthetic_catalog
+
+ROOT = Path(__file__).resolve().parents[1]
+SEMANTIC_PATH = ROOT / "catalog" / "semantic" / "catalog.json"
+SEMANTIC_SCHEMA_PATH = ROOT / "catalog" / "semantic" / "catalog.schema.json"
+PROFILE_PATH = ROOT / "catalog" / "profiles" / "open-v2.json"
+PROFILE_SCHEMA_PATH = ROOT / "catalog" / "profiles" / "profile.schema.json"
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_PATH = REPOSITORY_ROOT / "catalog" / "catalog.schema.json"
-CATALOG_PATH = REPOSITORY_ROOT / "catalog" / "catalog.json"
-
-
-def _read_json(path: Path) -> dict[str, Any]:
+def read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
 
 
-class CatalogSchemaParityTests(unittest.TestCase):
+class CatalogSchemaContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.schema = _read_json(SCHEMA_PATH)
-        Draft202012Validator.check_schema(cls.schema)
-        cls.validator = Draft202012Validator(cls.schema)
+        cls.semantic = read_json(SEMANTIC_PATH)
+        cls.profile = read_json(PROFILE_PATH)
+        cls.semantic_schema = read_json(SEMANTIC_SCHEMA_PATH)
+        cls.profile_schema = read_json(PROFILE_SCHEMA_PATH)
+        Draft202012Validator.check_schema(cls.semantic_schema)
+        Draft202012Validator.check_schema(cls.profile_schema)
+        cls.semantic_validator = Draft202012Validator(cls.semantic_schema)
+        cls.profile_validator = Draft202012Validator(cls.profile_schema)
 
-    def assert_invalid_in_both(self, data: dict[str, Any]) -> None:
-        with self.assertRaises(ValidationError):
-            self.validator.validate(data)
-        with self.assertRaises(CatalogValidationError):
-            Catalog.from_mapping(data)
+    def test_canonical_modules_validate(self) -> None:
+        self.semantic_validator.validate(self.semantic)
+        self.profile_validator.validate(self.profile)
 
-    def test_canonical_and_synthetic_catalogs_validate(self) -> None:
-        for name, data in (
-            ("canonical", _read_json(CATALOG_PATH)),
-            ("synthetic", synthetic_catalog()),
-        ):
-            with self.subTest(catalog=name):
-                self.validator.validate(data)
-                Catalog.from_mapping(data)
-
-    def test_nonblank_strings_reject_surrounding_whitespace(self) -> None:
+    def test_nonblank_semantic_strings_reject_surrounding_whitespace(self) -> None:
         for value in (" Leading", "Trailing ", "Trailing\n"):
             with self.subTest(value=value):
-                data = synthetic_catalog()
-                data["clinical_objects"]["patient"]["label"] = value
-                self.assert_invalid_in_both(data)
+                semantic = deepcopy(self.semantic)
+                semantic["clinical_objects"]["patient"]["label"] = value
+                with self.assertRaises(ValidationError):
+                    self.semantic_validator.validate(semantic)
 
     def test_vocabulary_codes_are_nonempty_and_trimmed(self) -> None:
-        empty = synthetic_catalog()
-        empty["vocabularies"]["pathology.severity"]["codes"] = {}
-        self.assert_invalid_in_both(empty)
+        empty = deepcopy(self.profile)
+        vocabulary = next(iter(empty["vocabularies"].values()))
+        vocabulary["codes"] = {}
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(empty)
 
-        whitespace_key = synthetic_catalog()
-        whitespace_key["vocabularies"]["pathology.severity"]["codes"][
-            " 6"
-        ] = "Whitespace-prefixed code"
-        self.assert_invalid_in_both(whitespace_key)
+        whitespace = deepcopy(self.profile)
+        vocabulary = next(iter(whitespace["vocabularies"].values()))
+        vocabulary["codes"][" invalid"] = "Whitespace-prefixed code"
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(whitespace)
 
     def test_optional_semantic_collections_may_be_empty(self) -> None:
-        data = synthetic_catalog()
-        for concept in data["concepts"].values():
+        semantic = deepcopy(self.semantic)
+        for concept in semantic["concepts"].values():
             concept["temporal_semantics"] = []
             concept["aggregations"] = []
-        for profile in data["profile_bindings"].values():
-            for relationship in profile["relationship_bindings"]:
-                relationship["semantic_relationships"] = []
-            profile["relationship_binding_paths"] = []
         for collection in (
             "semantic_relationships",
             "temporal_semantics",
@@ -82,108 +74,111 @@ class CatalogSchemaParityTests(unittest.TestCase):
             "guardrails",
             "coverage",
         ):
-            data[collection] = {}
+            semantic[collection] = {}
+        self.semantic_validator.validate(semantic)
 
-        self.validator.validate(data)
-        Catalog.from_mapping(data)
+    def test_mapping_notes_and_nested_metadata_are_closed(self) -> None:
+        notes = deepcopy(self.profile)
+        notes["profile_binding"]["feature_bindings"][0]["notes"] = []
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(notes)
 
-    def test_feature_binding_notes_are_nonempty_when_present(self) -> None:
-        data = synthetic_catalog()
-        data["profile_bindings"]["profile-a"]["feature_bindings"][0][
-            "notes"
-        ] = []
-        self.assert_invalid_in_both(data)
+        column = deepcopy(self.profile)
+        column["profile_binding"]["tables"][0]["columns"][0][
+            "unexpected"
+        ] = True
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(column)
 
-    def test_v6_binding_metadata_shapes_are_closed(self) -> None:
-        mutations = []
+        identity = deepcopy(self.profile)
+        object_mapping = next(
+            item
+            for item in identity["profile_binding"]["object_bindings"]
+            if "instance_identity" in item
+        )
+        object_mapping["instance_identity"]["unexpected"] = True
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(identity)
 
-        occurrence = synthetic_catalog()
-        occurrence["profile_bindings"]["profile-a"]["feature_bindings"][2][
-            "occurrence_interpretations"
-        ][0]["unexpected"] = True
-        mutations.append(occurrence)
+    def test_physical_columns_own_type_and_nullability(self) -> None:
+        profile = deepcopy(self.profile)
+        table = profile["profile_binding"]["tables"][0]
+        column = table["columns"][0]
+        self.assertEqual(set(column), {"name", "physical_type", "nullable"})
 
-        identity = synthetic_catalog()
-        identity["profile_bindings"]["profile-b"]["object_bindings"][0][
-            "instance_identity"
-        ]["unexpected"] = True
-        mutations.append(identity)
+        missing = deepcopy(profile)
+        del missing["profile_binding"]["tables"][0]["columns"][0][
+            "physical_type"
+        ]
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(missing)
 
-        path = synthetic_catalog()
-        path["profile_bindings"]["profile-b"][
-            "relationship_binding_paths"
-        ][0]["unexpected"] = True
-        mutations.append(path)
+        mapping = profile["profile_binding"]["feature_bindings"][0]
+        for old_field in ("grain", "role", "physical_type", "nullable"):
+            mapping[old_field] = "legacy"
+            with self.assertRaises(ValidationError):
+                self.profile_validator.validate(profile)
+            del mapping[old_field]
 
-        for data in mutations:
-            with self.subTest():
-                self.assert_invalid_in_both(data)
+    def test_mapping_status_is_controlled_and_occurrences_are_many_to_many(self) -> None:
+        profile = deepcopy(self.profile)
+        mappings = profile["profile_binding"]["feature_bindings"]
+        duplicate_occurrence = deepcopy(mappings[0])
+        duplicate_occurrence["id"] = "open-v2.binding.feature.alternative-meaning"
+        duplicate_occurrence["concept"] = mappings[1]["concept"]
+        duplicate_occurrence["status"] = "ambiguous"
+        mappings.append(duplicate_occurrence)
+        self.profile_validator.validate(profile)
 
-    def test_v6_controlled_values_are_enforced(self) -> None:
-        guardrail = synthetic_catalog()
-        guardrail["guardrails"]["pathology.null-is-not-negative"][
-            "priority"
-        ] = "urgent"
-        self.assert_invalid_in_both(guardrail)
+        duplicate_occurrence["status"] = "canonical"
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(profile)
 
-        interpretation = synthetic_catalog()
-        interpretation["profile_bindings"]["profile-a"][
-            "feature_bindings"
-        ][2]["occurrence_interpretations"][0]["status"] = "assumed"
-        self.assert_invalid_in_both(interpretation)
+    def test_mapping_qualifiers_are_generic_scalar_metadata(self) -> None:
+        profile = deepcopy(self.profile)
+        mapping = profile["profile_binding"]["feature_bindings"][0]
+        mapping["qualifiers"] = {
+            "slot": 1,
+            "method": "source-defined",
+            "reviewed": False,
+        }
+        self.profile_validator.validate(profile)
 
-        identity = synthetic_catalog()
-        identity["profile_bindings"]["profile-b"]["object_bindings"][0][
-            "instance_identity"
-        ]["rows_per_instance"] = "many"
-        self.assert_invalid_in_both(identity)
+        mapping["qualifiers"] = {"nested": {"not": "descriptive scalar"}}
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(profile)
 
-    def test_every_profile_has_at_least_one_feature_binding(self) -> None:
-        data = synthetic_catalog()
-        data["profile_bindings"]["profile-a"]["feature_bindings"] = []
-        self.assert_invalid_in_both(data)
-
-    def test_slot_parameters_are_reserved_for_diagnosis_slot_bindings(
+    def test_object_mapping_axes_are_independent_and_co_location_is_not_authored(
         self,
     ) -> None:
-        unrelated = synthetic_catalog()
-        unrelated["profile_bindings"]["profile-a"]["feature_bindings"][0][
-            "parameters"
-        ] = {"slot": 1}
-        self.assert_invalid_in_both(unrelated)
-
-        missing_slot = _read_json(CATALOG_PATH)
-        binding = next(
-            item
-            for item in missing_slot["profile_bindings"]["open-v2"][
-                "feature_bindings"
-            ]
-            if item["concept"] == "pathology.diagnosis_code_slot"
+        profile = deepcopy(self.profile)
+        mapping = profile["profile_binding"]["object_bindings"][0]
+        mapping.update(
+            {
+                "completeness": "partial",
+                "authority": "reference",
+                "derivation": "projected",
+            }
         )
-        del binding["parameters"]
-        self.assert_invalid_in_both(missing_slot)
+        self.profile_validator.validate(profile)
 
-    def test_canonical_slot_parameters_are_positive_integers(self) -> None:
-        data = _read_json(CATALOG_PATH)
-        bindings = [
-            item
-            for item in data["profile_bindings"]["open-v2"][
-                "feature_bindings"
-            ]
-            if item["concept"] == "pathology.diagnosis_code_slot"
-        ]
+        mapping["representation"] = "co_located"
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(profile)
 
-        self.assertEqual(len(bindings), 20)
-        self.assertTrue(
-            all(
-                isinstance(item["parameters"]["slot"], int)
-                and not isinstance(item["parameters"]["slot"], bool)
-                and item["parameters"]["slot"] > 0
-                for item in bindings
-            )
-        )
-        self.validator.validate(deepcopy(data))
-        Catalog.from_mapping(data)
+    def test_contribution_availability_is_closed(self) -> None:
+        profile = deepcopy(self.profile)
+        concept = deepcopy(next(iter(self.semantic["concepts"].values())))
+        concept["availability"] = {
+            "scope": "profiles",
+            "profiles": ["open-v2"],
+        }
+        profile["contributions"]["concepts"]["open-v2.example"] = concept
+        self.profile_validator.validate(profile)
+
+        concept["availability"]["unexpected"] = True
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(profile)
 
 
 if __name__ == "__main__":

@@ -7,13 +7,16 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 from unittest.mock import Mock, patch
+from pathlib import Path
 
 from embed_context import __version__, load_catalog
 from embed_context.mcp_server import MCP_INSTALL_HINT, build_server, main
+from tests.test_cli import _outdated_module_arguments
 
 
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
@@ -286,6 +289,41 @@ class ModuleEntryPointTests(unittest.TestCase):
             stdout.getvalue().strip(),
             f"embed-context-mcp {__version__}",
         )
+
+    def test_help_requires_schema_v8_modules(self) -> None:
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as raised:
+            main(("--help",))
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("schema-v8 catalog-set manifest", stdout.getvalue())
+        self.assertIn("outdated modules are fatal", stdout.getvalue())
+
+    def test_outdated_modules_fail_before_server_construction(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_directory:
+            cases = _outdated_module_arguments(Path(raw_directory))
+            for kind, cli_arguments in cases:
+                arguments = tuple(
+                    value for value in cli_arguments if value != "validate"
+                )
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with (
+                    self.subTest(kind=kind),
+                    patch(
+                        "embed_context.mcp_server._require_mcp",
+                        return_value=(Mock, Mock),
+                    ),
+                    patch("embed_context.mcp_server.build_server") as dispatch,
+                    redirect_stdout(stdout),
+                    redirect_stderr(stderr),
+                ):
+                    status = main(arguments)
+
+                self.assertEqual(status, 2)
+                self.assertEqual(stdout.getvalue(), "")
+                self.assertIn("MCP server error:", stderr.getvalue())
+                dispatch.assert_not_called()
 
     def test_main_runs_the_built_server_over_stdio(self) -> None:
         catalog = FakeCatalog()

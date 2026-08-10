@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Verify one profile's secondary feature bindings against Parquet footers.
+"""Verify one profile's physical column inventory against Parquet footers.
 
 The verifier derives its complete expected manifest from the selected profile's
-feature bindings. Clinical objects and relationships remain independent of this
-storage check. The verifier opens Parquet footers for Arrow schemas only; it
-does not read row groups, data pages, statistics, or clinical values.
+table and column declarations. Semantic mappings, clinical objects, and
+relationships remain independent of this storage check. The verifier opens
+Parquet footers for Arrow schemas only; it does not read row groups, data pages,
+statistics, or clinical values.
 """
 
 from __future__ import annotations
@@ -74,18 +75,23 @@ def expected_profile_schema(
 
     expected: dict[str, dict[str, ExpectedColumn]] = {}
     profile_binding = catalog.profile_bindings[profile]
-    for binding in profile_binding.feature_bindings:
-        table = binding.table
-        column = binding.column
+    if not profile_binding.tables:
+        raise ProfileValidationError(
+            f"selected profile {profile!r} has no physical tables to verify"
+        )
+    for table_spec in profile_binding.tables:
+        table = table_spec.table
         if not SAFE_TABLE_NAME.fullmatch(table):
             raise ProfileValidationError(
-                f"binding has an unsafe table name: {table!r}"
+                f"table declaration has an unsafe table name: {table!r}"
             )
-
-        expected.setdefault(table, {})[column] = ExpectedColumn(
-            physical_type=binding.physical_type,
-            nullable=binding.nullable,
-        )
+        columns: dict[str, ExpectedColumn] = {}
+        for column in table_spec.columns:
+            columns[column.name] = ExpectedColumn(
+                physical_type=column.physical_type,
+                nullable=column.nullable,
+            )
+        expected[table] = columns
 
     return expected
 
@@ -206,8 +212,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=DEFAULT_CATALOG,
         help=(
-            "catalog-set manifest or legacy clinical-semantic catalog JSON "
-            "path (default: catalog/catalog-set.json)"
+            "catalog-set manifest path (default: catalog/catalog-set.json)"
         ),
     )
     parser.add_argument(

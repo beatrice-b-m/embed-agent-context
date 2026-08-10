@@ -27,12 +27,12 @@ class CuratorFormTests(unittest.TestCase):
 
     def test_every_field_has_a_control_and_lossless_fallback(self):
         for family in (
-            "extension_concept",
+            "concept",
             "clinical_context",
             "context_claim",
             "qualification",
             "feature_binding",
-            "revision",
+            "physical_column",
             "coverage",
             "vocabulary",
         ):
@@ -83,9 +83,9 @@ class CuratorFormTests(unittest.TestCase):
         )
 
     def test_existing_identifier_is_immutable_but_create_identifier_is_not(self):
-        existing = build_form_spec(self.extension_schema, "revision")
+        existing = build_form_spec(self.extension_schema, "feature_binding")
         creating = build_form_spec(
-            self.extension_schema, "revision", creating=True
+            self.extension_schema, "feature_binding", creating=True
         )
         existing_id = next(field for field in existing["fields"] if field["name"] == "id")
         creating_id = next(field for field in creating["fields"] if field["name"] == "id")
@@ -115,7 +115,7 @@ class CuratorFormTests(unittest.TestCase):
             }
         )
         spec = build_form_spec(
-            self.extension_schema, "revision", record=record
+            self.extension_schema, "feature_binding", record=record
         )
         self.assertEqual(
             spec["record"]["nested"], {"values": ["one", "two"]}

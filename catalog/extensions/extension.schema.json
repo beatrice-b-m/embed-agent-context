@@ -10,22 +10,20 @@
     "extension",
     "applies_to",
     "requires",
-    "semantic_additions",
+    "contributions",
     "qualifications",
     "feature_lineage",
     "sources",
     "contexts",
-    "coverage",
     "vocabularies",
-    "binding_additions",
-    "revisions"
+    "profile_binding"
   ],
   "properties": {
     "$schema": {
       "const": "./extension.schema.json"
     },
     "extension_schema_version": {
-      "const": 1
+      "const": 2
     },
     "extension": {
       "type": "object",
@@ -73,33 +71,18 @@
       ],
       "properties": {
         "semantic_schema_version": {
-          "const": 7
+          "const": 8
         },
         "profile_schema_version": {
-          "const": 1
+          "const": 2
         },
         "extensions": {
           "$ref": "#/$defs/identifiers"
         }
       }
     },
-    "semantic_additions": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "concepts"
-      ],
-      "properties": {
-        "concepts": {
-          "type": "object",
-          "patternProperties": {
-            "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
-              "$ref": "#/$defs/extension_concept"
-            }
-          },
-          "additionalProperties": false
-        }
-      }
+    "contributions": {
+      "$ref": "#/$defs/contributions"
     },
     "qualifications": {
       "type": "object",
@@ -137,15 +120,6 @@
       },
       "additionalProperties": false
     },
-    "coverage": {
-      "type": "object",
-      "patternProperties": {
-        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
-          "$ref": "#/$defs/coverage"
-        }
-      },
-      "additionalProperties": false
-    },
     "vocabularies": {
       "type": "object",
       "patternProperties": {
@@ -155,54 +129,8 @@
       },
       "additionalProperties": false
     },
-    "binding_additions": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "feature_bindings",
-        "object_bindings",
-        "tables",
-        "relationship_bindings",
-        "relationship_binding_paths"
-      ],
-      "properties": {
-        "feature_bindings": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/feature_binding"
-          }
-        },
-        "object_bindings": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/object_binding"
-          }
-        },
-        "tables": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/table"
-          }
-        },
-        "relationship_bindings": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/relationship_binding"
-          }
-        },
-        "relationship_binding_paths": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/relationship_binding_path"
-          }
-        }
-      }
-    },
-    "revisions": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/revision"
-      }
+    "profile_binding": {
+      "$ref": "#/$defs/profile_binding"
     }
   },
   "$defs": {
@@ -242,18 +170,6 @@
         "temporal",
         "workflow",
         "technical"
-      ]
-    },
-    "binding_grain": {
-      "enum": [
-        "patient",
-        "exam",
-        "breast_side",
-        "imaging_finding",
-        "pathology_finding",
-        "report",
-        "risk_assessment",
-        "wide_row"
       ]
     },
     "evidence": {
@@ -304,6 +220,89 @@
         "$ref": "#/$defs/nonblank_string"
       }
     },
+    "availability": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scope"],
+          "properties": {
+            "scope": {"const": "portable"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scope", "profiles"],
+          "properties": {
+            "scope": {"const": "profiles"},
+            "profiles": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/identifier"}
+            }
+          }
+        }
+      ]
+    },
+    "contributions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clinical_objects",
+        "concepts",
+        "semantic_relationships",
+        "temporal_semantics",
+        "aggregations",
+        "guardrails",
+        "coverage"
+      ],
+      "properties": {
+        "clinical_objects": {"$ref": "#/$defs/clinical_object_registry"},
+        "concepts": {"$ref": "#/$defs/concept_registry"},
+        "semantic_relationships": {"$ref": "#/$defs/semantic_relationship_registry"},
+        "temporal_semantics": {"$ref": "#/$defs/temporal_semantic_registry"},
+        "aggregations": {"$ref": "#/$defs/aggregation_registry"},
+        "guardrails": {"$ref": "#/$defs/guardrail_registry"},
+        "coverage": {"$ref": "#/$defs/coverage_registry"}
+      }
+    },
+    "clinical_object_registry": {
+      "type": "object",
+      "patternProperties": {"^[a-z][a-z0-9_.-]*(?![\\s\\S])": {"$ref": "#/$defs/clinical_object"}},
+      "additionalProperties": false
+    },
+    "concept_registry": {
+      "type": "object",
+      "patternProperties": {"^[a-z][a-z0-9_.-]*(?![\\s\\S])": {"$ref": "#/$defs/concept"}},
+      "additionalProperties": false
+    },
+    "semantic_relationship_registry": {
+      "type": "object",
+      "patternProperties": {"^[a-z][a-z0-9_.-]*(?![\\s\\S])": {"$ref": "#/$defs/semantic_relationship"}},
+      "additionalProperties": false
+    },
+    "temporal_semantic_registry": {
+      "type": "object",
+      "patternProperties": {"^[a-z][a-z0-9_.-]*(?![\\s\\S])": {"$ref": "#/$defs/temporal_semantic"}},
+      "additionalProperties": false
+    },
+    "aggregation_registry": {
+      "type": "object",
+      "patternProperties": {"^[a-z][a-z0-9_.-]*(?![\\s\\S])": {"$ref": "#/$defs/aggregation"}},
+      "additionalProperties": false
+    },
+    "guardrail_registry": {
+      "type": "object",
+      "patternProperties": {"^[a-z][a-z0-9_.-]*(?![\\s\\S])": {"$ref": "#/$defs/guardrail"}},
+      "additionalProperties": false
+    },
+    "coverage_registry": {
+      "type": "object",
+      "patternProperties": {"^[a-z][a-z0-9_.-]*(?![\\s\\S])": {"$ref": "#/$defs/coverage"}},
+      "additionalProperties": false
+    },
     "clinical_object": {
       "type": "object",
       "additionalProperties": false,
@@ -317,6 +316,7 @@
         "caveats"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -382,6 +382,7 @@
         "objects"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -540,6 +541,7 @@
         "caveats"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -606,6 +608,7 @@
         "caveats"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -667,6 +670,7 @@
         "caveats"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -750,6 +754,7 @@
         "caveats"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "title": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -836,6 +841,7 @@
         "caveats"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "subject_kind": {
           "enum": [
             "clinical_object",
@@ -927,6 +933,7 @@
         "codes"
       ],
       "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -1301,20 +1308,6 @@
         }
       ]
     },
-    "binding_parameters": {
-      "type": "object",
-      "minProperties": 1,
-      "additionalProperties": false,
-      "required": [
-        "slot"
-      ],
-      "properties": {
-        "slot": {
-          "type": "integer",
-          "minimum": 1
-        }
-      }
-    },
     "occurrence_interpretation": {
       "type": "object",
       "additionalProperties": false,
@@ -1349,44 +1342,29 @@
         }
       }
     },
+    "mapping_qualifiers": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "oneOf": [
+            {"$ref": "#/$defs/nonblank_string"},
+            {"type": "number"},
+            {"type": "boolean"}
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "feature_binding": {
       "type": "object",
       "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "concept": {
-                "const": "pathology.diagnosis_code_slot"
-              }
-            },
-            "required": [
-              "concept"
-            ]
-          },
-          "then": {
-            "required": [
-              "parameters"
-            ]
-          },
-          "else": {
-            "not": {
-              "required": [
-                "parameters"
-              ]
-            }
-          }
-        }
-      ],
       "required": [
         "id",
         "table",
         "column",
         "concept",
-        "grain",
-        "role",
-        "physical_type",
-        "nullable"
+        "status"
       ],
       "properties": {
         "id": {
@@ -1401,25 +1379,17 @@
         "concept": {
           "$ref": "#/$defs/identifier"
         },
-        "grain": {
-          "$ref": "#/$defs/binding_grain"
-        },
-        "role": {
+        "status": {
           "enum": [
-            "canonical",
-            "reference",
-            "wide_projection",
-            "technical"
+            "direct",
+            "derived",
+            "conditional",
+            "ambiguous",
+            "unresolved"
           ]
         },
-        "physical_type": {
-          "$ref": "#/$defs/nonblank_string"
-        },
-        "nullable": {
-          "type": "boolean"
-        },
-        "parameters": {
-          "$ref": "#/$defs/binding_parameters"
+        "qualifiers": {
+          "$ref": "#/$defs/mapping_qualifiers"
         },
         "notes": {
           "type": "array",
@@ -1516,7 +1486,6 @@
         "object",
         "table",
         "columns",
-        "representation",
         "claim_refs",
         "caveats"
       ],
@@ -1537,13 +1506,27 @@
             "$ref": "#/$defs/physical_name"
           }
         },
-        "representation": {
+        "completeness": {
           "enum": [
-            "canonical",
+            "complete",
             "partial",
-            "co_located",
-            "projection",
-            "reference"
+            "unknown"
+          ]
+        },
+        "authority": {
+          "enum": [
+            "preferred",
+            "reference",
+            "alternative",
+            "unspecified"
+          ]
+        },
+        "derivation": {
+          "enum": [
+            "source",
+            "projected",
+            "derived",
+            "unknown"
           ]
         },
         "claim_refs": {
@@ -1620,7 +1603,7 @@
       "required": [
         "id",
         "table",
-        "grain",
+        "columns",
         "keys",
         "caveats"
       ],
@@ -1632,7 +1615,14 @@
           "$ref": "#/$defs/physical_name"
         },
         "grain": {
-          "$ref": "#/$defs/binding_grain"
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/physical_column"
+          }
         },
         "keys": {
           "type": "array",
@@ -1643,6 +1633,16 @@
         "caveats": {
           "$ref": "#/$defs/nonblank_strings"
         }
+      }
+    },
+    "physical_column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "physical_type", "nullable"],
+      "properties": {
+        "name": {"$ref": "#/$defs/physical_name"},
+        "physical_type": {"$ref": "#/$defs/nonblank_string"},
+        "nullable": {"type": "boolean"}
       }
     },
     "source_endpoint": {
@@ -1802,7 +1802,6 @@
       "properties": {
         "feature_bindings": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "$ref": "#/$defs/feature_binding"
           }
@@ -1893,114 +1892,6 @@
         }
       }
     },
-    "extension_concept": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "label",
-        "definition",
-        "feature_kind",
-        "domains",
-        "search_terms",
-        "caveats",
-        "evidence",
-        "objects",
-        "lifecycle_status"
-      ],
-      "properties": {
-        "label": {
-          "$ref": "#/$defs/nonblank_string"
-        },
-        "definition": {
-          "$ref": "#/$defs/nonblank_string"
-        },
-        "feature_kind": {
-          "enum": [
-            "identifier",
-            "date",
-            "categorical",
-            "coded",
-            "flag",
-            "numeric",
-            "text",
-            "aggregate",
-            "model_output",
-            "technical"
-          ]
-        },
-        "domains": {
-          "$ref": "#/$defs/domains_list"
-        },
-        "search_terms": {
-          "$ref": "#/$defs/search_terms"
-        },
-        "caveats": {
-          "$ref": "#/$defs/nonblank_strings"
-        },
-        "evidence": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/evidence"
-          }
-        },
-        "objects": {
-          "$ref": "#/$defs/identifiers"
-        },
-        "vocabulary": {
-          "$ref": "#/$defs/identifier"
-        },
-        "claim_refs": {
-          "$ref": "#/$defs/claim_refs"
-        },
-        "missing_states": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/missing_state"
-          }
-        },
-        "temporal_semantics": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/identifier"
-          }
-        },
-        "aggregations": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/identifier"
-          }
-        },
-        "lifecycle_status": {
-          "$ref": "#/$defs/lifecycle_status"
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "feature_kind": {
-                "const": "technical"
-              }
-            },
-            "required": [
-              "feature_kind"
-            ]
-          },
-          "else": {
-            "properties": {
-              "objects": {
-                "minItems": 1
-              }
-            }
-          }
-        }
-      ]
-    },
     "lifecycle_status": {
       "enum": [
         "work_in_progress",
@@ -2083,90 +1974,6 @@
             },
             "path": {
               "$ref": "#/$defs/nonblank_string"
-            }
-          }
-        }
-      ]
-    },
-    "revision": {
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "id",
-            "kind",
-            "original_concept",
-            "replacement_concept",
-            "semantic_difference",
-            "reason",
-            "claim_refs",
-            "known_limitations"
-          ],
-          "properties": {
-            "id": {
-              "$ref": "#/$defs/identifier"
-            },
-            "reason": {
-              "$ref": "#/$defs/nonblank_string"
-            },
-            "claim_refs": {
-              "$ref": "#/$defs/claim_refs"
-            },
-            "known_limitations": {
-              "$ref": "#/$defs/nonblank_strings"
-            },
-            "kind": {
-              "const": "reinterprets_concept"
-            },
-            "original_concept": {
-              "$ref": "#/$defs/identifier"
-            },
-            "replacement_concept": {
-              "$ref": "#/$defs/identifier"
-            },
-            "semantic_difference": {
-              "$ref": "#/$defs/nonblank_string"
-            }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "id",
-            "kind",
-            "original_binding",
-            "replacement_binding",
-            "reason",
-            "claim_refs",
-            "known_limitations",
-            "original_remains_alternative"
-          ],
-          "properties": {
-            "id": {
-              "$ref": "#/$defs/identifier"
-            },
-            "reason": {
-              "$ref": "#/$defs/nonblank_string"
-            },
-            "claim_refs": {
-              "$ref": "#/$defs/claim_refs"
-            },
-            "known_limitations": {
-              "$ref": "#/$defs/nonblank_strings"
-            },
-            "kind": {
-              "const": "replaces_binding"
-            },
-            "original_binding": {
-              "$ref": "#/$defs/identifier"
-            },
-            "replacement_binding": {
-              "$ref": "#/$defs/identifier"
-            },
-            "original_remains_alternative": {
-              "type": "boolean"
             }
           }
         }

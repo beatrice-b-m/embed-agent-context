@@ -1,6 +1,6 @@
 [project]
 name = "embedv2-agent-context-curator"
-version = "0.9.0"
+version = "0.10.0"
 description = "Optional local curation viewer for EMBED Agent Context"
 readme = "README.md"
 license-files = ["LICENSE"]
@@ -9,7 +9,7 @@ authors = [
 ]
 requires-python = ">=3.11,<3.14"
 dependencies = [
-    "embedv2-agent-context==0.9.0",
+    "embedv2-agent-context==0.10.0",
 ]
 keywords = ["EMBED", "breast imaging", "clinical semantics", "curation"]
 classifiers = [

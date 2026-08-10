@@ -19,7 +19,6 @@ def match(identifier: str, score: int, **values: object) -> dict[str, object]:
         "match_reasons": values.pop("match_reasons", []),
         "profile_coverage": values.pop("profile_coverage", []),
         "qualifications": values.pop("qualifications", []),
-        "active_revisions": values.pop("active_revisions", []),
         "implementation_bindings": values.pop(
             "implementation_bindings", {}
         ),
@@ -55,7 +54,6 @@ class CuratorQueryDiffTests(unittest.TestCase):
                     25,
                     match_reasons=[{"field": "definition", "terms": ["alpha"]}],
                     qualifications=[{"id": "q.new"}],
-                    active_revisions=[{"id": "revision.new"}],
                     implementation_bindings={
                         "profile": "open-v2",
                         "feature_bindings": [{"id": "binding.new"}],
@@ -75,7 +73,6 @@ class CuratorQueryDiffTests(unittest.TestCase):
         self.assertEqual(changed["score"]["delta"], 5)
         self.assertIn("match_reasons", changed)
         self.assertIn("qualifications", changed)
-        self.assertIn("active_revisions", changed)
         self.assertEqual(
             changed["implementation_binding_inventory"]["draft"][
                 "feature_bindings"

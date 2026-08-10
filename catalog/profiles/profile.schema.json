@@ -9,9 +9,9 @@
     "profile_schema_version",
     "profile",
     "requires",
+    "contributions",
     "sources",
     "contexts",
-    "coverage",
     "qualifications",
     "vocabularies",
     "profile_binding"
@@ -21,7 +21,7 @@
       "const": "./profile.schema.json"
     },
     "profile_schema_version": {
-      "const": 1
+      "const": 2
     },
     "profile": {
       "type": "object",
@@ -47,9 +47,12 @@
       ],
       "properties": {
         "semantic_schema_version": {
-          "const": 7
+          "const": 8
         }
       }
+    },
+    "contributions": {
+      "$ref": "#/$defs/contributions"
     },
     "sources": {
       "type": "object",
@@ -65,15 +68,6 @@
       "patternProperties": {
         "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
           "$ref": "#/$defs/clinical_context"
-        }
-      },
-      "additionalProperties": false
-    },
-    "coverage": {
-      "type": "object",
-      "patternProperties": {
-        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
-          "$ref": "#/$defs/coverage"
         }
       },
       "additionalProperties": false
@@ -139,18 +133,6 @@
         "technical"
       ]
     },
-    "binding_grain": {
-      "enum": [
-        "patient",
-        "exam",
-        "breast_side",
-        "imaging_finding",
-        "pathology_finding",
-        "report",
-        "risk_assessment",
-        "wide_row"
-      ]
-    },
     "evidence": {
       "enum": [
         "release_schema",
@@ -199,6 +181,142 @@
         "$ref": "#/$defs/nonblank_string"
       }
     },
+    "availability": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope"
+          ],
+          "properties": {
+            "scope": {
+              "const": "portable"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "profiles"
+          ],
+          "properties": {
+            "scope": {
+              "const": "profiles"
+            },
+            "profiles": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/identifier"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "contributions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clinical_objects",
+        "concepts",
+        "semantic_relationships",
+        "temporal_semantics",
+        "aggregations",
+        "guardrails",
+        "coverage"
+      ],
+      "properties": {
+        "clinical_objects": {
+          "$ref": "#/$defs/clinical_object_registry"
+        },
+        "concepts": {
+          "$ref": "#/$defs/concept_registry"
+        },
+        "semantic_relationships": {
+          "$ref": "#/$defs/semantic_relationship_registry"
+        },
+        "temporal_semantics": {
+          "$ref": "#/$defs/temporal_semantic_registry"
+        },
+        "aggregations": {
+          "$ref": "#/$defs/aggregation_registry"
+        },
+        "guardrails": {
+          "$ref": "#/$defs/guardrail_registry"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage_registry"
+        }
+      }
+    },
+    "clinical_object_registry": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/clinical_object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "concept_registry": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/concept"
+        }
+      },
+      "additionalProperties": false
+    },
+    "semantic_relationship_registry": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/semantic_relationship"
+        }
+      },
+      "additionalProperties": false
+    },
+    "temporal_semantic_registry": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/temporal_semantic"
+        }
+      },
+      "additionalProperties": false
+    },
+    "aggregation_registry": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/aggregation"
+        }
+      },
+      "additionalProperties": false
+    },
+    "guardrail_registry": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/guardrail"
+        }
+      },
+      "additionalProperties": false
+    },
+    "coverage_registry": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "$ref": "#/$defs/coverage"
+        }
+      },
+      "additionalProperties": false
+    },
     "clinical_object": {
       "type": "object",
       "additionalProperties": false,
@@ -212,6 +330,9 @@
         "caveats"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -277,6 +398,9 @@
         "objects"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -435,6 +559,9 @@
         "caveats"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -501,6 +628,9 @@
         "caveats"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -562,6 +692,9 @@
         "caveats"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -645,6 +778,9 @@
         "caveats"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "title": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -731,6 +867,9 @@
         "caveats"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "subject_kind": {
           "enum": [
             "clinical_object",
@@ -822,6 +961,9 @@
         "codes"
       ],
       "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
         "label": {
           "$ref": "#/$defs/nonblank_string"
         },
@@ -1196,20 +1338,6 @@
         }
       ]
     },
-    "binding_parameters": {
-      "type": "object",
-      "minProperties": 1,
-      "additionalProperties": false,
-      "required": [
-        "slot"
-      ],
-      "properties": {
-        "slot": {
-          "type": "integer",
-          "minimum": 1
-        }
-      }
-    },
     "occurrence_interpretation": {
       "type": "object",
       "additionalProperties": false,
@@ -1244,44 +1372,35 @@
         }
       }
     },
+    "mapping_qualifiers": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]*(?![\\s\\S])": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonblank_string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "feature_binding": {
       "type": "object",
       "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "concept": {
-                "const": "pathology.diagnosis_code_slot"
-              }
-            },
-            "required": [
-              "concept"
-            ]
-          },
-          "then": {
-            "required": [
-              "parameters"
-            ]
-          },
-          "else": {
-            "not": {
-              "required": [
-                "parameters"
-              ]
-            }
-          }
-        }
-      ],
       "required": [
         "id",
         "table",
         "column",
         "concept",
-        "grain",
-        "role",
-        "physical_type",
-        "nullable"
+        "status"
       ],
       "properties": {
         "id": {
@@ -1296,25 +1415,17 @@
         "concept": {
           "$ref": "#/$defs/identifier"
         },
-        "grain": {
-          "$ref": "#/$defs/binding_grain"
-        },
-        "role": {
+        "status": {
           "enum": [
-            "canonical",
-            "reference",
-            "wide_projection",
-            "technical"
+            "direct",
+            "derived",
+            "conditional",
+            "ambiguous",
+            "unresolved"
           ]
         },
-        "physical_type": {
-          "$ref": "#/$defs/nonblank_string"
-        },
-        "nullable": {
-          "type": "boolean"
-        },
-        "parameters": {
-          "$ref": "#/$defs/binding_parameters"
+        "qualifiers": {
+          "$ref": "#/$defs/mapping_qualifiers"
         },
         "notes": {
           "type": "array",
@@ -1411,7 +1522,6 @@
         "object",
         "table",
         "columns",
-        "representation",
         "claim_refs",
         "caveats"
       ],
@@ -1432,13 +1542,27 @@
             "$ref": "#/$defs/physical_name"
           }
         },
-        "representation": {
+        "completeness": {
           "enum": [
-            "canonical",
+            "complete",
             "partial",
-            "co_located",
-            "projection",
-            "reference"
+            "unknown"
+          ]
+        },
+        "authority": {
+          "enum": [
+            "preferred",
+            "reference",
+            "alternative",
+            "unspecified"
+          ]
+        },
+        "derivation": {
+          "enum": [
+            "source",
+            "projected",
+            "derived",
+            "unknown"
           ]
         },
         "claim_refs": {
@@ -1515,7 +1639,7 @@
       "required": [
         "id",
         "table",
-        "grain",
+        "columns",
         "keys",
         "caveats"
       ],
@@ -1527,7 +1651,14 @@
           "$ref": "#/$defs/physical_name"
         },
         "grain": {
-          "$ref": "#/$defs/binding_grain"
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/physical_column"
+          }
         },
         "keys": {
           "type": "array",
@@ -1537,6 +1668,26 @@
         },
         "caveats": {
           "$ref": "#/$defs/nonblank_strings"
+        }
+      }
+    },
+    "physical_column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "physical_type",
+        "nullable"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/physical_name"
+        },
+        "physical_type": {
+          "$ref": "#/$defs/nonblank_string"
+        },
+        "nullable": {
+          "type": "boolean"
         }
       }
     },
@@ -1697,7 +1848,6 @@
       "properties": {
         "feature_bindings": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "$ref": "#/$defs/feature_binding"
           }

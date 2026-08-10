@@ -1,4 +1,4 @@
-"""Standalone schema and artifact checks for the schema-v7 catalog set."""
+"""Standalone schema and artifact checks for the schema-v8 catalog set."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ class CatalogSetSchemaTests(unittest.TestCase):
 
     def test_semantic_artifact_is_profile_independent(self) -> None:
         semantic = self.documents["semantic"][1]
-        self.assertEqual(semantic["semantic_schema_version"], 7)
+        self.assertEqual(semantic["semantic_schema_version"], 8)
         self.assertEqual(semantic["coverage"], {})
         self.assertEqual(semantic["vocabularies"], {})
         self.assertNotIn("profiles", semantic)
@@ -110,10 +110,11 @@ class CatalogSetSchemaTests(unittest.TestCase):
     def test_open_v2_module_owns_release_specific_content(self) -> None:
         profile = self.documents["profile"][1]
         self.assertEqual(profile["profile"]["id"], "open-v2")
-        self.assertEqual(profile["requires"]["semantic_schema_version"], 7)
+        self.assertEqual(profile["profile_schema_version"], 2)
+        self.assertEqual(profile["requires"]["semantic_schema_version"], 8)
         self.assertTrue(profile["sources"])
         self.assertTrue(profile["contexts"])
-        self.assertTrue(profile["coverage"])
+        self.assertTrue(profile["contributions"]["coverage"])
         self.assertTrue(profile["qualifications"])
         self.assertTrue(profile["vocabularies"])
         self.assertTrue(
@@ -129,45 +130,45 @@ class CatalogSetSchemaTests(unittest.TestCase):
             )
         )
 
-    def test_open_v2_split_is_mechanical_against_legacy_fixture(self) -> None:
-        legacy = read_json(CATALOG / "catalog.json")
-        semantic = self.documents["semantic"][1]
+    def test_internal_v2_profile_can_start_with_semantics_before_bindings(self) -> None:
+        profile_schema = self.documents["profile"][0]
+        manifest_schema = self.documents["manifest"][0]
+        internal_profile = read_json(CATALOG / "profiles" / "internal-v2.json")
+        internal_manifest = read_json(CATALOG / "internal-v2-catalog-set.json")
+
+        Draft202012Validator(profile_schema).validate(internal_profile)
+        Draft202012Validator(manifest_schema).validate(internal_manifest)
+        self.assertEqual(internal_profile["profile"]["id"], "internal-v2")
+        self.assertIn(
+            "region_of_interest",
+            internal_profile["contributions"]["clinical_objects"],
+        )
+        self.assertIn(
+            "clinical.image-region-of-interest",
+            internal_profile["contributions"]["semantic_relationships"],
+        )
+        self.assertEqual(
+            internal_profile["profile_binding"]["feature_bindings"], []
+        )
+        self.assertEqual(internal_profile["profile_binding"]["tables"], [])
+
+    def test_physical_inventory_is_independent_from_semantic_mappings(self) -> None:
         profile = self.documents["profile"][1]
-
-        self.assertEqual(
-            profile["sources"],
-            {
-                key: value
-                for key, value in legacy["sources"].items()
-                if value["scope"] == "profile_specific"
-            },
-        )
-        self.assertEqual(
-            profile["contexts"],
-            {
-                key: value
-                for key, value in legacy["contexts"].items()
-                if value["scope"] == "profile_specific"
-            },
-        )
-        self.assertEqual(profile["coverage"], legacy["coverage"])
-        self.assertEqual(
-            profile["vocabularies"],
-            {
-                f"open-v2.{identifier}": value
-                for identifier, value in legacy["vocabularies"].items()
-            },
-        )
-        self.assertEqual(set(semantic["clinical_objects"]), set(legacy["clinical_objects"]))
-        self.assertEqual(set(semantic["concepts"]), set(legacy["concepts"]))
-
-        split_binding = deepcopy(profile["profile_binding"])
-        for collection in ("feature_bindings", "object_bindings", "tables"):
-            for record in split_binding[collection]:
-                record.pop("id")
-        for record in split_binding["feature_bindings"]:
-            record.pop("vocabulary", None)
-        self.assertEqual(split_binding, legacy["profile_bindings"]["open-v2"])
+        tables = {
+            table["table"]: {column["name"]: column for column in table["columns"]}
+            for table in profile["profile_binding"]["tables"]
+        }
+        self.assertTrue(tables)
+        for mapping in profile["profile_binding"]["feature_bindings"]:
+            self.assertIn(mapping["column"], tables[mapping["table"]])
+            self.assertNotIn("physical_type", mapping)
+            self.assertNotIn("nullable", mapping)
+            self.assertNotIn("grain", mapping)
+            self.assertNotIn("role", mapping)
+            self.assertIn(
+                mapping["status"],
+                {"direct", "derived", "conditional", "ambiguous", "unresolved"},
+            )
 
     def test_binding_and_qualification_ids_are_authored_and_unique(self) -> None:
         profile = self.documents["profile"][1]
@@ -208,7 +209,11 @@ class CatalogSetSchemaTests(unittest.TestCase):
         for qualification in profile["qualifications"].values():
             subject = qualification["subject"]
             self.assertIn(
-                subject["id"], semantic[collection_for_kind[subject["kind"]]]
+                subject["id"],
+                {
+                    **semantic[collection_for_kind[subject["kind"]]],
+                    **profile["contributions"][collection_for_kind[subject["kind"]]],
+                },
             )
             self.assertTrue(qualification["claim_refs"])
 
@@ -222,14 +227,17 @@ class CatalogSetSchemaTests(unittest.TestCase):
         }
         self.assertEqual(selected, set(profile["vocabularies"]))
         self.assertTrue(
-            all(item["concept"] in semantic["concepts"]
+            all(item["concept"] in {
+                    **semantic["concepts"],
+                    **profile["contributions"]["concepts"],
+                }
                 for item in profile["profile_binding"]["feature_bindings"])
         )
 
-    def test_empty_extension_validates_and_typed_revisions_are_closed(self) -> None:
+    def test_empty_extension_validates_and_old_revision_fields_are_rejected(self) -> None:
         extension = {
             "$schema": "./extension.schema.json",
-            "extension_schema_version": 1,
+            "extension_schema_version": 2,
             "extension": {
                 "id": "project.example",
                 "version": "0.1.0",
@@ -238,39 +246,37 @@ class CatalogSetSchemaTests(unittest.TestCase):
             },
             "applies_to": {"profile": "open-v2"},
             "requires": {
-                "semantic_schema_version": 7,
-                "profile_schema_version": 1,
+                "semantic_schema_version": 8,
+                "profile_schema_version": 2,
                 "extensions": [],
             },
-            "semantic_additions": {"concepts": {}},
+            "contributions": {
+                "clinical_objects": {},
+                "concepts": {},
+                "semantic_relationships": {},
+                "temporal_semantics": {},
+                "aggregations": {},
+                "guardrails": {},
+                "coverage": {},
+            },
             "qualifications": {},
             "feature_lineage": {},
             "sources": {},
             "contexts": {},
-            "coverage": {},
             "vocabularies": {},
-            "binding_additions": {
+            "profile_binding": {
                 "feature_bindings": [],
                 "object_bindings": [],
                 "tables": [],
                 "relationship_bindings": [],
                 "relationship_binding_paths": [],
             },
-            "revisions": [],
         }
         validator = Draft202012Validator(self.extension_schema)
         validator.validate(extension)
 
         invalid = deepcopy(extension)
-        invalid["revisions"] = [
-            {
-                "id": "project.example.revision",
-                "kind": "mutates_record",
-                "reason": "Not a supported typed revision.",
-                "claim_refs": [],
-                "known_limitations": [],
-            }
-        ]
+        invalid["revisions"] = []
         with self.assertRaises(ValidationError):
             validator.validate(invalid)
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-SEMANTIC_COLLECTIONS = {
+CONTRIBUTION_COLLECTIONS = {
     "clinical_objects": "clinical_object",
     "concepts": "feature",
     "semantic_relationships": "semantic_relationship",
@@ -17,6 +17,9 @@ SEMANTIC_COLLECTIONS = {
     "aggregations": "aggregation",
     "guardrails": "guardrail",
     "coverage": "coverage",
+}
+SEMANTIC_COLLECTIONS = {
+    **CONTRIBUTION_COLLECTIONS,
     "vocabularies": "vocabulary",
     "sources": "source",
     "contexts": "context",
@@ -24,7 +27,6 @@ SEMANTIC_COLLECTIONS = {
 MODULE_COLLECTIONS = {
     "sources": "source",
     "contexts": "context",
-    "coverage": "coverage",
     "qualifications": "qualification",
     "vocabularies": "vocabulary",
     "feature_lineage": "feature_lineage",
@@ -49,8 +51,10 @@ class SourceEntry:
     module_id: str | None
     target_profile: str | None
     collection: str
-    container_path: tuple[str, ...]
+    container_path: tuple[str | int, ...]
     storage: str
+    identity_field: str | None
+    identity_value: str
     json_pointer: str
     editable: bool
 
@@ -76,35 +80,26 @@ def build_source_index(
         if document.kind == "manifest":
             continue
         is_editable = editable is not None and document.source_path.resolve() == editable
-        if document.kind in {"semantic", "legacy"}:
+        if document.kind == "semantic":
             for collection, kind in SEMANTIC_COLLECTIONS.items():
                 entries.extend(_map_entries(document, (collection,), collection, kind, is_editable))
-            if document.kind == "legacy":
-                for profile in document.mapping.get("profile_bindings", {}):
-                    for collection, kind in BINDING_COLLECTIONS.items():
-                        entries.extend(
-                            _array_entries(
-                                document,
-                                ("profile_bindings", profile, collection),
-                                collection,
-                                kind,
-                                False,
-                            )
-                        )
-        elif document.kind == "profile":
+        elif document.kind in {"profile", "extension"}:
+            for collection, kind in CONTRIBUTION_COLLECTIONS.items():
+                entries.extend(
+                    _map_entries(
+                        document,
+                        ("contributions", collection),
+                        collection,
+                        kind,
+                        is_editable,
+                    )
+                )
             for collection, kind in MODULE_COLLECTIONS.items():
                 if collection in document.mapping:
                     entries.extend(_map_entries(document, (collection,), collection, kind, is_editable))
             for collection, kind in BINDING_COLLECTIONS.items():
                 entries.extend(_array_entries(document, ("profile_binding", collection), collection, kind, is_editable))
-        elif document.kind == "extension":
-            entries.extend(_map_entries(document, ("semantic_additions", "concepts"), "concepts", "feature", is_editable))
-            for collection, kind in MODULE_COLLECTIONS.items():
-                if collection in document.mapping:
-                    entries.extend(_map_entries(document, (collection,), collection, kind, is_editable))
-            for collection, kind in BINDING_COLLECTIONS.items():
-                entries.extend(_array_entries(document, ("binding_additions", collection), collection, kind, is_editable))
-            entries.extend(_array_entries(document, ("revisions",), "revisions", "revision", is_editable))
+            entries.extend(_physical_column_entries(document, is_editable))
     return tuple(sorted(entries, key=lambda item: (item.kind, item.identifier, item.key)))
 
 
@@ -113,10 +108,7 @@ def record_at(mapping: Mapping[str, Any], entry: SourceEntry) -> Mapping[str, An
     if entry.storage == "map":
         value = container[entry.identifier]
     else:
-        value = next(
-            item for item in container
-            if isinstance(item, Mapping) and item.get("id") == entry.identifier
-        )
+        value = container[_array_index(container, entry.identity_field, entry.identity_value)]
     if not isinstance(value, Mapping):
         raise KeyError(entry.key)
     return value
@@ -127,7 +119,7 @@ def replace_record(mapping: dict[str, Any], entry: SourceEntry, record: Mapping[
     if entry.storage == "map":
         container[entry.identifier] = mutable_copy(record)
         return
-    index = _array_index(container, entry.identifier)
+    index = _array_index(container, entry.identity_field, entry.identity_value)
     container[index] = mutable_copy(record)
 
 
@@ -136,12 +128,13 @@ def delete_record(mapping: dict[str, Any], entry: SourceEntry) -> None:
     if entry.storage == "map":
         del container[entry.identifier]
     else:
-        del container[_array_index(container, entry.identifier)]
+        del container[_array_index(container, entry.identity_field, entry.identity_value)]
 
 
 def create_record(
-    mapping: dict[str, Any], *, container_path: tuple[str, ...], storage: str,
-    identifier: str, record: Mapping[str, Any]
+    mapping: dict[str, Any], *, container_path: tuple[str | int, ...], storage: str,
+    identifier: str, record: Mapping[str, Any], identity_field: str = "id",
+    identity_value: str | None = None,
 ) -> None:
     container = _container(mapping, container_path)
     if storage == "map":
@@ -149,11 +142,17 @@ def create_record(
             raise ValueError(f"record {identifier!r} already exists")
         container[identifier] = mutable_copy(record)
         return
-    if any(isinstance(item, Mapping) and item.get("id") == identifier for item in container):
+    selected_value = identity_value or identifier
+    if any(
+        isinstance(item, Mapping) and item.get(identity_field) == selected_value
+        for item in container
+    ):
         raise ValueError(f"record {identifier!r} already exists")
     item = mutable_copy(record)
-    if item.get("id") != identifier:
-        raise ValueError("array record id must match the requested stable ID")
+    if item.get(identity_field) != selected_value:
+        raise ValueError(
+            f"array record {identity_field} must match the requested identity"
+        )
     container.append(item)
 
 
@@ -164,6 +163,12 @@ def creation_location(document_kind: str, kind: str) -> tuple[tuple[str, ...], s
         if collection:
             return (collection,), "map"
     if document_kind in {"profile", "extension"}:
+        inverse_contributions = {
+            value: key for key, value in CONTRIBUTION_COLLECTIONS.items()
+        }
+        collection = inverse_contributions.get(kind)
+        if collection:
+            return ("contributions", collection), "map"
         inverse_modules = {value: key for key, value in MODULE_COLLECTIONS.items()}
         collection = inverse_modules.get(kind)
         if collection and not (document_kind == "profile" and kind == "feature_lineage"):
@@ -171,12 +176,7 @@ def creation_location(document_kind: str, kind: str) -> tuple[tuple[str, ...], s
         inverse_bindings = {value: key for key, value in BINDING_COLLECTIONS.items()}
         binding = inverse_bindings.get(kind)
         if binding:
-            parent = "profile_binding" if document_kind == "profile" else "binding_additions"
-            return (parent, binding), "array"
-    if document_kind == "extension" and kind == "feature":
-        return ("semantic_additions", "concepts"), "map"
-    if document_kind == "extension" and kind == "revision":
-        return ("revisions",), "array"
+            return ("profile_binding", binding), "array"
     raise ValueError(f"{kind!r} records are not owned by an editable {document_kind} module")
 
 
@@ -185,23 +185,64 @@ def _map_entries(document: Any, path: tuple[str, ...], collection: str, kind: st
     if not isinstance(container, Mapping):
         return []
     return [
-        _entry(document, path, collection, kind, str(identifier), "map", editable, position=None)
+        _entry(
+            document, path, collection, kind, str(identifier), "map", editable,
+            position=None, identity_field=None, identity_value=str(identifier),
+        )
         for identifier in container
     ]
 
 
-def _array_entries(document: Any, path: tuple[str, ...], collection: str, kind: str, editable: bool) -> list[SourceEntry]:
+def _array_entries(document: Any, path: tuple[str | int, ...], collection: str, kind: str, editable: bool) -> list[SourceEntry]:
     container = _container(document.mapping, path)
     if not isinstance(container, Sequence) or isinstance(container, (str, bytes)):
         return []
     result = []
     for position, item in enumerate(container):
         if isinstance(item, Mapping) and isinstance(item.get("id"), str):
-            result.append(_entry(document, path, collection, kind, item["id"], "array", editable, position=position))
+            result.append(
+                _entry(
+                    document, path, collection, kind, item["id"], "array",
+                    editable, position=position, identity_field="id",
+                    identity_value=item["id"],
+                )
+            )
     return result
 
 
-def _entry(document: Any, path: tuple[str, ...], collection: str, kind: str, identifier: str, storage: str, editable: bool, position: int | None) -> SourceEntry:
+def _physical_column_entries(document: Any, editable: bool) -> list[SourceEntry]:
+    result: list[SourceEntry] = []
+    tables = document.mapping.get("profile_binding", {}).get("tables", ())
+    if not isinstance(tables, Sequence) or isinstance(tables, (str, bytes)):
+        return result
+    for table_index, table in enumerate(tables):
+        if not isinstance(table, Mapping) or not isinstance(table.get("id"), str):
+            continue
+        columns = table.get("columns", ())
+        if not isinstance(columns, Sequence) or isinstance(columns, (str, bytes)):
+            continue
+        for column_index, column in enumerate(columns):
+            if not isinstance(column, Mapping) or not isinstance(column.get("name"), str):
+                continue
+            identifier = f"{table['id']}::{column['name']}"
+            result.append(
+                _entry(
+                    document,
+                    ("profile_binding", "tables", table_index, "columns"),
+                    "columns",
+                    "physical_column",
+                    identifier,
+                    "array",
+                    editable,
+                    position=column_index,
+                    identity_field="name",
+                    identity_value=column["name"],
+                )
+            )
+    return result
+
+
+def _entry(document: Any, path: tuple[str | int, ...], collection: str, kind: str, identifier: str, storage: str, editable: bool, position: int | None, identity_field: str | None, identity_value: str) -> SourceEntry:
     pointer_parts = [*_pointer_parts(path)]
     pointer_parts.append(_escape(identifier) if storage == "map" else str(position))
     return SourceEntry(
@@ -210,26 +251,31 @@ def _entry(document: Any, path: tuple[str, ...], collection: str, kind: str, ide
         locator_kind=document.locator_kind, module_id=document.module_id,
         target_profile=document.target_profile, collection=collection,
         container_path=path, storage=storage,
+        identity_field=identity_field, identity_value=identity_value,
         json_pointer="/" + "/".join(pointer_parts), editable=editable,
     )
 
 
-def _container(mapping: Any, path: tuple[str, ...]) -> Any:
+def _container(mapping: Any, path: tuple[str | int, ...]) -> Any:
     value = mapping
     for key in path:
         value = value[key]
     return value
 
 
-def _array_index(values: Sequence[Any], identifier: str) -> int:
+def _array_index(
+    values: Sequence[Any], identity_field: str | None, identity_value: str
+) -> int:
+    if identity_field is None:
+        raise KeyError(identity_value)
     for index, item in enumerate(values):
-        if isinstance(item, Mapping) and item.get("id") == identifier:
+        if isinstance(item, Mapping) and item.get(identity_field) == identity_value:
             return index
-    raise KeyError(identifier)
+    raise KeyError(identity_value)
 
 
-def _pointer_parts(path: tuple[str, ...]) -> list[str]:
-    return [_escape(part) for part in path]
+def _pointer_parts(path: tuple[str | int, ...]) -> list[str]:
+    return [_escape(str(part)) for part in path]
 
 
 def _escape(value: str) -> str:

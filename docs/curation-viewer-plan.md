@@ -1,12 +1,17 @@
 # Local catalog curation viewer implementation plan
 
+> Historical implementation plan. The current viewer consumes schema v8,
+> profile schema v2, and extension schema v2. References below to schema-v7
+> ownership, typed revisions, and legacy review mode describe the former
+> implementation and are retained as design history.
+
 ## Status
 
-Delivered and merged into `main`. This document now records the design,
-acceptance contract, and intentional implementation boundaries for the
-temporary maintainer-operated schema-v7 viewer and editor.
+Delivered and subsequently migrated to schema v8. This document records the
+original design and acceptance history for the temporary maintainer-operated
+viewer; current serialized behavior follows `catalog-format.md`.
 
-As of software `0.9.0`, the delivered viewer is packaged as the separately
+As of software `0.10.0`, the viewer is packaged as the separately
 installed `embedv2-agent-context-curator` companion distribution. Selecting the
 root package's `curator` extra installs it; the lightweight base wheel contains
 only the `curate` command's dispatch stub and installation diagnostic, not the
@@ -84,7 +89,7 @@ resolution rules.
 
 ### Initial supported documents
 
-The viewer supports schema-v7 documents only for editing:
+The former viewer contract supported schema-v7 documents only for editing:
 
 - one semantic catalog;
 - any independently loaded profile module; and

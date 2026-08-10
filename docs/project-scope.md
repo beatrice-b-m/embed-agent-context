@@ -28,9 +28,12 @@ pipelines, and analyses. It does not prescribe those designs.
 
 ## Canonical deliverable
 
-`catalog/semantic/catalog.json` is the source of truth for portable clinical
-meaning. `catalog/profiles/open-v2.json` owns the released representation and
-`catalog/catalog-set.json` selects the bundled defaults. Together they must
+`catalog/semantic/catalog.json` is the source of truth for shared clinical
+meaning. Profiles and extensions may add availability-scoped meaning alongside
+their physical representation; `catalog/profiles/open-v2.json` owns the
+released public representation and `catalog/profiles/internal-v2.json` is a
+non-default working scaffold. `catalog/catalog-set.json` selects bundled
+defaults. Together they must
 remain:
 
 - valid against their version-matched standalone JSON Schemas;
@@ -58,6 +61,8 @@ patient
 └── breast-imaging episode
     └── imaging exam
         ├── breast side
+        ├── image
+        │   └── region of interest (internal-v2 contribution)
         └── imaging finding
             └── imaging interpretation / recommendation
                 └── linked procedure
@@ -79,13 +84,23 @@ needs before selecting an analysis policy.
 Physical tables are not the conceptual model. `profile_bindings` is a secondary
 implementation layer containing:
 
-- feature-to-column bindings;
-- object-to-table representations;
-- table grains and key candidates; and
+- table-owned column inventories with type and schema nullability;
+- many-to-many feature-to-column mappings;
+- object-to-table mappings with independent completeness, authority, and
+  derivation axes;
+- optional descriptive table grains and key candidates; and
 - physical relationship bindings, composed binding paths, and join hazards.
 
 A clinical object does not need its own table. One row can represent parts of
 several objects, and the same semantic model can bind to a different layout.
+Co-location is inferred from shared table mappings rather than authored as a
+representation role.
+
+The shared semantic catalog includes images because they are part of EMBED,
+including the public data. The internal-v2 scaffold contributes regions of
+interest and their attachment to images at profile availability. This semantic
+scaffold is not evidence for ROI table names, geometry, coordinate systems,
+identifiers, or physical joins.
 
 ## Breast-cancer outcome focus
 
@@ -179,9 +194,9 @@ turning them into policy.
 
 ## Discovery requirements
 
-`discover` is the clinical-first entry point. It searches the portable semantic
-collections and supporting context claims without requiring a caller to know a
-table name or stable identifier.
+`discover` is the clinical-first entry point. It searches shared semantics,
+applicable profile/extension contributions, and supporting context claims
+without requiring a caller to know a table name or stable identifier.
 
 Every match must explain why it matched through:
 
@@ -223,9 +238,9 @@ agent-facing feature documentation. Prohibited examples include:
   semantics.
 
 The policy does not prohibit semantic numbers. Documented code values, units,
-time horizons, physical types, the positive `parameters.slot` required only by
-`pathology.diagnosis_code_slot` bindings, qualitative cardinality, and
-genuinely defined sentinel meanings belong when they explain representation.
+time horizons, physical types, scalar mapping qualifiers such as a documented
+repeated-field slot, qualitative cardinality, and genuinely defined sentinel
+meanings belong when they explain representation.
 Schema nullability is physical metadata; how often null occurs is not.
 
 Unresolved missing-value or sentinel behavior may be stated without a
@@ -244,6 +259,12 @@ is unchanged.
 Create separate concepts when meaning changes. A finding-level presence flag,
 side-level rollup, and exam-level rollup are not interchangeable merely because
 their column names share a stem.
+
+Profiles and extensions may contribute new objects, concepts, relationships,
+temporal semantics, aggregations, guardrails, and coverage. Give them portable
+or profile availability explicitly when the module default is insufficient.
+Do not create a shared placeholder merely to obtain permission to describe a
+real profile-specific concept.
 
 Technical concepts may have no clinical-object owner. They must remain
 explicitly technical and must not be promoted to clinical identity, ordering,
@@ -269,6 +290,12 @@ When the same portable concept has different value or null meaning at different
 physical occurrences, record `occurrence_interpretations` on the feature
 binding rather than applying one global meaning. Representation, meaning,
 review status, claim references, and caveats remain occurrence-specific.
+
+Declare every physical column once under its table. Feature mappings reference
+that inventory and carry a stable mapping ID plus `direct`, `derived`,
+`conditional`, `ambiguous`, or `unresolved` status. A column may remain
+unmapped, one column may have several mappings, and one concept may map to many
+columns. Optional `qualifiers` contain scalar descriptive metadata only.
 
 ### Relationships
 
@@ -361,6 +388,8 @@ wheels bundle the JSON and JSON Schema so the default loader and installed
 commands do not depend on the checkout working directory. Draft 2020-12 JSON
 Schema validates closed shapes and local conditions. The core validator
 separately enforces graph, provenance, clinical, and profile invariants.
+Schema v8 has no compatibility loader: semantic schema 7, profile or extension
+schema 1, schema-v6 monoliths, and unknown versions are fatal startup errors.
 
 ## Non-goals
 
@@ -381,14 +410,19 @@ The project does not:
 A profile is complete when:
 
 - its key exactly matches one declared profile;
-- each feature binding references a portable concept and a declared table;
-- each nonempty object binding references a portable object, declared table,
+- each feature mapping has a unique ID and references an available concept,
+  declared table, and declared column;
+- each nonempty object binding references an available object, declared table,
   and bound columns;
+- table column inventories own physical type and schema nullability, while
+  feature mappings do not duplicate them;
+- unmapped physical columns are allowed and remain visibly unresolved;
 - declared `instance_identity` is scoped and does not confuse physical rows
   with persistent clinical identity;
 - occurrence interpretations qualify the physical binding whose value or null
   meaning they describe;
-- every bound table has one table specification at the correct binding grain;
+- every bound table has one table specification; optional grain is descriptive
+  rather than selected from a global closed list;
 - key candidates state kind, uniqueness, completeness, evidence, and caveats;
 - physical relationship endpoints resolve to compatible bound columns;
 - relationship bindings retain source completeness, bidirectional
@@ -399,9 +433,11 @@ A profile is complete when:
 - unsupported capture or representation is recorded through coverage rather
   than inferred from missing columns.
 
-Footer validation verifies physical table, column, type, and schema-nullability
-surfaces only. It does not establish uniqueness, referential coverage,
-cardinality, clinical attribution, outcome capture, or availability.
+Footer validation verifies the selected profile's exact physical table,
+column, type, and schema-nullability surfaces only. It reads direct-child
+Parquet footer metadata and no rows, values, counts, or statistics. It does not
+establish uniqueness, referential coverage, cardinality, clinical attribution,
+ROI geometry, outcome capture, or availability.
 
 ## Documentation synchronization
 
@@ -410,8 +446,8 @@ update relevant usage, format, architecture, and configuration documentation
 in the same logical commit. Examples and cross-references must be checked for
 stale identifiers, commands, filters, fields, and file paths. The current
 architectural decision is documented in
-[`architecture-v7.md`](architecture-v7.md). Earlier architecture pages are
-retained as history.
+[`architecture-v8.md`](architecture-v8.md). Earlier architecture pages and the
+schema-v7 profile-module migration are retained as history.
 
 ## Completion criteria
 

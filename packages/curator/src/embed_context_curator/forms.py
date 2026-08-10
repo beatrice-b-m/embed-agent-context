@@ -40,6 +40,7 @@ _REFERENCE_KINDS: dict[str, tuple[str, ...]] = {
     "aggregation": ("aggregation",),
     "aggregations": ("aggregation",),
     "claim_refs": ("claim",),
+    "column": ("physical_column",),
     "concept": ("concept",),
     "concepts": ("concept",),
     "coverage": ("coverage",),
@@ -47,14 +48,8 @@ _REFERENCE_KINDS: dict[str, tuple[str, ...]] = {
     "input_concepts": ("concept",),
     "object": ("clinical_object",),
     "objects": ("clinical_object",),
-    "original": ("concept",),
-    "original_binding": ("feature_binding",),
-    "original_concept": ("concept",),
     "output_concept": ("concept",),
     "relationship_bindings": ("relationship_binding",),
-    "replacement": ("concept",),
-    "replacement_binding": ("feature_binding",),
-    "replacement_concept": ("concept",),
     "semantic_relationship": ("semantic_relationship",),
     "semantic_relationships": ("semantic_relationship",),
     "source_concept": ("concept",),
@@ -70,12 +65,11 @@ _REFERENCE_KINDS: dict[str, tuple[str, ...]] = {
 
 _ENHANCED_FAMILIES = {
     "concept",
-    "extension_concept",
     "clinical_context",
     "context_claim",
     "qualification",
     "feature_binding",
-    "revision",
+    "physical_column",
 }
 
 _FIELD_HELP = {
@@ -83,13 +77,11 @@ _FIELD_HELP = {
     "id": "Stable identifier. Existing record identifiers cannot be renamed in the viewer.",
     "lifecycle_status": "Project contribution lifecycle; this does not alter released semantics.",
     "subject": "Portable record qualified by this profile or extension contribution.",
-    "replacement": "Project-owned replacement selected by this typed revision.",
 }
 
 _FIELD_WARNINGS = {
     "definition": "Changing clinical meaning may require a new concept rather than editing an existing one.",
     "id": "Stable IDs are immutable after record creation.",
-    "replacement": "A revision changes the active project view without mutating the original contribution.",
     "subject": "Qualifications add scoped interpretation; they do not redefine portable meaning.",
 }
 

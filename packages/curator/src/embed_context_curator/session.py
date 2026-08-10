@@ -237,7 +237,9 @@ class CuratorSession:
                     self._editable_document.mapping, before[key]
                 )
                 current_record = record_at(self._draft_document().mapping, current)
-                if _records_equal(baseline_record, current_record):
+                if _records_equal_for_entry(
+                    entry, baseline_record, current_record
+                ):
                     continue
             document = self._document_for_entry(current or entry)
             origin = self._origin(entry.kind, entry.identifier)
@@ -307,7 +309,17 @@ class CuratorSession:
             raise CuratorError("kind, identifier, and record are required")
         with self._lock:
             self._check_revision(revision)
-            path, storage = creation_location(self._editable_document.kind, kind)
+            if kind == "physical_column":
+                path, storage, identity_field, identity_value = (
+                    *self._physical_column_creation(identifier),
+                    "name",
+                    identifier.split("::", 1)[1],
+                )
+            else:
+                path, storage = creation_location(
+                    self._editable_document.kind, kind
+                )
+                identity_field, identity_value = "id", identifier
             schema, family = self._schema_and_family(self._editable_document, kind)
             diagnostics = local_validate_record(schema, family, record)
             if diagnostics:
@@ -320,7 +332,11 @@ class CuratorSession:
                 raise CuratorError(
                     "Map record id must match the requested stable ID."
                 )
-            insert_authored_record(self._draft, container_path=path, storage=storage, identifier=identifier, record=record)
+            insert_authored_record(
+                self._draft, container_path=path, storage=storage,
+                identifier=identifier, record=record,
+                identity_field=identity_field, identity_value=identity_value,
+            )
             return self._finish_mutation()
 
     def creation_form_spec(self, kind: str) -> dict[str, Any]:
@@ -329,7 +345,8 @@ class CuratorSession:
         self._require_editable()
         with self._lock:
             try:
-                creation_location(self._editable_document.kind, kind)
+                if kind != "physical_column":
+                    creation_location(self._editable_document.kind, kind)
                 schema, family = self._schema_and_family(
                     self._editable_document, kind
                 )
@@ -344,6 +361,31 @@ class CuratorSession:
                     f"{kind!r} is not a creatable record kind for this module."
                 ) from exc
 
+    def _physical_column_creation(
+        self, identifier: str
+    ) -> tuple[tuple[str | int, ...], str]:
+        try:
+            table_id, column_name = identifier.split("::", 1)
+        except ValueError as exc:
+            raise CuratorError(
+                "A physical-column identifier must be TABLE_BINDING_ID::COLUMN_NAME."
+            ) from exc
+        if not table_id or not column_name:
+            raise CuratorError(
+                "A physical-column identifier must be TABLE_BINDING_ID::COLUMN_NAME."
+            )
+        tables = self._draft["profile_binding"]["tables"]
+        matches = [
+            index for index, table in enumerate(tables)
+            if isinstance(table, Mapping) and table.get("id") == table_id
+        ]
+        if len(matches) != 1:
+            raise CuratorError(
+                f"parent table {table_id!r} was not found",
+                error_type="not_found", http_status=404,
+            )
+        return ("profile_binding", "tables", matches[0], "columns"), "array"
+
     def replace_record(self, kind: str, identifier: str, request: Mapping[str, Any]) -> dict[str, Any]:
         record = request.get("record")
         if not isinstance(record, Mapping):
@@ -351,8 +393,10 @@ class CuratorSession:
         with self._lock:
             self._check_revision(request.get("revision"))
             entry = self._find_entry(kind, identifier, editable=True)
-            if entry.storage == "array" and record.get("id") != identifier:
-                raise CuratorError("stable IDs are immutable")
+            if entry.storage == "array" and entry.identity_field is not None:
+                if record.get(entry.identity_field) != entry.identity_value:
+                    label = "stable IDs" if entry.identity_field == "id" else "physical column names"
+                    raise CuratorError(f"{label} are immutable")
             if entry.storage == "map" and "id" in record:
                 existing = record_at(self._draft, entry)
                 if existing.get("id") is not None and record.get("id") != existing.get("id"):
@@ -481,7 +525,7 @@ class CuratorSession:
                 self._composition, self._editable_document, self._draft,
                 source_bytes=prospective,
             )
-        except (CatalogError, OSError, ValueError) as exc:
+        except (CatalogError, KeyError, OSError, ValueError) as exc:
             self._diagnostics = [_diagnostic(exc, self.editable_path)]
             return
         self._draft_composition = candidate
@@ -503,7 +547,7 @@ class CuratorSession:
         requested = Path(edit_module).resolve()
         matches = [item for item in self._composition.documents if item.source_path.resolve() == requested and item.kind in {"semantic", "profile", "extension"}]
         if len(matches) != 1:
-            raise CuratorError("--edit-module must resolve to exactly one loaded schema-v7 semantic, profile, or extension document")
+            raise CuratorError("--edit-module must resolve to exactly one loaded schema-v8 semantic, profile-v2, or extension-v2 document")
         item = matches[0]
         if "embed_context/_data" in item.source_path.as_posix():
             raise CuratorError("installed bundled resources are read-only; load an external or source-tree module explicitly")
@@ -576,9 +620,10 @@ class CuratorSession:
         if kind == "qualification":
             qualification = catalog.qualifications.get(identifier)
             return qualification.origin.to_dict() if qualification is not None else {}
-        if kind == "revision":
-            revision = catalog.revisions.get(identifier)
-            return revision.origin.to_dict() if revision is not None else {}
+        if kind == "physical_column":
+            table_id = identifier.split("::", 1)[0]
+            origin = catalog.origins.get(f"table:{table_id}")
+            return origin.to_dict() if origin is not None else {}
         aliases = {"feature": "concept", "table": "table", "feature_binding": "binding", "object_binding": "binding", "relationship_binding": "binding", "relationship_binding_path": "binding"}
         origin = catalog.origins.get(f"{aliases.get(kind, kind)}:{identifier}")
         return origin.to_dict() if origin is not None else {}
@@ -615,7 +660,7 @@ class CuratorSession:
             item for item in self._composition.documents
             if item.source_path.resolve() == entry.document_path.resolve()
         )
-        if document.kind == "legacy" or not document.schema_resource:
+        if not document.schema_resource:
             return None
         try:
             schema, family = self._schema_and_family(document, entry.kind)
@@ -630,14 +675,13 @@ class CuratorSession:
 
     @staticmethod
     def _schema_and_family(document: Any, kind: str) -> tuple[dict[str, Any], str]:
-        if document.kind == "legacy" or not document.schema_resource:
+        if not document.schema_resource:
             raise KeyError(kind)
         family = {
-            "feature": (
-                "extension_concept" if document.kind == "extension" else "concept"
-            ),
+            "feature": "concept",
             "context": "clinical_context",
             "source": "context_source",
+            "physical_column": "physical_column",
         }.get(kind, kind)
         schema = json.loads(
             _schema_path_for(document.schema_resource).read_text(encoding="utf-8")
@@ -656,6 +700,12 @@ class CuratorSession:
                 if isinstance(table, str):
                     reference_value = table
                     reference_label = f"{table} ({item.identifier})"
+            elif item.kind == "physical_column":
+                document = self._document_for_entry(item)
+                name = record_at(document.mapping, item).get("name")
+                if isinstance(name, str):
+                    reference_value = name
+                    reference_label = f"{name} ({item.identifier})"
             references.setdefault(reference_kind, []).append(
                 {"id": reference_value, "label": reference_label}
             )
@@ -688,7 +738,11 @@ class CuratorSession:
         try:
             old = record_at(self._editable_document.mapping, baseline)
             new = record_at(self._draft_document().mapping, entry)
-            return "baseline" if _records_equal(old, new) else "modified"
+            return (
+                "baseline"
+                if _records_equal_for_entry(entry, old, new)
+                else "modified"
+            )
         except (KeyError, StopIteration):
             return "deleted"
 
@@ -701,7 +755,8 @@ class CuratorSession:
                 state = "new"
             elif key not in after:
                 state = "deleted"
-            elif not _records_equal(
+            elif not _records_equal_for_entry(
+                after[key],
                 record_at(self._editable_document.mapping, before[key]),
                 record_at(self._draft_document().mapping, after[key]),
             ):
@@ -750,6 +805,20 @@ def _records_equal(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
     """Compare authored values after normalizing frozen and mutable shapes."""
 
     return mutable_copy(left) == mutable_copy(right)
+
+
+def _records_equal_for_entry(
+    entry: SourceEntry, left: Mapping[str, Any], right: Mapping[str, Any]
+) -> bool:
+    """Compare parent tables independently from their physical columns."""
+
+    if entry.kind != "table":
+        return _records_equal(left, right)
+    left_table = mutable_copy(left)
+    right_table = mutable_copy(right)
+    left_table.pop("columns", None)
+    right_table.pop("columns", None)
+    return left_table == right_table
 
 
 def _diagnostic(exc: Exception, fallback: Path) -> dict[str, Any]:

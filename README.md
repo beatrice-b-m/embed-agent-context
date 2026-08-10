@@ -154,8 +154,8 @@ clinical reality.
 
 ## Move from meaning to implementation
 
-Use portable clinical semantics first. Once you know which concepts your work
-needs, inspect how the registered `open-v2` profile represents them:
+Start with shared or selected-profile clinical semantics. Once you know which
+concepts your work needs, inspect how the selected profile represents them:
 
 ```bash
 embed-context feature pathology.severity --include-codes
@@ -169,6 +169,12 @@ embed-context relationship-bindings \
 Profile bindings describe tables, columns, physical associations, evidence,
 and known join hazards. They are not executable joins and do not choose an
 analysis policy for you.
+
+Physical columns are inventoried independently from their semantic mappings.
+This lets unmapped columns remain visible during curation, allows renamed or
+derived columns to reuse a concept, and permits one occurrence to carry several
+explicitly ambiguous or conditional mappings. Co-located objects are computed
+from their shared table rather than declared as a special representation.
 
 Run `embed-context --help` to see all commands. The main navigation pattern is:
 
@@ -205,7 +211,7 @@ embed-context curate
 
 The server binds only to `127.0.0.1`, opens an automatically allocated port,
 and stops with the command. Review mode is read-only. To edit, explicitly name
-one loaded filesystem-backed schema-v7 module:
+one loaded filesystem-backed schema-v8 module:
 
 ```bash
 embed-context \
@@ -309,7 +315,7 @@ extension modules are explicit and are never searched for automatically:
 
 ```python
 catalog = load_catalog(
-    profile_paths=["profiles/internal-working.json"],
+    profile_paths=["catalog/profiles/internal-v2.json"],
     extension_paths=["project-configs/derived-features.json"],
     include_default_profiles=False,
 )
@@ -324,9 +330,21 @@ profiles make vocabulary resolution ambiguous.
 
 Query results retain contribution origins, so portable meaning, released
 profile representation, and project-owned content remain distinguishable.
-Profile and extension qualifications add applicable evidence and caveats
-without mutating portable records; typed extension revisions keep original and
-replacement records directly addressable.
+Profiles and extensions may contribute availability-scoped objects, concepts,
+relationships, time semantics, aggregations, guardrails, and coverage rather
+than waiting for every meaning to become portable. Qualifications add evidence
+and caveats without mutating records; competing mappings remain separately
+addressable and surface as alternatives or ambiguity.
+
+Schema v8 is intentionally strict. Semantic schema 7, profile/extension schema
+1, and schema-v6 monoliths are rejected at startup rather than silently
+migrated. Update authored modules before loading them with software `0.10.0`.
+
+The non-default `internal-v2` scaffold demonstrates profile-owned semantics:
+it contributes a region-of-interest object attached to the shared image
+object. It intentionally leaves ROI tables, identifiers, geometry, coordinate
+system, and physical linkage uncataloged. Load it explicitly when developing
+the internal profile; it is not part of the public default manifest.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal
@@ -365,9 +383,14 @@ inform study design.
 ## Terms and version axes
 
 - A **clinical object** is an independently meaningful entity or observation.
-- A **feature** is a portable meaning owned by one or more clinical objects.
+- A **feature** is shared or profile-available meaning owned by one or more
+  clinical objects.
 - A **semantic relationship** describes clinical adjacency or attribution.
 - A **profile binding** describes how a physical release represents a meaning.
+- A **physical column inventory** records a table's names, types, and schema
+  nullability independently of semantic mappings.
+- A **feature mapping** links one column occurrence to one concept with a
+  `direct`, `derived`, `conditional`, `ambiguous`, or `unresolved` status.
 - **Clinical instance identity** states how bound columns identify one
   represented object instance and where that identity stops.
 - An **occurrence interpretation** qualifies the meaning of a value or null at
@@ -385,13 +408,13 @@ The version numbers describe different things:
 
 | Axis | Current value |
 | --- | --- |
-| Software package and commands | `0.9.0` |
-| Semantic catalog schema | `7` |
-| Profile-module schema | `1` |
-| Extension-module schema | `1` |
+| Software package and commands | `0.10.0` |
+| Semantic catalog schema | `8` |
+| Profile-module schema | `2` |
+| Extension-module schema | `2` |
 | Registered EMBED V2 physical profile | `open-v2` |
 | Optional MCP SDK dependency | `2.0.0` |
-| Optional curator companion | lockstep `0.9.0` |
+| Optional curator companion | lockstep `0.10.0` |
 
 ## Learn more
 
@@ -400,10 +423,11 @@ The version numbers describe different things:
   clinical graph and interpretation limits.
 - [Catalog format](docs/catalog-format.md) — integrate with the serialized
   model or Python, CLI, and MCP interfaces.
-- [Architecture v7](docs/architecture-v7.md) — understand the current
-  composable catalog-set architecture and effective query view.
-- [Profile-module migration](docs/profile-module-migration.md) — review the
-  full design and migration record for profiles and project extensions.
+- [Architecture v8](docs/architecture-v8.md) — understand the current scoped
+  contribution model, physical inventories, and effective query view.
+- [Architecture v7](docs/architecture-v7.md) and
+  [profile-module migration](docs/profile-module-migration.md) — review the
+  preceding ownership and typed-revision design as history.
 - [Architecture v6](docs/architecture-v6.md) — review the preceding monolithic
   schema-v6 architecture.
 - [Contributing](CONTRIBUTING.md) — set up a development environment and make

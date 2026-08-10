@@ -1,10 +1,17 @@
 # Profile-module migration
 
+> Historical migration record. This document describes the former schema-v7,
+> profile-v1, and extension-v1 design. Schema v8 intentionally removed its
+> portable-first permission boundary, mixed representation roles, typed
+> revisions, and legacy compatibility. See
+> [architecture v8](architecture-v8.md) and [catalog format](catalog-format.md)
+> for the current contract.
+
 ## Status and outcome
 
-This document defines the agreed target state for the schema-v7 migration from
-one closed catalog file to a composable catalog set. It is the durable
-implementation reference for the active schema-v7 catalog-set contract.
+This document defined the target state for the completed schema-v7 migration
+from one closed catalog file to a composable catalog set. It is retained as the
+implementation record for that superseded contract.
 
 The implemented catalog set lets the same EMBED clinical-semantic backbone load independently
 authored physical profiles, including public V1, public V2, and uncommitted

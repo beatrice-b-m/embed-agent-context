@@ -1,4 +1,4 @@
-"""Synthetic schema-v6 catalog fixtures shared by core tests."""
+"""Synthetic schema-v8 catalog fixtures shared by core tests."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import Any
 
 from embed_context.catalog import (
     AGGREGATION_STATUSES,
-    BINDING_GRAINS,
     CLAIM_STATUSES,
     CONTEXT_KINDS,
     CONTEXT_SCOPES,
@@ -28,9 +27,8 @@ def synthetic_catalog() -> dict[str, Any]:
 
     return {
         "$schema": "./catalog.schema.json",
-        "schema_version": 6,
+        "schema_version": 8,
         "profiles": ["profile-a", "profile-b"],
-        "binding_grains": list(BINDING_GRAINS),
         "feature_kinds": list(FEATURE_KINDS),
         "domains": list(DOMAINS),
         "context_kinds": list(CONTEXT_KINDS),
@@ -466,31 +464,26 @@ def synthetic_catalog() -> dict[str, Any]:
             "profile-a": {
                 "feature_bindings": [
                     {
+                        "id": "profile-a.feature.patient-id",
                         "table": "clinical_a",
                         "column": "person_id",
                         "concept": "identity.patient_identifier",
-                        "grain": "wide_row",
-                        "role": "wide_projection",
-                        "physical_type": "int64",
-                        "nullable": False,
+                        "status": "direct",
                     },
                     {
+                        "id": "profile-a.feature.study-date",
                         "table": "clinical_a",
                         "column": "study_when",
                         "concept": "exam.study_date",
-                        "grain": "wide_row",
-                        "role": "wide_projection",
-                        "physical_type": "timestamp[ns]",
-                        "nullable": True,
+                        "status": "direct",
                     },
                     {
+                        "id": "profile-a.feature.severity",
                         "table": "clinical_a",
                         "column": "severity_code",
                         "concept": "pathology.severity",
-                        "grain": "wide_row",
-                        "role": "wide_projection",
-                        "physical_type": "int8",
-                        "nullable": True,
+                        "status": "direct",
+                        "qualifiers": {"slot": 1},
                         "occurrence_interpretations": [
                             {
                                 "representation": "null",
@@ -508,34 +501,48 @@ def synthetic_catalog() -> dict[str, Any]:
                 ],
                 "object_bindings": [
                     {
+                        "id": "profile-a.object.patient",
                         "object": "patient",
                         "table": "clinical_a",
                         "columns": ["person_id"],
-                        "representation": "co_located",
+                        "completeness": "complete",
+                        "authority": "preferred",
+                        "derivation": "source",
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": [],
                     },
                     {
+                        "id": "profile-a.object.exam",
                         "object": "imaging_exam",
                         "table": "clinical_a",
                         "columns": ["study_when"],
-                        "representation": "co_located",
+                        "completeness": "partial",
+                        "derivation": "projected",
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": [],
                     },
                     {
+                        "id": "profile-a.object.pathology",
                         "object": "pathology_diagnosis",
                         "table": "clinical_a",
                         "columns": ["severity_code"],
-                        "representation": "co_located",
+                        "completeness": "partial",
+                        "derivation": "projected",
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": [],
                     },
                 ],
                 "tables": [
                     {
+                        "id": "profile-a.table.clinical",
                         "table": "clinical_a",
                         "grain": "wide_row",
+                        "columns": [
+                            {"name": "person_id", "physical_type": "int64", "nullable": False},
+                            {"name": "study_when", "physical_type": "timestamp[ns]", "nullable": True},
+                            {"name": "severity_code", "physical_type": "int8", "nullable": True},
+                            {"name": "unmapped_note", "physical_type": "string", "nullable": True},
+                        ],
                         "keys": [
                             {
                                 "id": "profile-a.clinical.row",
@@ -550,63 +557,76 @@ def synthetic_catalog() -> dict[str, Any]:
                         "caveats": ["One row co-locates several clinical objects."],
                     }
                 ],
-                "relationship_bindings": [],
+                "relationship_bindings": [
+                    {
+                        "id": "profile-a.patient-exam-colocated",
+                        "kind": "hierarchy",
+                        "semantic_relationships": ["patient.has_exam"],
+                        "source": {
+                            "table": "clinical_a",
+                            "columns": ["person_id"],
+                            "completeness": "required",
+                        },
+                        "target": {"table": "clinical_a", "columns": ["person_id"]},
+                        "cardinality": {
+                            "targets_per_source": "unknown",
+                            "sources_per_target": "unknown",
+                        },
+                        "evidence": ["release_schema"],
+                        "claim_refs": ["profiles.synthetic#severity-binding"],
+                        "caveats": ["The related objects are co-located in one physical row."],
+                        "join_hazards": [],
+                    }
+                ],
                 "relationship_binding_paths": [],
             },
             "profile-b": {
                 "feature_bindings": [
                     {
+                        "id": "profile-b.feature.patient-id",
                         "table": "patients_b",
                         "column": "pid",
                         "concept": "identity.patient_identifier",
-                        "grain": "patient",
-                        "role": "canonical",
-                        "physical_type": "int64",
-                        "nullable": False,
+                        "status": "direct",
                     },
                     {
+                        "id": "profile-b.feature.exam-patient-id",
                         "table": "exams_b",
                         "column": "pid",
                         "concept": "identity.patient_identifier",
-                        "grain": "exam",
-                        "role": "reference",
-                        "physical_type": "int64",
-                        "nullable": False,
+                        "status": "direct",
                     },
                     {
+                        "id": "profile-b.feature.exam-id",
                         "table": "exams_b",
                         "column": "exam_id",
                         "concept": "technical.row_index",
-                        "grain": "exam",
-                        "role": "technical",
-                        "physical_type": "int64",
-                        "nullable": False,
+                        "status": "direct",
                     },
                     {
+                        "id": "profile-b.feature.exam-date",
                         "table": "exams_b",
                         "column": "exam_date",
                         "concept": "exam.study_date",
-                        "grain": "exam",
-                        "role": "canonical",
-                        "physical_type": "timestamp[ns]",
-                        "nullable": True,
+                        "status": "direct",
                     },
                     {
+                        "id": "profile-b.feature.pathology-severity",
                         "table": "exams_b",
                         "column": "path_group",
                         "concept": "pathology.severity",
-                        "grain": "exam",
-                        "role": "reference",
-                        "physical_type": "int8",
-                        "nullable": True,
+                        "status": "direct",
                     },
                 ],
                 "object_bindings": [
                     {
+                        "id": "profile-b.object.patient",
                         "object": "patient",
                         "table": "patients_b",
                         "columns": ["pid"],
-                        "representation": "canonical",
+                        "completeness": "complete",
+                        "authority": "preferred",
+                        "derivation": "source",
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": [],
                         "instance_identity": {
@@ -618,26 +638,37 @@ def synthetic_catalog() -> dict[str, Any]:
                         },
                     },
                     {
+                        "id": "profile-b.object.exam",
                         "object": "imaging_exam",
                         "table": "exams_b",
                         "columns": ["exam_id"],
-                        "representation": "canonical",
+                        "completeness": "complete",
+                        "authority": "preferred",
+                        "derivation": "source",
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": [],
                     },
                     {
+                        "id": "profile-b.object.pathology",
                         "object": "pathology_diagnosis",
                         "table": "exams_b",
                         "columns": ["path_group"],
-                        "representation": "partial",
+                        "completeness": "partial",
+                        "authority": "reference",
+                        "derivation": "projected",
                         "claim_refs": ["profiles.synthetic#severity-binding"],
                         "caveats": ["Diagnosis detail is projected at exam grain."],
                     },
                 ],
                 "tables": [
                     {
+                        "id": "profile-b.table.patients",
                         "table": "patients_b",
                         "grain": "patient",
+                        "columns": [
+                            {"name": "pid", "physical_type": "int64", "nullable": False},
+                            {"name": "unmapped_patient_note", "physical_type": "string", "nullable": True},
+                        ],
                         "keys": [
                             {
                                 "id": "profile-b.patient.id",
@@ -652,8 +683,15 @@ def synthetic_catalog() -> dict[str, Any]:
                         "caveats": [],
                     },
                     {
+                        "id": "profile-b.table.exams",
                         "table": "exams_b",
                         "grain": "exam",
+                        "columns": [
+                            {"name": "pid", "physical_type": "int64", "nullable": False},
+                            {"name": "exam_id", "physical_type": "int64", "nullable": False},
+                            {"name": "exam_date", "physical_type": "timestamp[ns]", "nullable": True},
+                            {"name": "path_group", "physical_type": "int8", "nullable": True},
+                        ],
                         "keys": [
                             {
                                 "id": "profile-b.exam.id",

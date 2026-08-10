@@ -76,11 +76,11 @@ class PackagingContractTests(unittest.TestCase):
                 "catalog/catalog-set.json": (
                     "embed_context/_data/catalog-set.json"
                 ),
+                "catalog/internal-v2-catalog-set.json": (
+                    "embed_context/_data/internal-v2-catalog-set.json"
+                ),
                 "catalog/catalog-set.schema.json": (
                     "embed_context/_data/catalog-set.schema.json"
-                ),
-                "catalog/catalog.schema.json": (
-                    "embed_context/_data/catalog.schema.json"
                 ),
                 "catalog/semantic/catalog.json": (
                     "embed_context/_data/semantic/catalog.json"
@@ -90,6 +90,9 @@ class PackagingContractTests(unittest.TestCase):
                 ),
                 "catalog/profiles/open-v2.json": (
                     "embed_context/_data/profiles/open-v2.json"
+                ),
+                "catalog/profiles/internal-v2.json": (
+                    "embed_context/_data/profiles/internal-v2.json"
                 ),
                 "catalog/profiles/profile.schema.json": (
                     "embed_context/_data/profiles/profile.schema.json"
@@ -105,7 +108,7 @@ class PackagingContractTests(unittest.TestCase):
 
         self.assertEqual(
             optional["curator"],
-            ["embedv2-agent-context-curator==0.9.0"],
+            ["embedv2-agent-context-curator==0.10.0"],
         )
         self.assertEqual(
             self.configuration["tool"]["uv"]["sources"][
@@ -185,7 +188,7 @@ class PackagingContractTests(unittest.TestCase):
         path = default_catalog_path()
 
         self.assertTrue(path.is_file(), path)
-        self.assertEqual(load_catalog().schema_version, 7)
+        self.assertEqual(load_catalog().schema_version, 8)
 
 
 if __name__ == "__main__":

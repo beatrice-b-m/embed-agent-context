@@ -1,6 +1,6 @@
 [project]
 name = "embedv2-agent-context"
-version = "0.9.0"
+version = "0.10.0"
 description = "Count-free clinical-semantic context for EMBED data"
 readme = "README.md"
 authors = [
@@ -37,7 +37,7 @@ mcp = [
     "mcp==2.0.0",
 ]
 curator = [
-    "embedv2-agent-context-curator==0.9.0",
+    "embedv2-agent-context-curator==0.10.0",
 ]
 
 [dependency-groups]
@@ -54,11 +54,12 @@ packages = ["embed_context"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "catalog/catalog-set.json" = "embed_context/_data/catalog-set.json"
+"catalog/internal-v2-catalog-set.json" = "embed_context/_data/internal-v2-catalog-set.json"
 "catalog/catalog-set.schema.json" = "embed_context/_data/catalog-set.schema.json"
-"catalog/catalog.schema.json" = "embed_context/_data/catalog.schema.json"
 "catalog/semantic/catalog.json" = "embed_context/_data/semantic/catalog.json"
 "catalog/semantic/catalog.schema.json" = "embed_context/_data/semantic/catalog.schema.json"
 "catalog/profiles/open-v2.json" = "embed_context/_data/profiles/open-v2.json"
+"catalog/profiles/internal-v2.json" = "embed_context/_data/profiles/internal-v2.json"
 "catalog/profiles/profile.schema.json" = "embed_context/_data/profiles/profile.schema.json"
 "catalog/extensions/extension.schema.json" = "embed_context/_data/extensions/extension.schema.json"
 [tool.uv]
