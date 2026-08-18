@@ -83,7 +83,9 @@ Suppose a review establishes a new timestamp meaning.
    `type(scope): subject` message.
 
 Never add SQL, dataframe logic, executable cohort rules, preferred outcomes,
-empirical counts, distributions, or clinical data to the catalog.
+empirical counts, distributions, or raw clinical data to the catalog. In an
+authorized environment, targeted source-data inspection may inform a specific
+semantic decision under the boundary below.
 
 ## Clone-safe validation
 
@@ -157,21 +159,44 @@ git status --short
 git log --oneline -3
 ```
 
-## Optional local-artifact verification
+## Optional local-source investigation
 
-Maintainers who separately possess the ignored
-`reference_files/clinical_tables/` artifacts may run:
+The ignored `reference_files/` directory may contain authorized internal V2
+tables, an older V1 Open Data dictionary, and release legends. Before reading
+source rows, write down the specific catalog question and use the smallest
+practical set of columns and records. Appropriate investigations include
+reconciling an existing dictionary entry with all represented categorical
+values, checking a sentinel interpretation, and testing a proposed row grain or
+linkage. Broad profiling and general-purpose dataset summaries are out of
+scope.
+
+Compare internal V2 observations with all applicable evidence:
+
+- maintainer-confirmed meaning;
+- the current internal schema and source representation;
+- the V2 Open Data legend;
+- the non-comprehensive V1 Open Data dictionary; and
+- [public EMBED documentation](https://docs.hitilab.com/datasets/embed), which
+  primarily describes earlier public representations.
+
+Do not assume historical documentation was carried forward unchanged. Record
+conflicts and uncertainty at claim level. Never copy raw rows, identifiers,
+dates, report text, extracts, empirical counts, distributions, or statistics
+into tracked files or task reports. Only reconciled non-identifying controlled
+values and their supported meanings belong in the catalog. Keep temporary
+scripts and outputs ignored or outside the checkout, and never commit anything
+under `reference_files/`.
+
+For an exact footer-only comparison, maintainers may run:
 
 ```bash
 uv run --locked python scripts/validate_source_profile.py
 ```
 
-The verifier reads Parquet footer schemas only. It must never inspect or copy
-rows, clinical values, identifiers, anonymized dates, report text, statistics,
-or counts. It checks the selected profile's exact table-owned column inventory,
-types, and schema nullability; it does not validate keys, joins, cardinality,
-clinical meaning, or ROI geometry. `reference_files/` is not required for a
-fresh clone and must never be committed.
+This verifier remains footer-only. It checks the selected profile's exact
+table-owned column inventory, types, and schema nullability; it does not
+validate keys, joins, cardinality, clinical meaning, represented values, or ROI
+geometry. `reference_files/` is not required for a fresh clone.
 
 ## Continuous integration
 
@@ -188,6 +213,8 @@ EMBED data or `reference_files/`.
 
 - Clinical meaning and instance grain are independent of storage.
 - Claims have the narrowest correct scope, evidence, and review status.
+- Targeted source-data findings are reconciled with applicable current and
+  historical references without copying raw data or empirical summaries.
 - Missing states, attribution, temporal meaning, aggregation, guardrails, and
   coverage stay explicit.
 - Instance identity, occurrence-specific interpretations, and composed binding

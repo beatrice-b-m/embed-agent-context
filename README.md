@@ -27,6 +27,15 @@ Use it to answer questions such as:
 The catalog works without access to EMBED data. It contains no clinical rows,
 counts, distributions, or executable cohort definitions.
 
+Catalog maintainers working in an authorized environment may use narrowly
+scoped source-data inspection to resolve a specific representation question.
+That authoring evidence is reconciled against applicable dictionaries, legends,
+maintainer knowledge, and the
+[public EMBED documentation](https://docs.hitilab.com/datasets/embed); source
+rows and empirical summaries never become catalog content. See
+[project scope](docs/project-scope.md#local-source-investigation) for the
+boundary.
+
 ## Install
 
 You need [uv](https://docs.astral.sh/uv/getting-started/installation/). Install

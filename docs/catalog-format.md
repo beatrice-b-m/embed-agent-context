@@ -222,6 +222,26 @@ cardinality, clinical attribution, ROI geometry, outcome capture, or
 availability. The verifier is intentionally exact rather than a partial
 catalog-authoring scanner.
 
+## Authoring from local source data
+
+Footer verification is not the only permitted authoring evidence. In an
+authorized environment, maintainers may perform minimal, question-specific
+inspection of local source data to reconcile represented values, sentinels,
+row grain, or physical relationships. This investigation remains outside the
+runtime catalog and verifier.
+
+Historical references—including the V1 Open Data dictionary and public EMBED
+documentation—and the V2 Open Data legend must be checked against internal V2
+rather than copied as profile truth. The authored result may contain reconciled
+non-identifying controlled values and supported meanings, but never raw rows,
+identifiers, report text, extracts, empirical counts, frequencies, or
+distributions.
+
+Represent a targeted source-data observation as a profile source with kind
+`supporting_internal` and locator kind `logical_artifact`. Its version scope and
+notes should identify the internal-V2 question it answered without recording a
+local path, row, or source value.
+
 ## Authoring rule
 
 Search existing stable IDs before adding meaning. Reuse shared semantics when

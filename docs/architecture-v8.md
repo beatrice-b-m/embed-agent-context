@@ -107,6 +107,22 @@ and it does not establish key uniqueness, referential coverage, cardinality,
 clinical attribution, outcome capture, or availability. Missing local
 artifacts remain an explicit operational prerequisite, not a catalog error.
 
+## Authoring evidence from source data
+
+The runtime and clone-safe validation remain independent of EMBED data. During
+authorized profile authoring, however, a maintainer may inspect the minimum
+source rows or values needed to resolve a specific question about represented
+codes, sentinels, grain, or relationships. This is a human/agent evidence
+workflow, not a new runtime interface and not an expansion of the footer
+verifier.
+
+Direct internal V2 observations are reconciled with maintainer knowledge, the
+V2 Open Data legend, supporting internal material, the non-comprehensive V1
+Open Data dictionary, and public EMBED documentation. Historical references do
+not override current source evidence, while observed occurrence alone does not
+prove clinical meaning or exhaustiveness. Only the reconciled, non-identifying,
+count-free conclusion enters the catalog.
+
 ## History
 
 [Architecture v7](architecture-v7.md) and the

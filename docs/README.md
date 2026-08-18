@@ -72,6 +72,11 @@ executable analysis recipes:
 - [Open-v2 linkage review](open-v2-linkage-review.md)
 
 The ignored `reference_files/` directory is optional maintainer material.
-Never inspect or copy clinical rows, identifiers, anonymized dates, report
-text, statistics, or counts. The dedicated source-profile verifier is limited
-to Parquet footer schemas.
+In an authorized environment it may support narrowly scoped investigation of a
+specific catalog question, including reconciliation of represented categorical
+values. Raw rows, identifiers, dates, report text, extracts, counts, and
+distributions must not enter tracked files. The V1 Open Data dictionary and
+[public EMBED documentation](https://docs.hitilab.com/datasets/embed) are useful
+but historical and non-comprehensive; compare them, and the V2 Open Data
+legend, against internal V2 source data before asserting profile behavior. The
+dedicated source-profile verifier remains limited to Parquet footer schemas.

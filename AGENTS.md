@@ -42,17 +42,36 @@ availability; keep physical columns in table inventories and interpretations
 in stable-ID mappings. Typed revisions and legacy catalog loading are not part
 of schema v8.
 
-## Clinical-data safety boundary
+## Clinical-source investigation boundary
 
-The catalog and normal test suite are count-free and require no EMBED data.
+The catalog and normal test suite remain count-free and require no EMBED data.
+When authorized local artifacts are present, maintainers and agents may inspect
+clinical source data narrowly to answer a specific catalog question.
 
-- Never inspect, sample, copy, summarize, or commit clinical rows, identifiers,
-  anonymized dates, report text, values, statistics, distributions, or counts.
+- State the question first and inspect only the columns and rows needed to
+  answer it. Targeted uses include reconciling a documented feature with the
+  complete set of represented categorical values, checking a sentinel, or
+  testing a proposed row-grain or linkage interpretation. Do not perform broad,
+  open-ended profiling.
+- Direct internal-V2 observations establish what the working data represents;
+  they do not by themselves establish clinical meaning, exhaustiveness, or a
+  preferred analysis policy. Reconcile them with maintainer knowledge,
+  applicable legends, dictionaries, and documentation.
+- The V1 Open Data dictionary and public EMBED documentation are historical,
+  non-comprehensive references. The V2 Open Data legend is a closer comparison
+  source, but none may be assumed to describe internal V2 without checking the
+  source data and recording disagreements or uncertainty.
+- Never copy or commit raw rows, patient or exam identifiers, anonymized dates,
+  report text, source extracts, empirical counts, distributions, or statistics.
+  Non-identifying controlled values may enter the catalog only after their
+  meaning and scope have been reconciled.
 - `reference_files/` is ignored local material. Never add or commit any of its
-  contents.
-- The only permitted automated access to local clinical table artifacts is the
-  dedicated `scripts/validate_source_profile.py` footer-schema check. It reads
-  Parquet metadata only and must remain row-, statistics-, and count-free.
+  contents. Keep temporary investigation outputs there or outside the checkout
+  and review staged changes for accidental clinical content.
+- `scripts/validate_source_profile.py` remains a footer-only exact schema
+  verifier. Its narrow implementation must not be expanded into a row reader;
+  separate, question-specific investigation may be used during authorized
+  catalog authoring.
 - Treat release-schema and legend evidence as profile-specific. Public or
   historical material cannot silently fill a verified profile gap.
 - Do not turn guardrails or historical recipes into SQL, dataframe logic,

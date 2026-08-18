@@ -337,16 +337,26 @@ scientific-validity judgments.
 
 ## Evidence and source priority
 
-When sources disagree, use the following order:
+Use each source for the claim it can actually support:
 
-1. Facts supplied or confirmed by EMBED maintainers.
-2. Definitions verified from the applicable release schema and legend.
-3. Supporting internal material.
-4. Public EMBED documentation and other external sources.
+- maintainer-confirmed facts are the strongest evidence for intended clinical
+  meaning;
+- the internal V2 schema and targeted observations of internal V2 source data
+  establish its physical representation and represented values;
+- the V2 Open Data legend is relevant comparison evidence for concepts retained
+  across the internal and curated public representations;
+- supporting internal material can explain provenance and known processing;
+  and
+- the V1 Open Data dictionary and
+  [public EMBED documentation](https://docs.hitilab.com/datasets/embed) provide
+  historical definitions and candidate value meanings.
 
-Public EMBED V1 material is not authoritative for V2 without verification.
-External material can supply general clinical context but cannot fill a
-profile-specific gap as verified release behavior.
+The V1 dictionary and public documentation are non-comprehensive and primarily
+describe earlier EMBED releases. They are not authoritative for internal V2 on
+their own. Likewise, a value observed in internal V2 establishes occurrence,
+not clinical meaning or exhaustiveness. Reconcile these sources: retain
+consistent meanings, record release-specific differences, and leave conflicts
+unresolved or contradicted rather than silently preferring one source.
 
 Apply review state at claim level. Catalog membership does not itself make a
 statement authoritative. Portable entities reference claims with
@@ -354,17 +364,49 @@ statement authoritative. Portable entities reference claims with
 unknowns remain traceable rather than being silently overwritten.
 
 General clinical, EMBED-general, and profile-specific scopes remain distinct.
-A profile-specific verified claim must cite applicable maintainer-confirmed,
-release-schema, or release-legend evidence.
+A profile-specific verified claim must cite evidence applicable to internal V2,
+which may include a narrowly described source-data observation alongside the
+reference used to interpret it. Cite source data as a non-sensitive logical
+artifact; never reproduce a row or identifying value as provenance.
+In a profile module, use `supporting_internal` with a `logical_artifact`
+locator for such an observation, and state its profile and question scope in
+`version_scope` and notes rather than exposing a local path or source values.
 
-## Local source boundary
+## Local source investigation
 
 The ignored `reference_files/` directory contains local release artifacts used
-to construct and verify profile bindings. Source-profile validation may read
-Parquet footer schemas through the dedicated verifier and may consult the
-release legend. It must not inspect or copy clinical rows, identifiers,
-anonymized dates, report text, values, statistics, counts, or empirical
-summaries. The directory is optional for a clone and must never be committed.
+to construct and verify profile bindings. When access is authorized, a
+maintainer or agent may inspect source rows and values to answer a named,
+bounded catalog question. Examples include enumerating the represented values
+of an already identified categorical feature, checking whether a documented
+sentinel occurs as described, or testing a proposed row-grain or relationship
+interpretation.
+
+Use the smallest practical projection and subset. Do not begin with broad
+profiling, generate a general-purpose data report, or treat exploratory
+statistics as catalog semantics. A targeted check may compute the information
+needed to answer its question, but raw rows, identifiers, anonymized dates,
+report text, extracts, empirical counts, frequencies, distributions, and
+statistics must not be copied into tracked files, tests, documentation, commit
+messages, or task reports. Reconciled non-identifying controlled values and
+their documented meanings may enter profile vocabularies or occurrence
+interpretations.
+
+Local reference material may include internal V2 clinical tables, a
+non-comprehensive V1 Open Data dictionary, and the V2 Open Data legend. Public
+EMBED pages such as
+[Dataset Structure](https://docs.hitilab.com/datasets/embed/structure) and
+[Label Assignment](https://docs.hitilab.com/datasets/embed/label-assignment)
+are additional historical context. Compare all of these against the internal
+V2 source rather than assuming their field lists, values, aggregation products,
+or physical layout were carried forward unchanged.
+
+The directory is optional for a clone and must never be committed. Temporary
+investigation code and outputs must remain ignored or outside the checkout, and
+staged changes must be reviewed for accidental source content.
+
+The dedicated source-profile verifier remains intentionally narrower: it reads
+Parquet footer schemas only and does not perform semantic investigation.
 
 The incomplete alpha context system and Cortex knowledge-base notes are design
 and hazard-discovery inputs, not runtime dependencies or unreviewed clinical
@@ -402,7 +444,7 @@ The project does not:
 - treat physical tables or denormalized rows as the clinical model;
 - anticipate every research workflow;
 - provide clinical advice;
-- expose clinical rows, identifiers, or report text; or
+- expose clinical rows, identifiers, report text, or local source extracts; or
 - add empirical counts or distributions to the portable catalog.
 
 ## Profile binding requirements
