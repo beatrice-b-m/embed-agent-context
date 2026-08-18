@@ -74,7 +74,12 @@ jobs:
           UV_TOOL_DIR: ${{ runner.temp }}/embed-context-tools
           UV_TOOL_BIN_DIR: ${{ runner.temp }}/embed-context-bin
         run: |
-          uv tool install "${GITHUB_WORKSPACE}"/dist/embedv2_agent_context-0.9.0-py3-none-any.whl
+          base_wheels=("${GITHUB_WORKSPACE}"/dist/embedv2_agent_context-*.whl)
+          if [ "${#base_wheels[@]}" -ne 1 ]; then
+            echo "expected exactly one core wheel, found ${#base_wheels[@]}" >&2
+            exit 1
+          fi
+          uv tool install "${base_wheels[0]}"
           "${UV_TOOL_BIN_DIR}/embed-context" --version
           "${UV_TOOL_BIN_DIR}/embed-context" validate
           if "${UV_TOOL_BIN_DIR}/embed-context" curate --no-open 2>curator-error.log; then
@@ -89,10 +94,16 @@ jobs:
           UV_TOOL_DIR: ${{ runner.temp }}/embed-context-tools
           UV_TOOL_BIN_DIR: ${{ runner.temp }}/embed-context-bin
         run: |
+          base_wheels=("${GITHUB_WORKSPACE}"/dist/embedv2_agent_context-*.whl)
+          curator_wheels=("${GITHUB_WORKSPACE}"/dist/embedv2_agent_context_curator-*.whl)
+          if [ "${#base_wheels[@]}" -ne 1 ] || [ "${#curator_wheels[@]}" -ne 1 ]; then
+            echo "expected exactly one core and one curator wheel" >&2
+            exit 1
+          fi
           uv tool install --reinstall \
-            --with "${GITHUB_WORKSPACE}"/dist/embedv2_agent_context_curator-0.9.0-py3-none-any.whl \
+            --with "${curator_wheels[0]}" \
             --with mcp==2.0.0 \
-            "${GITHUB_WORKSPACE}"/dist/embedv2_agent_context-0.9.0-py3-none-any.whl
+            "${base_wheels[0]}"
           "${UV_TOOL_BIN_DIR}/embed-context-mcp" --version
           "${UV_TOOL_BIN_DIR}/embed-context" curate --no-open --port 8123 >curator.log 2>&1 &
           curator_pid=$!
