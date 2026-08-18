@@ -349,11 +349,16 @@ Schema v8 is intentionally strict. Semantic schema 7, profile/extension schema
 1, and schema-v6 monoliths are rejected at startup rather than silently
 migrated. Update authored modules before loading them with software `0.10.0`.
 
-The non-default `internal-v2` scaffold demonstrates profile-owned semantics:
-it contributes a region-of-interest object attached to the shared image
-object. It intentionally leaves ROI tables, identifiers, geometry, coordinate
-system, and physical linkage uncataloged. Load it explicitly when developing
-the internal profile; it is not part of the public default manifest.
+The non-default `internal-v2` working profile now inventories the wide
+`magview_all_cohorts_PACS_v2_anon` clinical table and binds distinct patient,
+partial-episode, exam, breast-side, finding, interpretation, procedure,
+specimen, and pathology objects alongside supported workflow meanings. Unclear
+columns remain in the physical inventory without manufactured
+mappings, and absent curated Open V2 aggregates are not projected onto the
+internal table. The profile also retains image-attached ROI semantics, but
+image metadata, DICOM attributes, image identity and enrichments, and all image
+and ROI physical bindings remain deferred to Phase 2. Load `internal-v2`
+explicitly; it is not part of the public default manifest.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal

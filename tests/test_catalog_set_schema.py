@@ -130,7 +130,9 @@ class CatalogSetSchemaTests(unittest.TestCase):
             )
         )
 
-    def test_internal_v2_profile_can_start_with_semantics_before_bindings(self) -> None:
+    def test_internal_v2_profile_combines_magview_bindings_with_unbound_roi_semantics(
+        self,
+    ) -> None:
         profile_schema = self.documents["profile"][0]
         manifest_schema = self.documents["manifest"][0]
         internal_profile = read_json(CATALOG / "profiles" / "internal-v2.json")
@@ -147,28 +149,90 @@ class CatalogSetSchemaTests(unittest.TestCase):
             "clinical.image-region-of-interest",
             internal_profile["contributions"]["semantic_relationships"],
         )
+        binding = internal_profile["profile_binding"]
         self.assertEqual(
-            internal_profile["profile_binding"]["feature_bindings"], []
+            [table["table"] for table in binding["tables"]],
+            ["magview_all_cohorts_PACS_v2_anon"],
         )
-        self.assertEqual(internal_profile["profile_binding"]["tables"], [])
+        self.assertEqual(len(binding["tables"][0]["columns"]), 152)
+        self.assertTrue(binding["feature_bindings"])
+        self.assertTrue(binding["object_bindings"])
+        self.assertTrue(binding["relationship_bindings"])
+        self.assertTrue(
+            {"image", "region_of_interest"}.isdisjoint(
+                item["object"] for item in binding["object_bindings"]
+            )
+        )
+        self.assertFalse(
+            any(
+                "clinical.image-region-of-interest"
+                in item["semantic_relationships"]
+                for item in binding["relationship_bindings"]
+            )
+        )
+        self.assertIn(
+            "6",
+            internal_profile["vocabularies"][
+                "internal-v2.pathology.severity"
+            ]["codes"],
+        )
+        pathology_claims = {
+            claim["id"]: claim
+            for claim in internal_profile["contexts"][
+                "internal-v2.magview-pathology-context"
+            ]["claims"]
+        }
+        self.assertEqual(
+            pathology_claims["path-severity-five-six-disagreement"]["status"],
+            "contradicted",
+        )
+
+        all_ids = [
+            record["id"]
+            for collection in (
+                "feature_bindings",
+                "object_bindings",
+                "tables",
+                "relationship_bindings",
+                "relationship_binding_paths",
+            )
+            for record in binding[collection]
+        ]
+        self.assertTrue(
+            all(identifier.startswith("internal-v2.") for identifier in all_ids)
+        )
+        self.assertEqual(len(all_ids), len(set(all_ids)))
 
     def test_physical_inventory_is_independent_from_semantic_mappings(self) -> None:
-        profile = self.documents["profile"][1]
-        tables = {
-            table["table"]: {column["name"]: column for column in table["columns"]}
-            for table in profile["profile_binding"]["tables"]
+        profiles = {
+            "open-v2": self.documents["profile"][1],
+            "internal-v2": read_json(CATALOG / "profiles" / "internal-v2.json"),
         }
-        self.assertTrue(tables)
-        for mapping in profile["profile_binding"]["feature_bindings"]:
-            self.assertIn(mapping["column"], tables[mapping["table"]])
-            self.assertNotIn("physical_type", mapping)
-            self.assertNotIn("nullable", mapping)
-            self.assertNotIn("grain", mapping)
-            self.assertNotIn("role", mapping)
-            self.assertIn(
-                mapping["status"],
-                {"direct", "derived", "conditional", "ambiguous", "unresolved"},
-            )
+        for profile_id, profile in profiles.items():
+            with self.subTest(profile=profile_id):
+                tables = {
+                    table["table"]: {
+                        column["name"]: column for column in table["columns"]
+                    }
+                    for table in profile["profile_binding"]["tables"]
+                }
+                self.assertTrue(tables)
+                for mapping in profile["profile_binding"]["feature_bindings"]:
+                    self.assertIn(mapping["column"], tables[mapping["table"]])
+                    self.assertNotIn("physical_type", mapping)
+                    self.assertNotIn("nullable", mapping)
+                    self.assertNotIn("grain", mapping)
+                    self.assertNotIn("role", mapping)
+                    self.assertIn(
+                        mapping["status"],
+                        {
+                            "direct",
+                            "derived",
+                            "conditional",
+                            "ambiguous",
+                            "unresolved",
+                        },
+                    )
 
     def test_binding_and_qualification_ids_are_authored_and_unique(self) -> None:
         profile = self.documents["profile"][1]

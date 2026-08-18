@@ -31,9 +31,12 @@ This setup and the baseline test suite need no EMBED data. Read
 - `catalog/semantic/catalog.json` is the canonical shared semantic content.
 - `catalog/profiles/open-v2.json` is the canonical Open V2 evidence, coverage,
   vocabulary, qualification, and physical-binding inventory.
-- `catalog/profiles/internal-v2.json` is a non-default working scaffold for
-  internal-only semantics, currently including image-attached ROIs without
-  invented physical details.
+- `catalog/profiles/internal-v2.json` is the non-default working internal
+  profile. Phase 1 inventories the wide `magview_all_cohorts_PACS_v2_anon`
+  clinical table, binds its supported clinical objects and meanings, and
+  contributes internal-only specimen, staging, biomarker, nodal, and
+  source-workflow semantics. Image metadata and image/ROI physical bindings
+  remain deferred to Phase 2.
 - `catalog/catalog-set.json` selects bundled defaults; each document type has
   a standalone version-matched JSON Schema shape contract.
 - `embed_context/catalog.py` adds strict semantic, cross-reference, scope, and

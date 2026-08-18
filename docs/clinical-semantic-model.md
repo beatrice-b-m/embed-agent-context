@@ -35,10 +35,15 @@ The initial graph distinguishes:
 10. clinical risk-assessment rows.
 
 The shared graph includes acquired images and their relationship to imaging
-exams. The non-default internal-v2 profile adds regions of interest attached to
-images. That scaffold deliberately does not equate an ROI with a clinical
-finding and does not yet claim ROI geometry, coordinates, identifiers, tables,
-or joins.
+exams. The non-default internal-v2 profile now binds the Phase 1 wide MagView
+clinical table to separate patient, partial-episode, exam, breast-side, finding,
+interpretation, procedure, specimen, pathology-observation, and
+pathology-diagnosis objects. Its profile-owned specimen, staging, biomarker,
+nodal, and source-workflow semantics do not become portable merely because
+they share the wide table. The profile also retains regions of interest
+attached to images as semantic-only content: image metadata and all image/ROI
+geometry, coordinates, identifiers, tables, and joins remain deferred to Phase
+2, and an ROI is not equated with a clinical finding.
 
 An object does not imply a dedicated table. In open-v2, procedure, pathology
 observation, diagnosis, and report-date fields can be co-located on a
@@ -62,7 +67,8 @@ interpretations.
 
 ## Pathology outcome states
 
-`pathology.severity` uses this closed represented code set:
+The governed portable and Open V2 `pathology.severity` vocabulary uses this
+closed represented code set:
 
 | Code | Represented diagnosis state |
 |---|---|
@@ -74,7 +80,11 @@ interpretations.
 | `5` | Non-breast cancer |
 
 Lower values are more severe. The six codes are not automatically two
-analysis classes, and the catalog does not recommend combining them.
+analysis classes, and the catalog does not recommend combining them. The
+internal-v2 profile preserves an additional represented code `6` as unresolved
+because historical public documentation and the current internal descriptor
+associations disagree over the code-5/code-6 meanings.
+
 In particular, `5` represents non-breast cancer; it is not benign pathology,
 a healthy state, or absence of malignancy.
 
@@ -136,10 +146,19 @@ two supplied rollups is recorded through profile-specific coverage and result
 feature bindings; `provided` does not imply that every future profile contains
 the same fields.
 
-Finding-level severity requires an analyst-declared policy because attribution
-is optional and many-to-many. No canonical patient-level outcome rollup is
-provided. Patient-level questions must address multiple sides, exams,
-procedures, diagnoses, changing states, and time explicitly.
+Internal-v2 Phase 1 maps its represented finding-associated pathology severity
+without binding Open V2's curated side- and exam-level aggregate columns, and
+it has no supplied patient-level severity aggregate. A downstream grouping
+that seeks the most severe represented value must declare its linkage and
+grain, handle null and unresolved code `6` explicitly, and use the minimum over
+the governed comparable values. It is analyst-defined, not a supplied internal
+feature or universal default.
+
+A new finding-level reduction across attributed pathology occurrences requires
+an analyst-declared policy because attribution is optional and many-to-many. No
+canonical patient-level outcome rollup is provided. Patient-level questions
+must address multiple sides, exams, procedures, diagnoses, changing states,
+and time explicitly.
 
 ## Capture and uncertainty
 

@@ -31,9 +31,11 @@ pipelines, and analyses. It does not prescribe those designs.
 `catalog/semantic/catalog.json` is the source of truth for shared clinical
 meaning. Profiles and extensions may add availability-scoped meaning alongside
 their physical representation; `catalog/profiles/open-v2.json` owns the
-released public representation and `catalog/profiles/internal-v2.json` is a
-non-default working scaffold. `catalog/catalog-set.json` selects bundled
-defaults. Together they must
+released public representation and `catalog/profiles/internal-v2.json` is the
+non-default working internal profile. Its Phase 1 binding inventories the wide
+MagView clinical table; image metadata and image/ROI physical bindings remain
+deferred to Phase 2. `catalog/catalog-set.json` selects bundled defaults.
+Together they must
 remain:
 
 - valid against their version-matched standalone JSON Schemas;
@@ -62,7 +64,8 @@ patient
     └── imaging exam
         ├── breast side
         ├── image
-        │   └── region of interest (internal-v2 contribution)
+        │   └── region of interest (internal-v2 semantic contribution;
+        │       physical binding deferred to Phase 2)
         └── imaging finding
             └── imaging interpretation / recommendation
                 └── linked procedure
@@ -81,7 +84,7 @@ adjacency and attribution independently of joins. Temporal semantics,
 aggregations, guardrails, and coverage capture the qualifications an agent
 needs before selecting an analysis policy.
 
-Physical tables are not the conceptual model. `profile_bindings` is a secondary
+Physical tables are not the conceptual model. `profile_binding` is a secondary
 implementation layer containing:
 
 - table-owned column inventories with type and schema nullability;
@@ -97,10 +100,13 @@ Co-location is inferred from shared table mappings rather than authored as a
 representation role.
 
 The shared semantic catalog includes images because they are part of EMBED,
-including the public data. The internal-v2 scaffold contributes regions of
-interest and their attachment to images at profile availability. This semantic
-scaffold is not evidence for ROI table names, geometry, coordinate systems,
-identifiers, or physical joins.
+including the public data. Internal-v2 Phase 1 inventories the complete
+physical schema of `magview_all_cohorts_PACS_v2_anon` and binds each supported
+clinical object independently despite their wide-row co-location. It also adds
+profile-scoped specimen, staging, biomarker, nodal, and source-workflow
+meaning. The profile's image-attached ROI semantics are not evidence for image
+metadata or ROI table names, geometry, coordinate systems, identifiers, or
+physical joins; those physical surfaces remain Phase 2 work.
 
 ## Breast-cancer outcome focus
 
@@ -123,10 +129,15 @@ to a patient, exam, breast side, imaging finding, and procedure. Finding-level
 attribution can be optional or many-to-many. No foreign-key or deterministic
 backfill guarantee may be inferred from a matching physical tuple.
 
-Supplied side- and exam-level pathology severity uses the minimum value because
-the represented scale is inverse. Finding-to-side, exam-to-patient, and
-patient-level outcome reductions require an explicit policy unless the catalog
-registers a supported aggregation. The catalog does not choose such a policy.
+Supplied Open V2 side- and exam-level pathology-severity rollups use the minimum
+because the represented scale is inverse. Internal-v2 Phase 1 maps the actual
+finding-associated severity occurrence but does not copy Open V2's curated
+side- or exam-level aggregate columns and has no supplied patient-level
+aggregate. Any downstream reduction must declare grouping, attribution,
+multiplicity, and time; handle null and the unresolved internal code `6`
+explicitly; and, when selecting the most severe among governed comparable
+values, use the minimum. The catalog does not choose that operation as a
+universal default.
 
 Outcome coverage must state what is known and unknown about capture and
 follow-up. Absence of a recorded outcome is not proof that the outcome did not

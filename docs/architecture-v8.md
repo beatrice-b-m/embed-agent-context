@@ -38,10 +38,15 @@ reported as ambiguity; modules do not silently overwrite one another.
 
 The shared catalog now includes the `image` object and the exam-to-image
 relationship because images occur across EMBED representations. The
-non-default `internal-v2` scaffold contributes the profile-specific
-`region_of_interest` object and image-to-ROI relationship. Its coverage record
-explicitly leaves ROI tables, identifiers, geometry, coordinate system, and
-linkage uncataloged until governed evidence exists.
+non-default `internal-v2` profile now inventories the wide
+`magview_all_cohorts_PACS_v2_anon` clinical table and binds its co-located
+patient, partial-episode, exam, side, finding, interpretation, procedure,
+specimen, pathology-observation, and pathology-diagnosis objects independently.
+Profile-owned specimen, staging, biomarker, nodal, and source-workflow
+semantics remain available only to `internal-v2`. The profile's
+`region_of_interest` object and image-to-ROI relationship remain semantic-only;
+image metadata, DICOM attributes, image identity and enrichments, and all
+image/ROI physical bindings are deferred to Phase 2.
 
 ## Physical schemas and mappings
 
@@ -71,6 +76,12 @@ independent axes describe `completeness`, `authority`, and `derivation`;
 `instance_identity` remains separate. Co-location is inferred whenever several
 objects bind to the same table. Same-table physical relationships are valid
 descriptive navigation and do not create a table-graph cycle.
+
+The internal Phase 1 MagView binding exercises this wide-table model directly:
+one physical row can project several clinical objects, and repeated finding or
+procedure associations do not collapse those objects into one row-grain
+identity. Curated Open V2 aggregate columns that are absent internally remain
+unbound rather than being recreated from semantic similarity.
 
 ## Extensions and composition
 

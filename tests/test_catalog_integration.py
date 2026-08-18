@@ -42,7 +42,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             with self.subTest(legacy_api=legacy_name):
                 self.assertFalse(hasattr(self.catalog, legacy_name))
 
-    def test_internal_v2_contributes_scoped_roi_semantics_before_physical_mapping(
+    def test_internal_v2_profiles_magview_while_roi_remains_semantic_only(
         self,
     ) -> None:
         internal = load_catalog(INTERNAL_MANIFEST_PATH)
@@ -63,7 +63,69 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "region_of_interest",
             {item["identifier"] for item in roi["matches"]},
         )
-        self.assertEqual(internal.profile_bindings["internal-v2"].tables, ())
+        binding = internal.profile_bindings["internal-v2"]
+        self.assertEqual(
+            {table.table for table in binding.tables},
+            {"magview_all_cohorts_PACS_v2_anon"},
+        )
+        expected_bound_objects = {
+            "patient",
+            "breast_imaging_episode",
+            "imaging_exam",
+            "breast_side",
+            "imaging_finding",
+            "imaging_interpretation",
+            "procedure",
+            "pathology_specimen",
+            "pathology_observation",
+            "pathology_diagnosis",
+        }
+        self.assertLessEqual(
+            expected_bound_objects,
+            {item.object for item in binding.object_bindings},
+        )
+        self.assertTrue(
+            {"image", "region_of_interest"}.isdisjoint(
+                item.object for item in binding.object_bindings
+            )
+        )
+        self.assertTrue(binding.relationship_bindings)
+        self.assertTrue(
+            all(
+                item.source.table == "magview_all_cohorts_PACS_v2_anon"
+                and item.target.table == "magview_all_cohorts_PACS_v2_anon"
+                for item in binding.relationship_bindings
+            )
+        )
+        self.assertFalse(
+            any(
+                "clinical.image-region-of-interest"
+                in item.semantic_relationships
+                for item in binding.relationship_bindings
+            )
+        )
+        severity = [
+            item
+            for item in binding.feature_bindings
+            if item.column == "path_severity"
+        ]
+        self.assertTrue(severity)
+        self.assertEqual(
+            {item.concept for item in severity}, {"pathology.severity"}
+        )
+        self.assertEqual(severity[0].status, "derived")
+        self.assertTrue(
+            {
+                "breast_side.pathology_severity_aggregate",
+                "exam.pathology_severity_aggregate",
+            }.isdisjoint(item.concept for item in binding.feature_bindings)
+        )
+        episode = next(
+            item
+            for item in binding.object_bindings
+            if item.object == "breast_imaging_episode"
+        )
+        self.assertEqual(episode.authority, "reference")
 
         expected_objects = {
             "patient",

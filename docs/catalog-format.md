@@ -12,8 +12,9 @@ catalog-set manifest (schema 1)
 ```
 
 The public manifest selects `catalog/semantic/catalog.json` and the `open-v2`
-profile. `internal-v2` is bundled as a scaffold but is not selected by default.
-All schemas use JSON Schema Draft 2020-12 and close authored objects with
+profile. `internal-v2` is bundled as a non-default working profile; its Phase 1
+binding covers the wide internal MagView clinical table. All schemas use JSON
+Schema Draft 2020-12 and close authored objects with
 `additionalProperties: false`.
 
 Schema v8 has no legacy input mode. A schema-v6 monolith, semantic schema 7,
@@ -87,11 +88,14 @@ When omitted, semantic-catalog records default to portable availability and a
 profile or extension contribution defaults to its target profile. Runtime
 validation checks availability against loaded profiles and provenance scope.
 
-The `internal-v2` profile demonstrates this mechanism with a
-`region_of_interest` object and the
-`clinical.image-region-of-interest` relationship. Its explicit `not_cataloged`
-coverage says that ROI tables, columns, identifiers, geometry, coordinate
-system, and physical linkage are still unknown.
+The `internal-v2` profile demonstrates this mechanism in two independent ways.
+Its Phase 1 binding maps the wide `magview_all_cohorts_PACS_v2_anon` clinical
+table to shared and profile-owned clinical semantics, including an internal
+pathology-specimen object. Its `region_of_interest` object and
+`clinical.image-region-of-interest` relationship remain semantic-only. Phase 1
+leaves image metadata outside the profile binding, while explicit
+`not_cataloged` coverage leaves ROI tables, columns, identifiers, geometry,
+coordinate systems, and physical linkage for Phase 2.
 
 ## Profile modules
 
