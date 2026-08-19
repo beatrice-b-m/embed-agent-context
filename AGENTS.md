@@ -26,9 +26,13 @@ versioned in lockstep with the core distribution.
   V2 profile, its qualifications, evidence, coverage, and physical bindings.
 - `catalog/profiles/internal-v2.json` is the non-default working internal
   profile. Its Phase 1 binding covers the wide MagView clinical table; its
-  procedure-level representation is supported, its specimen-level reliability
-  and identity remain unresolved, and its image-attached ROI contribution
-  remains semantic-only pending Phase 2.
+  procedure-level representation is supported and its specimen-level
+  reliability and identity remain unresolved. Its Phase 2 binding adds the
+  internal V1c image-metadata table with image, co-located patient/exam/side,
+  DICOM-attribute, modality, enrichment, and serialized region-of-interest
+  representations. The clinical surface is internal V2 while the paired image
+  metadata is internal V1c and deliberately narrower, so an unmatched clinical
+  exam means missing extraction coverage rather than missing images.
 - `catalog/catalog-set.json` selects the bundled semantic and default profile
   modules; version-matched schemas are standalone structural contracts.
 - `embed_context/catalog.py` implements strict parsing, cross-reference,
@@ -71,10 +75,11 @@ clinical source data narrowly to answer a specific catalog question.
 - `reference_files/` is ignored local material. Never add or commit any of its
   contents. Keep temporary investigation outputs there or outside the checkout
   and review staged changes for accidental clinical content.
-- `scripts/validate_source_profile.py` remains a footer-only exact schema
-  verifier. Its narrow implementation must not be expanded into a row reader;
-  separate, question-specific investigation may be used during authorized
-  catalog authoring.
+- `scripts/validate_source_profile.py` remains a footer-only, Parquet-only exact
+  schema verifier. Its narrow implementation must not be expanded into a row
+  reader or a delimited-text reader; separate, question-specific investigation
+  may be used during authorized catalog authoring. The internal V1c
+  image-metadata table is delimited text and is therefore outside its scope.
 - Treat release-schema and legend evidence as profile-specific. Public or
   historical material cannot silently fill a verified profile gap.
 - Do not turn guardrails or historical recipes into SQL, dataframe logic,

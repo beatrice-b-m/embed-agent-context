@@ -37,8 +37,14 @@ This setup and the baseline test suite need no EMBED data. Read
   procedure, pathology, and registry-reference meanings, and contributes
   internal-only specimen, staging, biomarker, nodal, and source-workflow
   semantics. Procedure information is supported; specimen-level reliability,
-  identity, completeness, and cardinality are unresolved. Image metadata and
-  image/ROI physical bindings remain deferred to Phase 2.
+  identity, completeness, and cardinality are unresolved. Phase 2 inventories
+  the internal V1c `metadata_all_cohorts_v1c` image-metadata table at one row
+  per extracted DICOM image instance and binds the image object, co-located
+  patient, exam, and image-derived side projections, image metadata concepts,
+  the cross-table exam-to-image route, and serialized regions of interest. The
+  clinical surface is internal V2 while the paired image metadata is internal
+  V1c and narrower; region coordinate axis order and per-region identity remain
+  unresolved.
 - `catalog/catalog-set.json` selects bundled defaults; each document type has
   a standalone version-matched JSON Schema shape contract.
 - `embed_context/catalog.py` adds strict semantic, cross-reference, scope, and
@@ -198,10 +204,13 @@ For an exact footer-only comparison, maintainers may run:
 uv run --locked python scripts/validate_source_profile.py
 ```
 
-This verifier remains footer-only. It checks the selected profile's exact
-table-owned column inventory, types, and schema nullability; it does not
-validate keys, joins, cardinality, clinical meaning, represented values, or ROI
-geometry. `reference_files/` is not required for a fresh clone.
+This verifier remains footer-only and Parquet-only. It checks the selected
+profile's exact table-owned column inventory, types, and schema nullability; it
+does not validate keys, joins, cardinality, clinical meaning, represented
+values, or ROI geometry. It defaults to `open-v2` and cannot verify the internal
+V1c delimited-text image-metadata table, whose recorded types are assessed parse
+types rather than an embedded schema; do not widen the verifier to read text.
+`reference_files/` is not required for a fresh clone.
 
 ## Continuous integration
 

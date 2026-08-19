@@ -43,12 +43,34 @@ presence, completeness, reliability, identity, and cardinality of specimen-level
 information remain unresolved; current internal operations should not depend on
 that specimen surface. Profile-owned staging, biomarker, nodal, and
 source-workflow semantics do not become portable merely because they share the
-wide table. The profile also retains regions of interest attached to images as
-semantic-only content: each ROI originates on exactly one required source image,
-while image metadata, geometry, coordinates, identifiers, tables, joins, and
-future grouping of corresponding ROIs across simultaneous FFDM, DBT, and
-synthetic 2D acquisitions remain deferred to Phase 2. An ROI is not equated
-with a clinical finding.
+wide table.
+
+Internal-v2 also binds a second physical table: the internal V1c image-metadata
+extraction, at one row per extracted DICOM image instance. It carries the image
+object together with co-located patient, exam, and image-derived breast-side
+projections, and it distinguishes source DICOM modality, the source DICOM
+image-type attribute, the pipeline-derived mammographic image-type
+classification, view position, and image laterality as separate features.
+Because that extraction inventories no DICOM instance identifier, the profile
+declares no image instance identity; the anonymized file locator is a technical,
+incomplete, release-local row locator.
+
+Each ROI still originates on exactly one required source image, and an ROI is
+not equated with a clinical finding. Physically, an image row carries a
+region-of-interest count with positionally aligned coordinate, frame-index, and
+depth-derivation collections, so the table is not one row per ROI, no ROI
+identifier exists, and a region is addressable only by collection position.
+Coordinate axis order and reference frame, per-region provenance, and grouping of
+corresponding ROIs across simultaneous FFDM, DBT, and synthetic 2D acquisitions
+remain unresolved or future work.
+
+The clinical surface here is internal V2 while the paired image metadata is
+internal V1c. That boundary is deliberate and temporary: V1c covers a shorter
+period and a smaller patient set, so a clinical exam without a matching image
+row is outside current extraction coverage and is never an exam without images.
+An inner accession join discards those exams silently. The image surface is
+mammography-centred, full-period extraction is in progress, and no future
+ultrasound or MRI columns are modelled.
 
 An object does not imply a dedicated table. In open-v2, procedure, pathology
 observation, diagnosis, and report-date fields can be co-located on a

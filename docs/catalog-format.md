@@ -13,9 +13,9 @@ catalog-set manifest (schema 1)
 
 The public manifest selects `catalog/semantic/catalog.json` and the `open-v2`
 profile. `internal-v2` is bundled as a non-default working profile; its Phase 1
-binding covers the wide internal MagView clinical table. All schemas use JSON
-Schema Draft 2020-12 and close authored objects with
-`additionalProperties: false`.
+binding covers the wide internal MagView clinical table and its Phase 2 binding
+adds the internal V1c image-metadata table. All schemas use JSON Schema
+Draft 2020-12 and close authored objects with `additionalProperties: false`.
 
 Schema v8 has no legacy input mode. A schema-v6 monolith, semantic schema 7,
 profile schema 1, extension schema 1, wrong discriminator, or unknown version
@@ -53,6 +53,9 @@ and temporal qualification. Claims cite exact `context-id#claim-id` records.
 The shared catalog includes the `image` object and `clinical.exam-image`
 relationship. Their presence expresses shared meaning; it does not assert that
 every profile supplies an image table, file layout, or verified physical key.
+`internal-v2` supplies an image table but still declares no image instance
+identity, because its current extraction inventories no DICOM instance
+identifier.
 
 ## Contributions and availability
 
@@ -96,12 +99,23 @@ unresolved. It also records longitudinal patient identity, same-episode linked
 accessions, accession-plus-finding-number identity, date-shift and event-time
 meaning, supported procedure representation, categorical normalization,
 invalid pathology-severity value `6`, and a technical cancer-registry
-reference. Its `region_of_interest` object and
-`clinical.image-region-of-interest` relationship remain semantic-only. Phase 1
-establishes one required source image per ROI but leaves image metadata and
-future cross-image ROI grouping outside the profile binding, while explicit
-`not_cataloged` coverage leaves ROI tables, columns, identifiers, geometry,
-coordinate systems, and physical linkage for Phase 2.
+reference.
+
+Its Phase 2 binding adds the `metadata_all_cohorts_v1c` image-metadata table at
+one row per extracted DICOM image instance. That table carries the `image`
+object, the profile's `region_of_interest` object, co-located patient, exam, and
+image-derived breast-side projections, a cross-table accession route for
+`clinical.exam-image`, and a same-table route for
+`clinical.image-region-of-interest`. Because the artifact is delimited text with
+no embedded column schema, its recorded physical types are assessed parse types
+and every column is conservatively nullable; unresolved and technical columns
+stay inventoried without mappings. Region-of-interest information is a
+serialized per-image collection, so no ROI row grain or ROI identifier is
+declared, ROI coordinate geometry and per-region provenance remain `unresolved`
+coverage, and cross-image ROI grouping is still absent. The paired image
+metadata is internal V1c while the clinical surface is internal V2, so the
+exam-to-image binding records incomplete coverage and states that an unmatched
+clinical exam is not an exam without images.
 
 ## Profile modules
 
@@ -231,6 +245,10 @@ Footer agreement does not validate key uniqueness, referential coverage,
 cardinality, clinical attribution, ROI geometry, outcome capture, or
 availability. The verifier is intentionally exact rather than a partial
 catalog-authoring scanner.
+
+It also reads Parquet only. The internal V1c image-metadata table is delimited
+text with no embedded schema, so it is outside footer verification and remains a
+separate authoring concern; the verifier must not be widened into a text reader.
 
 ## Authoring from local source data
 

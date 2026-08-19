@@ -42,7 +42,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             with self.subTest(legacy_api=legacy_name):
                 self.assertFalse(hasattr(self.catalog, legacy_name))
 
-    def test_internal_v2_profiles_magview_while_roi_remains_semantic_only(
+    def test_internal_v2_profiles_magview_and_v1c_image_metadata(
         self,
     ) -> None:
         internal = load_catalog(INTERNAL_MANIFEST_PATH)
@@ -66,7 +66,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         binding = internal.profile_bindings["internal-v2"]
         self.assertEqual(
             {table.table for table in binding.tables},
-            {"magview_all_cohorts_PACS_v2_anon"},
+            {"magview_all_cohorts_PACS_v2_anon", "metadata_all_cohorts_v1c"},
         )
         expected_bound_objects = {
             "patient",
@@ -79,25 +79,30 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "pathology_specimen",
             "pathology_observation",
             "pathology_diagnosis",
+            "image",
+            "region_of_interest",
         }
         self.assertLessEqual(
             expected_bound_objects,
             {item.object for item in binding.object_bindings},
         )
-        self.assertTrue(
-            {"image", "region_of_interest"}.isdisjoint(
-                item.object for item in binding.object_bindings
-            )
+        self.assertEqual(
+            {
+                item.table
+                for item in binding.object_bindings
+                if item.object in {"image", "region_of_interest"}
+            },
+            {"metadata_all_cohorts_v1c"},
         )
         self.assertTrue(binding.relationship_bindings)
         self.assertTrue(
-            all(
+            any(
                 item.source.table == "magview_all_cohorts_PACS_v2_anon"
                 and item.target.table == "magview_all_cohorts_PACS_v2_anon"
                 for item in binding.relationship_bindings
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             any(
                 "clinical.image-region-of-interest"
                 in item.semantic_relationships
@@ -218,6 +223,234 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
                     ),
                     endpoints,
                 )
+
+    def test_internal_v2_binds_v1c_image_metadata_and_roi_collections(
+        self,
+    ) -> None:
+        internal = load_catalog(INTERNAL_MANIFEST_PATH)
+        binding = internal.profile_bindings["internal-v2"]
+        metadata = next(
+            table
+            for table in binding.tables
+            if table.table == "metadata_all_cohorts_v1c"
+        )
+
+        # Complete physical inventory, conservatively typed and nullable.
+        self.assertEqual(len(metadata.columns), 166)
+        self.assertEqual(
+            {column.physical_type for column in metadata.columns},
+            {"string", "double", "int64"},
+        )
+        self.assertTrue(all(column.nullable for column in metadata.columns))
+        self.assertIn("image", metadata.grain)
+        self.assertIn(
+            "one row per region of interest",
+            " ".join(metadata.caveats),
+        )
+
+        # Image grain and the absence of an unjustified instance identity.
+        image = next(
+            item
+            for item in binding.object_bindings
+            if item.object == "image"
+        )
+        self.assertEqual(image.table, "metadata_all_cohorts_v1c")
+        self.assertEqual(image.completeness, "partial")
+        self.assertEqual(image.authority, "preferred")
+        self.assertEqual(image.derivation, "source")
+        self.assertIsNone(image.instance_identity)
+        self.assertEqual(
+            internal.coverage["coverage.internal-v2.v1c-image-instance-identity"]
+            .status,
+            "unresolved",
+        )
+        locator_key = next(
+            key
+            for key in metadata.keys
+            if key.columns == ("anon_dicom_path",)
+        )
+        self.assertEqual(locator_key.kind, "technical")
+        self.assertEqual(locator_key.uniqueness, "unique")
+        self.assertEqual(locator_key.completeness, "incomplete")
+
+        # Co-located patient, exam, and image-derived side projections.
+        by_object = {
+            item.object: item
+            for item in binding.object_bindings
+            if item.table == "metadata_all_cohorts_v1c"
+        }
+        self.assertEqual(by_object["patient"].columns, ("empi_anon",))
+        self.assertTrue(
+            by_object["patient"].instance_identity.longitudinal_identity
+        )
+        self.assertEqual(
+            by_object["imaging_exam"].instance_identity.columns,
+            ("acc_anon",),
+        )
+        self.assertFalse(
+            by_object["imaging_exam"].instance_identity.longitudinal_identity
+        )
+        self.assertEqual(
+            by_object["breast_side"].columns,
+            ("acc_anon", "ImageLateralityFinal"),
+        )
+        self.assertEqual(by_object["breast_side"].derivation, "derived")
+        self.assertIsNone(by_object["breast_side"].instance_identity)
+
+        # Cross-table exam-to-image route, explicitly incomplete from V2.
+        exam_image = next(
+            item
+            for item in binding.relationship_bindings
+            if item.id == "internal-v2.binding.relationship.exam-image"
+        )
+        self.assertEqual(
+            (exam_image.source.table, exam_image.target.table),
+            ("magview_all_cohorts_PACS_v2_anon", "metadata_all_cohorts_v1c"),
+        )
+        self.assertEqual(exam_image.source.columns, ("acc_anon",))
+        self.assertEqual(exam_image.target.columns, ("acc_anon",))
+        self.assertEqual(exam_image.targets_per_source, "zero_or_more")
+        self.assertEqual(exam_image.sources_per_target, "zero_or_more")
+        self.assertIn("clinical.exam-image", exam_image.semantic_relationships)
+        caveats = " ".join(exam_image.caveats)
+        self.assertIn("incomplete relative to internal clinical V2", caveats)
+        self.assertIn("no matching V1c image row", caveats)
+        self.assertIn("not evidence that the exam had no images", caveats)
+        self.assertIn("inner join", caveats)
+        hazards = " ".join(exam_image.join_hazards)
+        self.assertIn("consistency check", hazards)
+        qualification = internal.qualifications[
+            "internal-v2.qualification.semantic_relationship."
+            "clinical.exam-image"
+        ]
+        self.assertEqual(qualification.applicability, "supported")
+
+        # Image metadata concepts resolve and keep DICOM, derived, and
+        # enrichment meanings separate.
+        statuses = {
+            item.column: item.status
+            for item in binding.feature_bindings
+            if item.table == "metadata_all_cohorts_v1c"
+        }
+        self.assertEqual(statuses["Modality"], "direct")
+        self.assertEqual(statuses["ImageType"], "direct")
+        self.assertEqual(statuses["FinalImageType"], "derived")
+        self.assertEqual(statuses["ImageLaterality"], "direct")
+        self.assertEqual(statuses["LateralityDeriveFlag"], "ambiguous")
+        self.assertEqual(statuses["category"], "unresolved")
+        self.assertEqual(statuses["has_pix_array"], "unresolved")
+        self.assertEqual(statuses["anon_dicom_path"], "direct")
+        self.assertEqual(statuses["png_path"], "conditional")
+        concepts_by_column = {
+            item.column: item.concept
+            for item in binding.feature_bindings
+            if item.table == "metadata_all_cohorts_v1c"
+        }
+        self.assertEqual(
+            concepts_by_column["empi_anon"], "identity.patient_identifier"
+        )
+        self.assertEqual(
+            concepts_by_column["acc_anon"], "exam.accession_identifier"
+        )
+        for concept in set(concepts_by_column.values()):
+            with self.subTest(concept=concept):
+                self.assertIn(concept, internal.concepts)
+        self.assertEqual(
+            internal.concepts["internal-v2.image.dicom_file_locator"]
+            .feature_kind,
+            "technical",
+        )
+        self.assertEqual(
+            internal.concepts["internal-v2.image.dicom_file_locator"].objects,
+            (),
+        )
+        modality_codes = dict(
+            internal.vocabularies[
+                "internal-v2.vocabulary.image.source_modality"
+            ].codes
+        ).keys()
+        image_type_codes = dict(
+            internal.vocabularies[
+                "internal-v2.vocabulary.image.derived_image_type"
+            ].codes
+        ).keys()
+        self.assertTrue({"2D", "3D", "cview"} <= set(image_type_codes))
+        self.assertTrue(set(modality_codes).isdisjoint(image_type_codes))
+        self.assertEqual(
+            set(
+                dict(
+                    internal.vocabularies[
+                        "internal-v2.vocabulary.image.derived_laterality"
+                    ].codes
+                )
+            ),
+            {"L", "R"},
+        )
+
+        # ROI collections are bound without inventing a row-per-ROI identity.
+        roi = next(
+            item
+            for item in binding.object_bindings
+            if item.object == "region_of_interest"
+        )
+        self.assertEqual(roi.table, "metadata_all_cohorts_v1c")
+        self.assertEqual(roi.derivation, "derived")
+        self.assertIsNone(roi.instance_identity)
+        self.assertEqual(
+            set(roi.columns),
+            {"num_ROI", "ROI_coords", "ROI_frames", "ROI_depth_derived"},
+        )
+        roi_caveats = " ".join(roi.caveats)
+        self.assertIn("zero or more regions", roi_caveats)
+        self.assertIn("row-per-region representation", roi_caveats)
+        self.assertEqual(statuses["num_ROI"], "derived")
+        self.assertEqual(statuses["ROI_coords"], "ambiguous")
+        self.assertEqual(statuses["ROI_frames"], "derived")
+        self.assertEqual(statuses["ROI_depth_derived"], "derived")
+        roi_route = next(
+            item
+            for item in binding.relationship_bindings
+            if item.id
+            == "internal-v2.binding.relationship.image-region-of-interest"
+        )
+        self.assertEqual(roi_route.source.table, roi_route.target.table)
+        self.assertEqual(roi_route.targets_per_source, "zero_or_more")
+        self.assertEqual(roi_route.sources_per_target, "exactly_one")
+        self.assertEqual(
+            internal.coverage["coverage.internal-v2.roi-physical-binding"]
+            .status,
+            "supported",
+        )
+        self.assertEqual(
+            internal.coverage[
+                "coverage.internal-v2.v1c-roi-coordinate-geometry"
+            ].status,
+            "unresolved",
+        )
+        self.assertNotIn(
+            "not_cataloged",
+            {
+                record.status
+                for record in internal.coverage.values()
+                if "roi" in record.subject or "roi" in str(record.subject_kind)
+            },
+        )
+
+        # No future ultrasound or MRI extraction is represented.
+        self.assertEqual(
+            internal.coverage[
+                "coverage.internal-v2.v1c-image-modality-coverage"
+            ].status,
+            "unresolved",
+        )
+        self.assertNotIn("MRI", modality_codes)
+        metadata_columns = {column.name for column in metadata.columns}
+        self.assertTrue(
+            all(
+                "ultrasound" not in name.lower() and "mri" not in name.lower()
+                for name in metadata_columns
+            )
+        )
 
     def test_exact_getters_resolve_navigation_and_claim_provenance(self) -> None:
         result = self.catalog.get_clinical_object("pathology_diagnosis")

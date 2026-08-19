@@ -169,6 +169,81 @@
         "Used only to compare governed Open V2 meanings with the internal representation.",
         "Open V2 physical and aggregate bindings are not imported into internal-v2."
       ]
+    },
+    "internal-v2.v1c-metadata-artifact": {
+      "title": "Internal V1c image-metadata artifact inventory",
+      "kind": "supporting_internal",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "internal-v1c image-metadata delimited-text artifact",
+      "version_scope": "Internal EMBED V1c image-metadata artifact paired with the internal clinical V2 profile; exact column names and column order taken from the artifact header.",
+      "profiles": [
+        "internal-v2"
+      ],
+      "notes": [
+        "The artifact is delimited text and carries no embedded column schema, so it declares neither physical types nor nullability.",
+        "Recorded physical types are assessed parse types, not an embedded source schema.",
+        "The artifact is the current image-metadata companion for internal clinical V2 and is itself internal V1c."
+      ]
+    },
+    "internal-v2.v1c-metadata-structure-observation": {
+      "title": "Internal V1c image-metadata targeted structural observation",
+      "kind": "supporting_internal",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "internal-v1c image-metadata targeted structural review",
+      "version_scope": "Question scope: assessed parse types, image row grain, candidate image-identity uniqueness and completeness, accession and patient projection behaviour, represented controlled values for image, modality, view, laterality, and enrichment fields, and region-of-interest collection structure and alignment.",
+      "profiles": [
+        "internal-v2"
+      ],
+      "notes": [
+        "Only the columns and invariants needed to answer named catalog questions were read; no rows, identifiers, locator values, dates, counts, or distributions were retained.",
+        "Full-column checks were used only to establish uniqueness, completeness, and collection-alignment invariants.",
+        "An observed representation establishes occurrence in this extraction, not intended meaning or exhaustiveness."
+      ]
+    },
+    "internal-v2.public-embed-structure": {
+      "title": "HITI Lab public EMBED dataset-structure page",
+      "kind": "public_documentation",
+      "scope": "embed_general",
+      "locator_kind": "url",
+      "locator": "https://docs.hitilab.com/datasets/embed/structure",
+      "version_scope": "Public documentation of the classic image-oriented metadata table, its accession and laterality linkage, and its image-type filtering; historical and non-comprehensive for internal V1c.",
+      "profiles": [],
+      "notes": [
+        "Used only as a hypothesis source; every applicable statement was checked against the internal V1c artifact.",
+        "No public field name, parsing rule, or filtering recipe is imported as internal profile policy."
+      ]
+    },
+    "internal-v2.public-embed-roi": {
+      "title": "HITI Lab public EMBED region-of-interest page",
+      "kind": "public_documentation",
+      "scope": "embed_general",
+      "locator_kind": "url",
+      "locator": "https://docs.hitilab.com/datasets/embed/rois",
+      "version_scope": "Public documentation of a count, coordinate, and frame region-of-interest representation, a rectangular coordinate order, and positional frame alignment; historical and non-comprehensive for internal V1c.",
+      "profiles": [],
+      "notes": [
+        "Used only as a hypothesis source for internal V1c region-of-interest structure.",
+        "Its coordinate-order and tomosynthesis-only frame statements were not confirmed for internal V1c and are recorded as such."
+      ]
+    },
+    "internal-v2.v1c-metadata-version-boundary": {
+      "title": "Internal V2 clinical to V1c image-metadata version boundary",
+      "kind": "maintainer_confirmed",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "maintainer-confirmed:internal-v2-v1c-image-metadata-boundary",
+      "version_scope": "Deliberate and temporary pairing of the internal clinical V2 profile with an internal V1c image-metadata extraction, and the status of the in-progress full-period image extraction.",
+      "profiles": [
+        "internal-v2"
+      ],
+      "notes": [
+        "Image extraction for the full internal V2 period is still in progress; the V1c artifact is the current companion.",
+        "V1c covers a shorter period and a smaller patient set than internal clinical V2.",
+        "Future metadata is expected to add or expand modalities such as ultrasound and MRI and may replace this image surface.",
+        "Does not establish column names, encodings, or representations for any future extraction."
+      ]
     }
   },
   "contexts": {
@@ -179,17 +254,28 @@
       "profiles": [
         "internal-v2"
       ],
-      "summary": "Internal V2 represents regions of interest attached to images; detailed physical representation remains to be cataloged.",
+      "summary": "Internal V1c represents regions of interest as serialized per-image collections on the image-metadata table; each region originates on exactly one source image, while coordinate axis order, per-region identity, provenance, and cross-image correspondence remain unresolved.",
       "domains": [
         "imaging"
       ],
       "search_terms": [
+        "ROI coordinates",
+        "ROI count",
+        "ROI frames",
+        "image region of interest",
         "internal V2 ROI",
-        "image region of interest"
+        "serialized ROI collection"
       ],
       "related_concepts": [],
-      "related_tables": [],
-      "related_relationships": [],
+      "related_tables": [
+        {
+          "profile": "internal-v2",
+          "table": "metadata_all_cohorts_v1c"
+        }
+      ],
+      "related_relationships": [
+        "internal-v2.binding.relationship.image-region-of-interest"
+      ],
       "claims": [
         {
           "id": "roi-attached-to-image",
@@ -202,11 +288,79 @@
             "No physical representation or geometry semantics are asserted.",
             "Linking corresponding or normalized ROIs across simultaneously acquired FFDM, DBT, and synthetic 2D images is a separate future semantic and physical surface."
           ]
+        },
+        {
+          "id": "roi-serialized-collections",
+          "statement": "An internal V1c image row carries a represented region-of-interest count together with serialized coordinate, frame-index, and depth-derivation collections whose lengths agree with that count, and represents no regions of interest as empty collections.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.public-embed-roi"
+          ],
+          "caveats": [
+            "The three collections are aligned by position only; no per-region identifier is represented.",
+            "The public count, coordinate, and frame column description was confirmed against internal V1c, and the internal extraction adds a depth-derivation collection."
+          ]
+        },
+        {
+          "id": "roi-geometry-unresolved",
+          "statement": "Each represented region of interest is a four-element integer rectangle whose first two components are the lower bounds and whose last two are the matching upper bounds, but whether the first axis is the row axis or the column axis is not established for internal V1c and components can fall outside the pixel matrix.",
+          "status": "unresolved",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.public-embed-roi"
+          ],
+          "caveats": [
+            "The public row-first coordinate order is a hypothesis that a pixel-matrix bounds comparison did not confirm for internal V1c, because rectangles consistent with each order occur and some rectangles are consistent with neither.",
+            "Negative components occur, so a rectangle is not clipped to the pixel matrix and must be clamped explicitly before cropping.",
+            "No coordinate unit, origin, or reference-frame statement is supported beyond integer pixel-matrix indices.",
+            "Whether the rectangle approximates an original non-rectangular annotation is not established for internal V1c."
+          ]
+        },
+        {
+          "id": "roi-frames-not-tomosynthesis-only",
+          "statement": "Internal V1c frame-index collections are positionally aligned with the coordinate collection, use zero-based indices, and are represented for rows classified as two-dimensional and synthetic two-dimensional as well as tomosynthesis, so they are not a tomosynthesis-only field.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.public-embed-roi"
+          ],
+          "caveats": [
+            "The public statement that frame indices are populated only for tomosynthesis rows does not hold for internal V1c.",
+            "No inventoried column states a frame count, so no frame-index upper bound is established.",
+            "An empty frame collection alongside represented regions means no frame indices are represented, not frame zero."
+          ]
+        },
+        {
+          "id": "roi-identity-and-provenance-unresolved",
+          "statement": "Internal V1c represents no region-of-interest identifier, annotator, or derivation history, and a region is addressable only by its position within one image row's collections.",
+          "status": "unresolved",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation"
+          ],
+          "caveats": [
+            "Collection position is a serialization artefact and must not be treated as a durable region identifier.",
+            "The depth-derivation flag records that a region's depth information was derived rather than who or what produced the region."
+          ]
+        },
+        {
+          "id": "roi-cross-image-correspondence-absent",
+          "statement": "Internal V1c attaches region-of-interest collections to individual image rows and represents no correspondence among regions on separate images of one acquisition group.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.roi-maintainer-confirmation"
+          ],
+          "caveats": [
+            "The derived acquisition-group identifier groups image rows and must not be read as a region-of-interest grouping.",
+            "Linking corresponding regions across simultaneously acquired full-field, tomosynthesis, and synthetic two-dimensional images remains future work."
+          ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
-        "This context records the initial semantic boundary, not a complete ROI data dictionary."
+        "This context records the region-of-interest semantic boundary and its internal V1c physical representation, not a complete ROI data dictionary.",
+        "The physical representation belongs to the internal V1c image-metadata extraction and is expected to change when image extraction is rerun."
       ]
     },
     "internal-v2.magview-representation-context": {
@@ -802,6 +956,179 @@
         "Different date meanings must remain separate; missingness is not repaired through coalescing.",
         "No date is designated as a universal diagnosis date."
       ]
+    },
+    "internal-v2.v1c-metadata-context": {
+      "title": "Internal V1c image-metadata representation",
+      "kind": "data_representation",
+      "scope": "profile_specific",
+      "profiles": [
+        "internal-v2"
+      ],
+      "summary": "The internal clinical V2 profile is currently paired with an internal V1c image-metadata extraction whose rows describe one extracted DICOM image instance each, carry repeated patient and exam projections and serialized region-of-interest collections, and cover a narrower period and patient set than clinical V2.",
+      "domains": [
+        "imaging",
+        "exam",
+        "technical"
+      ],
+      "search_terms": [
+        "internal V1c image metadata",
+        "image metadata table",
+        "DICOM attributes",
+        "image identity",
+        "image laterality",
+        "derived image type",
+        "acquisition group",
+        "V1c coverage"
+      ],
+      "related_concepts": [],
+      "related_tables": [
+        {
+          "profile": "internal-v2",
+          "table": "metadata_all_cohorts_v1c"
+        }
+      ],
+      "related_relationships": [],
+      "claims": [
+        {
+          "id": "image-row-grain",
+          "statement": "One internal V1c image-metadata row represents the attributes of one extracted breast-imaging DICOM image instance, with region-of-interest information serialized inside that row.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.public-embed-structure"
+          ],
+          "caveats": [
+            "The public description of an image-oriented metadata table was confirmed against the internal V1c artifact rather than assumed.",
+            "A row is not a region-of-interest row and is not a file inventory entry."
+          ]
+        },
+        {
+          "id": "version-boundary",
+          "statement": "The internal clinical V2 profile is currently paired with an internal V1c image-metadata extraction that covers a shorter period and a smaller patient set than internal clinical V2.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.v1c-metadata-version-boundary"
+          ],
+          "caveats": [
+            "The pairing is deliberate and temporary; the profile remains internal V2 and is not renamed to V1c."
+          ]
+        },
+        {
+          "id": "coverage-is-not-image-absence",
+          "statement": "A clinical V2 exam with no matching internal V1c image-metadata row lies outside current extraction coverage and is not thereby an exam without images.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.v1c-metadata-version-boundary"
+          ],
+          "caveats": [
+            "Do not derive an image-availability indicator, a no-image cohort, or an exclusion rule from unmatched exams."
+          ]
+        },
+        {
+          "id": "future-extraction",
+          "statement": "Image extraction for the full internal V2 period is in progress and future metadata is expected to expand or replace this image surface, including adding or expanding modalities such as ultrasound and MRI.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.v1c-metadata-version-boundary"
+          ],
+          "caveats": [
+            "No column, encoding, table, or coverage record is asserted for a future extraction."
+          ]
+        },
+        {
+          "id": "image-identity-unresolved",
+          "statement": "The internal V1c extraction inventories no DICOM instance identifier; the anonymized DICOM file locator distinguishes rows wherever it is represented but is a technical locator that is not represented on every row, and the DICOM series and instance numbers do not distinguish one image row within an accession.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation"
+          ],
+          "caveats": [
+            "A file locator is a technical reference and must not be promoted to clinical image identity.",
+            "Any release-local row distinctness is scoped to this extraction and does not survive re-extraction."
+          ]
+        },
+        {
+          "id": "locator-and-enrichment-population",
+          "statement": "The rendered-image locator columns and the extraction category and pixel-array enrichment flags are represented only on part of the extraction, and the pixel-array flag represents only its negative state.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation"
+          ],
+          "caveats": [
+            "A missing rendered-image locator or enrichment flag is not evidence that image pixel data is absent for that row.",
+            "The intended meaning of the extraction category and pixel-array flags is not established."
+          ]
+        },
+        {
+          "id": "modality-surface",
+          "statement": "The represented source DICOM modality values in internal V1c are mammography, ultrasound, and other; the extraction is mammography-centred and every non-mammographic row falls into the residual derived image-type class.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation"
+          ],
+          "caveats": [
+            "Represented non-mammographic modality values do not establish systematic ultrasound or MRI image coverage.",
+            "A modality value absent from this extraction is not thereby absent from internal clinical V2 or from the imaging archive."
+          ]
+        },
+        {
+          "id": "image-type-distinctions",
+          "statement": "Source DICOM modality, the source DICOM image-type attribute, the pipeline-derived image-type classification, view position, and image laterality are separate internal V1c fields with separate meanings.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.public-embed-structure"
+          ],
+          "caveats": [
+            "The derived classification only separates mammographic acquisition forms and is not a modality field.",
+            "The derived two-dimensional class also covers contrast-enhanced, stereotactic, and post-biopsy acquisitions that are separable only through the source DICOM image-type attribute.",
+            "Equivalent source image-type tokens also occur under the residual class, so the classification is not exhaustive."
+          ]
+        },
+        {
+          "id": "laterality-roles",
+          "statement": "Internal V1c image laterality is an image attribute: the derived final image laterality represents only left or right, is not represented for a bilateral source laterality, and is not always represented even where a source laterality attribute is.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.public-embed-structure"
+          ],
+          "caveats": [
+            "Image laterality is not automatically the imaging-finding side or the procedure side.",
+            "A missing derived image laterality is not bilateral.",
+            "The public description of a laterality correspondence with the clinical side column is a linkage hint, not an equality."
+          ]
+        },
+        {
+          "id": "patient-and-exam-projection",
+          "statement": "The patient identifier and the accession repeat across internal V1c image rows and remain patient-level and exam-level respectively, and an accession value in this extraction does not by itself determine one patient identifier.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation"
+          ],
+          "caveats": [
+            "Treat the patient identifier as a required consistency check on an accession route rather than an assumed agreement.",
+            "Repetition across image rows is physical multiplicity, not clinical multiplicity."
+          ]
+        },
+        {
+          "id": "acquisition-grouping",
+          "statement": "Internal V1c represents a derived acquisition-group identifier that is nested within one accession, can contain several derived image types and view positions, and does not mix a represented left and right laterality.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.v1c-metadata-structure-observation"
+          ],
+          "caveats": [
+            "The construction rule for the grouping is not established.",
+            "The grouping is not a region-of-interest correspondence representation."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "The profile remains internal V2; the paired image metadata is internal V1c and is deliberately and temporarily narrower.",
+        "This context describes the current extraction only and asserts nothing about a future image-metadata surface."
+      ]
     }
   },
   "qualifications": {
@@ -1070,6 +1397,62 @@
       ],
       "caveats": [
         "Wide-row co-location is not evidence of availability at imaging time."
+      ]
+    },
+    "internal-v2.qualification.clinical_object.image": {
+      "id": "internal-v2.qualification.clinical_object.image",
+      "subject": {
+        "kind": "clinical_object",
+        "id": "image"
+      },
+      "applicability": "supported",
+      "summary": "The image object is bound to the internal V1c image-metadata extraction at one row per extracted DICOM image instance, with DICOM-derived attributes, pipeline-derived classifications, and enrichment flags kept distinct; no clinical image instance identity is established.",
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#image-row-grain",
+        "internal-v2.v1c-metadata-context#image-identity-unresolved",
+        "internal-v2.v1c-metadata-context#version-boundary"
+      ],
+      "caveats": [
+        "Coverage is internal V1c and narrower than internal clinical V2.",
+        "Row distinctness through the anonymized DICOM locator is technical and release-local and will be replaced by a future extraction."
+      ]
+    },
+    "internal-v2.qualification.clinical_object.region_of_interest": {
+      "id": "internal-v2.qualification.clinical_object.region_of_interest",
+      "subject": {
+        "kind": "clinical_object",
+        "id": "region_of_interest"
+      },
+      "applicability": "supported",
+      "summary": "Regions of interest are physically represented as serialized per-image collections on the internal V1c image-metadata table, with a count and positionally aligned coordinate, frame-index, and depth-derivation collections.",
+      "claim_refs": [
+        "internal-v2.roi-context#roi-attached-to-image",
+        "internal-v2.roi-context#roi-serialized-collections",
+        "internal-v2.roi-context#roi-geometry-unresolved",
+        "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
+      ],
+      "caveats": [
+        "One physical row can carry several regions, so the table is not one row per region and positional order is not region identity.",
+        "Coordinate axis order, coordinate reference frame, region provenance, and cross-image correspondence remain unresolved."
+      ]
+    },
+    "internal-v2.qualification.semantic_relationship.clinical.exam-image": {
+      "id": "internal-v2.qualification.semantic_relationship.clinical.exam-image",
+      "subject": {
+        "kind": "semantic_relationship",
+        "id": "clinical.exam-image"
+      },
+      "applicability": "supported",
+      "summary": "The exam-to-image relationship is physically bound between the internal MagView clinical table and the internal V1c image-metadata extraction through the accession, with physical many-to-many cardinality and incomplete V1c coverage of clinical V2 exams.",
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#version-boundary",
+        "internal-v2.v1c-metadata-context#coverage-is-not-image-absence",
+        "internal-v2.v1c-metadata-context#patient-and-exam-projection"
+      ],
+      "caveats": [
+        "A clinical V2 exam can have no matching V1c image row, and an unmatched exam is not an exam without images.",
+        "An inner join on the accession discards clinical V2 exams outside V1c coverage.",
+        "Physical linkage does not establish image availability for all internal V2 exams."
       ]
     }
   },
@@ -3520,6 +3903,128 @@
         "Y": "External",
         "N": "Internal"
       }
+    },
+    "internal-v2.vocabulary.image.source_modality": {
+      "availability": {
+        "scope": "profiles",
+        "profiles": [
+          "internal-v2"
+        ]
+      },
+      "label": "Source DICOM image modality codes",
+      "completeness": "open",
+      "parsing": "atomic",
+      "evidence": [
+        "observed_v2_values",
+        "inference"
+      ],
+      "caveats": [
+        "The represented set is scoped to the current internal V1c extraction; a future extraction may represent more modalities.",
+        "A code absent here is not absent from internal clinical V2 or from the imaging archive."
+      ],
+      "codes": {
+        "MG": "mammography",
+        "US": "ultrasound",
+        "OT": "other; a modality the source instance did not classify further"
+      }
+    },
+    "internal-v2.vocabulary.image.derived_image_type": {
+      "availability": {
+        "scope": "profiles",
+        "profiles": [
+          "internal-v2"
+        ]
+      },
+      "label": "Derived mammographic image-type classes",
+      "completeness": "open",
+      "parsing": "atomic",
+      "evidence": [
+        "observed_v2_values",
+        "inference"
+      ],
+      "caveats": [
+        "These are pipeline-derived classes, not source DICOM values, and the class set is scoped to the current internal V1c extraction.",
+        "The classification is not exhaustive: source image-type tokens equivalent to a named class also occur under the residual class.",
+        "Every non-mammographic source modality falls into the residual class."
+      ],
+      "codes": {
+        "2D": "two-dimensional mammographic acquisition; also covers contrast-enhanced, stereotactic, and post-biopsy acquisitions separable only through the source image-type attribute",
+        "3D": "tomosynthesis acquisition",
+        "cview": "synthetic two-dimensional image reconstructed from a tomosynthesis acquisition",
+        "ROI_SS": "secondary-capture screen-save image; the abbreviation and its distinction from the related class are not established",
+        "ROI_SSC": "secondary-capture screen-save image variant; the abbreviation and its distinction from the related class are not established",
+        "other": "residual class for rows the classification does not assign to a named mammographic acquisition form"
+      }
+    },
+    "internal-v2.vocabulary.image.derived_laterality": {
+      "availability": {
+        "scope": "profiles",
+        "profiles": [
+          "internal-v2"
+        ]
+      },
+      "label": "Derived final image laterality codes",
+      "completeness": "open",
+      "parsing": "atomic",
+      "evidence": [
+        "observed_v2_values"
+      ],
+      "caveats": [
+        "Only left and right are represented; a bilateral source laterality yields no derived value and a missing value is not bilateral.",
+        "The code set is scoped to the current internal V1c extraction.",
+        "This is image laterality, not imaging-finding or procedure side."
+      ],
+      "codes": {
+        "L": "Left",
+        "R": "Right"
+      }
+    },
+    "internal-v2.vocabulary.image.extraction_category": {
+      "availability": {
+        "scope": "profiles",
+        "profiles": [
+          "internal-v2"
+        ]
+      },
+      "label": "Extraction category values",
+      "completeness": "open",
+      "parsing": "atomic",
+      "evidence": [
+        "observed_v2_values",
+        "unresolved"
+      ],
+      "caveats": [
+        "These are pipeline-assigned labels whose intended meaning is not established for internal V1c.",
+        "The represented values are strongly associated with the derived image-type classification rather than distributed across it."
+      ],
+      "codes": {
+        "uncategorized": "default extraction category; no specific category was assigned to the image row",
+        "no image": "non-default extraction category assigned by the extraction; it must not be read as evidence that no image exists for the row, and its intended meaning is not established"
+      }
+    },
+    "internal-v2.vocabulary.image.laterality_derivation_flag": {
+      "availability": {
+        "scope": "profiles",
+        "profiles": [
+          "internal-v2"
+        ]
+      },
+      "label": "Image-laterality derivation indicator values",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "observed_v2_values",
+        "unresolved"
+      ],
+      "caveats": [
+        "Only structural association with the source and derived laterality fields was observed; no intended meaning is established.",
+        "The indicator is itself sometimes absent, including on rows whose derived laterality is represented."
+      ],
+      "codes": {
+        "0.0": "value occurring with rows whose image-level source laterality attribute is represented; intended meaning not established",
+        "1.0": "value occurring with rows where neither source laterality attribute is represented; intended meaning not established",
+        "2.0": "value occurring with rows for which no derived final image laterality is represented; intended meaning not established"
+      }
     }
   },
   "profile_binding": {
@@ -5139,6 +5644,608 @@
         "concept": "internal-v2.pathology.extensive_intraductal_component_status",
         "status": "direct",
         "vocabulary": "internal-v2.vocabulary.pathology.extensive_intraductal_component_status"
+      },
+      {
+        "id": "internal-v2.binding.feature.identity.patient_identifier.metadata-v1c.empi-anon",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "empi_anon",
+        "concept": "identity.patient_identifier",
+        "status": "direct",
+        "notes": [
+          "The identifier repeats across the patient's image rows and remains patient-level."
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.exam.accession_identifier.metadata-v1c.acc-anon",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "acc_anon",
+        "concept": "exam.accession_identifier",
+        "status": "direct",
+        "notes": [
+          "The accession repeats across the exam's image rows and does not by itself determine one patient identifier in this extraction."
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.exam.study_date.metadata-v1c.study-date-anon",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "study_date_anon",
+        "concept": "exam.study_date",
+        "status": "direct",
+        "occurrence_interpretations": [
+          {
+            "representation": "text-serialized date value",
+            "meaning": "Exam date as exported in the internal V1c image metadata",
+            "status": "unverified",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#patient-and-exam-projection"
+            ],
+            "caveats": [
+              "The value is text rather than a parsed timestamp, unlike the clinical table's exam-date projection.",
+              "Agreement with the clinical exam date and with its patient-specific anonymization shift was not verified in this phase."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.demographics.cohort.metadata-v1c.cohort-num",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "cohort_num",
+        "concept": "demographics.cohort",
+        "status": "direct",
+        "notes": [
+          "Repeated on image rows; it remains a patient-level extraction cohort rather than an image attribute."
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.breast.side.metadata-v1c.imagelateralityfinal",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ImageLateralityFinal",
+        "concept": "breast.side",
+        "status": "derived",
+        "occurrence_interpretations": [
+          {
+            "representation": "derived left or right image laterality",
+            "meaning": "Breast side projected from the pipeline-derived image laterality of the image row",
+            "status": "unverified",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#laterality-roles"
+            ],
+            "caveats": [
+              "Image laterality is not automatically the imaging-finding or procedure side; treat this projection as a consistency check rather than an equality."
+            ]
+          },
+          {
+            "representation": "null",
+            "meaning": "No derived image laterality is represented, including where the source laterality is bilateral",
+            "status": "reconciled",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#laterality-roles"
+            ],
+            "caveats": [
+              "Null is not bilateral."
+            ]
+          }
+        ],
+        "vocabulary": "internal-v2.vocabulary.image.derived_laterality"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.dicom_file_locator.metadata-v1c.anon-dicom-path",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "anon_dicom_path",
+        "concept": "internal-v2.image.dicom_file_locator",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.png_render_locator.metadata-v1c.png-path",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "png_path",
+        "concept": "internal-v2.image.png_render_locator",
+        "status": "conditional",
+        "qualifiers": {
+          "locator_component": "full_path"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.png_render_locator.metadata-v1c.png-folder-path",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "png_folder_path",
+        "concept": "internal-v2.image.png_render_locator",
+        "status": "conditional",
+        "qualifiers": {
+          "locator_component": "directory"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.png_render_locator.metadata-v1c.png-filename",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "png_filename",
+        "concept": "internal-v2.image.png_render_locator",
+        "status": "conditional",
+        "qualifiers": {
+          "locator_component": "filename"
+        },
+        "occurrence_interpretations": [
+          {
+            "representation": "null",
+            "meaning": "No rendered-image locator component is represented for the row",
+            "status": "unresolved",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+            ],
+            "caveats": [
+              "The locator columns are represented on only part of the extraction; absence is not evidence that no rendering exists."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.dicom_study_identifier.metadata-v1c.studyid",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "StudyID",
+        "concept": "internal-v2.image.dicom_study_identifier",
+        "status": "ambiguous"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.dicom_series_number.metadata-v1c.seriesnumber",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "SeriesNumber",
+        "concept": "internal-v2.image.dicom_series_number",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.dicom_instance_number.metadata-v1c.instancenumber",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "InstanceNumber",
+        "concept": "internal-v2.image.dicom_instance_number",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.acquisition_group_identifier.metadata-v1c.acquisition-group-id",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "acquisition_group_id",
+        "concept": "internal-v2.image.acquisition_group_identifier",
+        "status": "derived"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.source_modality.metadata-v1c.modality",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "Modality",
+        "concept": "internal-v2.image.source_modality",
+        "status": "direct",
+        "vocabulary": "internal-v2.vocabulary.image.source_modality"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.dicom_image_type.metadata-v1c.imagetype",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ImageType",
+        "concept": "internal-v2.image.dicom_image_type",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.derived_image_type.metadata-v1c.finalimagetype",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "FinalImageType",
+        "concept": "internal-v2.image.derived_image_type",
+        "status": "derived",
+        "vocabulary": "internal-v2.vocabulary.image.derived_image_type"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.view_position.metadata-v1c.viewposition",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ViewPosition",
+        "concept": "internal-v2.image.view_position",
+        "status": "direct",
+        "qualifiers": {
+          "source_attribute": "view_position"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.view_position.metadata-v1c.view-code-sequence-code-meaning",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "0_ViewCodeSequence_CodeMeaning",
+        "concept": "internal-v2.image.view_position",
+        "status": "direct",
+        "qualifiers": {
+          "source_attribute": "view_code_sequence_code_meaning"
+        },
+        "notes": [
+          "This occurrence is a source code meaning and is not reconciled with the plain view-position occurrence."
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.view_modifier.metadata-v1c.view-modifier-code-meaning",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "0_ViewCodeSequence_0_ViewModifierCodeSequence_CodeMeaning",
+        "concept": "internal-v2.image.view_modifier",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.spot_magnification_flag.metadata-v1c.spot-mag",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "spot_mag",
+        "concept": "internal-v2.image.spot_magnification_flag",
+        "status": "derived",
+        "occurrence_interpretations": [
+          {
+            "representation": "affirmative state only",
+            "meaning": "The extraction marked the image row as a spot-compression or magnification acquisition",
+            "status": "unverified",
+            "claim_refs": [],
+            "caveats": [
+              "The flag does not distinguish spot compression from magnification."
+            ]
+          },
+          {
+            "representation": "null",
+            "meaning": "No spot or magnification indication is represented",
+            "status": "unresolved",
+            "claim_refs": [],
+            "caveats": [
+              "Absence is not a negative determination, and the affirmative state does not occur on tomosynthesis-classified rows."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.source_laterality.metadata-v1c.imagelaterality",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ImageLaterality",
+        "concept": "internal-v2.image.source_laterality",
+        "status": "direct",
+        "qualifiers": {
+          "source_attribute": "image_laterality"
+        },
+        "vocabulary": "internal-v2.breast.side"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.source_laterality.metadata-v1c.laterality",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "Laterality",
+        "concept": "internal-v2.image.source_laterality",
+        "status": "direct",
+        "qualifiers": {
+          "source_attribute": "laterality"
+        },
+        "notes": [
+          "The two source laterality attributes sit at different DICOM levels and are not reconciled with one another."
+        ],
+        "vocabulary": "internal-v2.breast.side"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.derived_laterality.metadata-v1c.derived-image-laterality",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ImageLateralityFinal",
+        "concept": "internal-v2.image.derived_laterality",
+        "status": "derived",
+        "vocabulary": "internal-v2.vocabulary.image.derived_laterality"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.laterality_derivation_flag.metadata-v1c.lateralityderiveflag",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "LateralityDeriveFlag",
+        "concept": "internal-v2.image.laterality_derivation_flag",
+        "status": "ambiguous",
+        "vocabulary": "internal-v2.vocabulary.image.laterality_derivation_flag"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.body_part_examined.metadata-v1c.bodypartexamined",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "BodyPartExamined",
+        "concept": "internal-v2.image.body_part_examined",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.presentation_intent.metadata-v1c.presentationintenttype",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "PresentationIntentType",
+        "concept": "internal-v2.image.presentation_intent",
+        "status": "conditional",
+        "occurrence_interpretations": [
+          {
+            "representation": "null",
+            "meaning": "No presentation intent is represented for the row",
+            "status": "reconciled",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#image-type-distinctions"
+            ],
+            "caveats": [
+              "Tomosynthesis-classified and screen-save classified rows carry no presentation intent, so it must not be assumed for them."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.photometric_interpretation.metadata-v1c.photometricinterpretation",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "PhotometricInterpretation",
+        "concept": "internal-v2.image.photometric_interpretation",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_representation.metadata-v1c.pixelrepresentation",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "PixelRepresentation",
+        "concept": "internal-v2.image.pixel_representation",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_matrix_dimension.metadata-v1c.rows",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "Rows",
+        "concept": "internal-v2.image.pixel_matrix_dimension",
+        "status": "direct",
+        "qualifiers": {
+          "axis": "rows"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_matrix_dimension.metadata-v1c.columns",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "Columns",
+        "concept": "internal-v2.image.pixel_matrix_dimension",
+        "status": "direct",
+        "qualifiers": {
+          "axis": "columns"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_bit_depth.metadata-v1c.bitsallocated",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "BitsAllocated",
+        "concept": "internal-v2.image.pixel_bit_depth",
+        "status": "direct",
+        "qualifiers": {
+          "attribute": "bits_allocated"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_bit_depth.metadata-v1c.bitsstored",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "BitsStored",
+        "concept": "internal-v2.image.pixel_bit_depth",
+        "status": "direct",
+        "qualifiers": {
+          "attribute": "bits_stored"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_bit_depth.metadata-v1c.highbit",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "HighBit",
+        "concept": "internal-v2.image.pixel_bit_depth",
+        "status": "direct",
+        "qualifiers": {
+          "attribute": "high_bit"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.samples_per_pixel.metadata-v1c.samplesperpixel",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "SamplesPerPixel",
+        "concept": "internal-v2.image.samples_per_pixel",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.images_in_acquisition.metadata-v1c.imagesinacquisition",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ImagesInAcquisition",
+        "concept": "internal-v2.image.images_in_acquisition",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_spacing.metadata-v1c.imagerpixelspacing",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ImagerPixelSpacing",
+        "concept": "internal-v2.image.pixel_spacing",
+        "status": "direct",
+        "qualifiers": {
+          "attribute": "imager_pixel_spacing"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_spacing.metadata-v1c.pixelspacing",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "PixelSpacing",
+        "concept": "internal-v2.image.pixel_spacing",
+        "status": "direct",
+        "qualifiers": {
+          "attribute": "pixel_spacing"
+        }
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.compression_force.metadata-v1c.compressionforce",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "CompressionForce",
+        "concept": "internal-v2.image.compression_force",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.body_part_thickness.metadata-v1c.bodypartthickness",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "BodyPartThickness",
+        "concept": "internal-v2.image.body_part_thickness",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.tube_voltage_kvp.metadata-v1c.kvp",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "KVP",
+        "concept": "internal-v2.image.tube_voltage_kvp",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.entrance_dose_mgy.metadata-v1c.entrancedoseinmgy",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "EntranceDoseInmGy",
+        "concept": "internal-v2.image.entrance_dose_mgy",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.device_manufacturer.metadata-v1c.manufacturer",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "Manufacturer",
+        "concept": "internal-v2.image.device_manufacturer",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.device_model.metadata-v1c.manufacturermodelname",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ManufacturerModelName",
+        "concept": "internal-v2.image.device_model",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.device_software_versions.metadata-v1c.softwareversions",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "SoftwareVersions",
+        "concept": "internal-v2.image.device_software_versions",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.detector_type.metadata-v1c.detectortype",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "DetectorType",
+        "concept": "internal-v2.image.detector_type",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.breast_implant_present.metadata-v1c.breastimplantpresent",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "BreastImplantPresent",
+        "concept": "internal-v2.image.breast_implant_present",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.burned_in_annotation_flag.metadata-v1c.burnedinannotation",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "BurnedInAnnotation",
+        "concept": "internal-v2.image.burned_in_annotation_flag",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.dicom_conversion_type.metadata-v1c.conversiontype",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ConversionType",
+        "concept": "internal-v2.image.dicom_conversion_type",
+        "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.extraction_category_flag.metadata-v1c.category",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "category",
+        "concept": "internal-v2.image.extraction_category_flag",
+        "status": "unresolved",
+        "occurrence_interpretations": [
+          {
+            "representation": "non-default category value",
+            "meaning": "The extraction assigned a category other than its default to the image row",
+            "status": "unresolved",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+            ],
+            "caveats": [
+              "The category label must not be read as evidence that no image exists for the row.",
+              "The represented values are strongly associated with the derived image-type classification."
+            ]
+          }
+        ],
+        "vocabulary": "internal-v2.vocabulary.image.extraction_category"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.pixel_array_present_flag.metadata-v1c.has-pix-array",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "has_pix_array",
+        "concept": "internal-v2.image.pixel_array_present_flag",
+        "status": "unresolved",
+        "occurrence_interpretations": [
+          {
+            "representation": "negative state only",
+            "meaning": "The extraction recorded a negative pixel-array determination for the image row",
+            "status": "unresolved",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+            ],
+            "caveats": [
+              "The affirmative state is not represented, so a missing value must not be read as pixel data being present."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.region_of_interest_count.metadata-v1c.num-roi",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "num_ROI",
+        "concept": "internal-v2.image.region_of_interest_count",
+        "status": "derived"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.roi.coordinate_collection.metadata-v1c.roi-coords",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ROI_coords",
+        "concept": "internal-v2.roi.coordinate_collection",
+        "status": "ambiguous",
+        "occurrence_interpretations": [
+          {
+            "representation": "serialized collection of four-element integer rectangles",
+            "meaning": "One lower-bound pair followed by the matching upper-bound pair for each region of interest on the image row",
+            "status": "unresolved",
+            "claim_refs": [
+              "internal-v2.roi-context#roi-geometry-unresolved"
+            ],
+            "caveats": [
+              "Whether the first axis is the row axis or the column axis is not established for internal V1c, so the public row-first order must not be assumed.",
+              "Components can be negative or exceed the pixel matrix."
+            ]
+          },
+          {
+            "representation": "empty serialized collection",
+            "meaning": "No region of interest is represented for the image row",
+            "status": "reconciled",
+            "claim_refs": [
+              "internal-v2.roi-context#roi-serialized-collections"
+            ],
+            "caveats": []
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.roi.frame_index_collection.metadata-v1c.roi-frames",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ROI_frames",
+        "concept": "internal-v2.roi.frame_index_collection",
+        "status": "derived",
+        "occurrence_interpretations": [
+          {
+            "representation": "serialized collection of zero-based frame-index lists",
+            "meaning": "Frame indices at which each positionally corresponding region of interest is represented",
+            "status": "reconciled",
+            "claim_refs": [
+              "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+            ],
+            "caveats": [
+              "Represented for two-dimensional and synthetic two-dimensional rows as well as tomosynthesis rows.",
+              "No inventoried column states a frame count, so no upper bound is established."
+            ]
+          },
+          {
+            "representation": "empty serialized collection alongside represented regions of interest",
+            "meaning": "No frame indices are represented for the row's regions",
+            "status": "reconciled",
+            "claim_refs": [
+              "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+            ],
+            "caveats": [
+              "An empty collection is not frame zero."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.roi.depth_derivation_flag_collection.metadata-v1c.roi-depth-derived",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "ROI_depth_derived",
+        "concept": "internal-v2.roi.depth_derivation_flag_collection",
+        "status": "derived"
       }
     ],
     "object_bindings": [
@@ -5428,6 +6535,187 @@
         "caveats": [
           "The row-level severity is descriptor derived and not a supplied reduction across every row linked to one finding.",
           "Severity code 6 is invalid or unexpected, and regional-node TNM code meanings remain unresolved."
+        ]
+      },
+      {
+        "id": "internal-v2.image.metadata-v1c",
+        "object": "image",
+        "table": "metadata_all_cohorts_v1c",
+        "columns": [
+          "empi_anon",
+          "acc_anon",
+          "study_date_anon",
+          "anon_dicom_path",
+          "png_path",
+          "png_folder_path",
+          "png_filename",
+          "StudyID",
+          "SeriesNumber",
+          "InstanceNumber",
+          "acquisition_group_id",
+          "Modality",
+          "ImageType",
+          "FinalImageType",
+          "ViewPosition",
+          "0_ViewCodeSequence_CodeMeaning",
+          "0_ViewCodeSequence_0_ViewModifierCodeSequence_CodeMeaning",
+          "spot_mag",
+          "ImageLaterality",
+          "Laterality",
+          "ImageLateralityFinal",
+          "LateralityDeriveFlag",
+          "BodyPartExamined",
+          "PresentationIntentType",
+          "PhotometricInterpretation",
+          "PixelRepresentation",
+          "Rows",
+          "Columns",
+          "BitsAllocated",
+          "BitsStored",
+          "HighBit",
+          "SamplesPerPixel",
+          "ImagesInAcquisition",
+          "ImagerPixelSpacing",
+          "PixelSpacing",
+          "CompressionForce",
+          "BodyPartThickness",
+          "KVP",
+          "EntranceDoseInmGy",
+          "Manufacturer",
+          "ManufacturerModelName",
+          "SoftwareVersions",
+          "DetectorType",
+          "BreastImplantPresent",
+          "BurnedInAnnotation",
+          "ConversionType",
+          "category",
+          "has_pix_array",
+          "num_ROI"
+        ],
+        "completeness": "partial",
+        "authority": "preferred",
+        "derivation": "source",
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-row-grain",
+          "internal-v2.v1c-metadata-context#image-identity-unresolved",
+          "internal-v2.v1c-metadata-context#version-boundary",
+          "internal-v2.v1c-metadata-context#modality-surface",
+          "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+        ],
+        "caveats": [
+          "Coverage is internal V1c: the extraction spans a shorter period and a smaller patient set than the internal clinical V2 table, and a future extraction is expected to expand or replace it.",
+          "No DICOM instance identifier is inventoried, so no clinical image instance identity is declared; the anonymized DICOM locator is a technical, incomplete, release-local row locator.",
+          "DICOM-derived attributes, pipeline-derived classifications, and enrichment flags are separate mappings and must not be conflated.",
+          "The row describes image attributes; a missing file locator or enrichment flag is not evidence that no image exists."
+        ]
+      },
+      {
+        "id": "internal-v2.region_of_interest.metadata-v1c",
+        "object": "region_of_interest",
+        "table": "metadata_all_cohorts_v1c",
+        "columns": [
+          "num_ROI",
+          "ROI_coords",
+          "ROI_frames",
+          "ROI_depth_derived"
+        ],
+        "completeness": "partial",
+        "authority": "preferred",
+        "derivation": "derived",
+        "claim_refs": [
+          "internal-v2.roi-context#roi-attached-to-image",
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-geometry-unresolved",
+          "internal-v2.roi-context#roi-identity-and-provenance-unresolved",
+          "internal-v2.roi-context#roi-cross-image-correspondence-absent"
+        ],
+        "caveats": [
+          "One image row carries a collection of zero or more regions, so this binding is a collection-valued occurrence and not a row-per-region representation.",
+          "No region identifier is declared: within a row a region is addressable only by its position in the aligned collections, and position is not durable identity.",
+          "Coordinate axis order, coordinate reference frame, and region provenance remain unresolved, and rectangles are not clipped to the pixel matrix.",
+          "Correspondence among regions on separate images of one acquisition group is not represented."
+        ]
+      },
+      {
+        "id": "internal-v2.patient.metadata-v1c",
+        "object": "patient",
+        "table": "metadata_all_cohorts_v1c",
+        "columns": [
+          "empi_anon"
+        ],
+        "completeness": "partial",
+        "authority": "reference",
+        "derivation": "projected",
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#patient-and-exam-projection",
+          "internal-v2.v1c-metadata-context#version-boundary"
+        ],
+        "caveats": [
+          "The patient identifier repeats across the patient's image rows and remains patient-level; row multiplicity is not clinical multiplicity.",
+          "The clinical table remains the preferred patient representation; this projection carries no patient attributes.",
+          "Alignment with the clinical table's anonymized patient identifier is expected but was not verified in this phase."
+        ],
+        "instance_identity": {
+          "columns": [
+            "empi_anon"
+          ],
+          "scope": "Release-scoped anonymized patient identity within the internal V1c image-metadata extraction.",
+          "reserved_exceptions": [],
+          "rows_per_instance": "one_or_more",
+          "longitudinal_identity": true
+        }
+      },
+      {
+        "id": "internal-v2.imaging_exam.metadata-v1c",
+        "object": "imaging_exam",
+        "table": "metadata_all_cohorts_v1c",
+        "columns": [
+          "acc_anon",
+          "study_date_anon",
+          "cohort_num"
+        ],
+        "completeness": "partial",
+        "authority": "reference",
+        "derivation": "projected",
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#patient-and-exam-projection",
+          "internal-v2.v1c-metadata-context#version-boundary",
+          "internal-v2.v1c-metadata-context#coverage-is-not-image-absence"
+        ],
+        "caveats": [
+          "The accession repeats across the exam's image rows and remains exam-level.",
+          "An accession value in this extraction does not by itself determine one patient identifier, so a patient consistency check is required on any accession route.",
+          "Only an accession, an exam date, and a cohort number project here; the clinical table remains the preferred exam representation.",
+          "Exam coverage is internal V1c and narrower than internal clinical V2."
+        ],
+        "instance_identity": {
+          "columns": [
+            "acc_anon"
+          ],
+          "scope": "Accession-scoped exam projection within the internal V1c image-metadata extraction; not longitudinal and not verified equal to the clinical table's accession projection.",
+          "reserved_exceptions": [],
+          "rows_per_instance": "one_or_more",
+          "longitudinal_identity": false
+        }
+      },
+      {
+        "id": "internal-v2.breast_side.metadata-v1c",
+        "object": "breast_side",
+        "table": "metadata_all_cohorts_v1c",
+        "columns": [
+          "acc_anon",
+          "ImageLateralityFinal"
+        ],
+        "completeness": "partial",
+        "authority": "alternative",
+        "derivation": "derived",
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#laterality-roles"
+        ],
+        "caveats": [
+          "This side projection is the pipeline-derived image laterality; it is not the imaging-finding side or the procedure side and was not verified equal to the clinical table's side projection.",
+          "Only left and right are represented; a missing derived laterality is not bilateral and prevents a side projection for that row.",
+          "No side identity is declared because the derived laterality is not always resolved."
         ]
       }
     ],
@@ -6311,6 +7599,939 @@
           "The modality_desc occurrence is preferred; modality remains unmapped because its relationship to modality_desc is unknown.",
           "Unmapped columns remain physically inventoried because their clinical meaning is unresolved or outside supported Phase 1 evidence."
         ]
+      },
+      {
+        "id": "internal-v2.binding.table.metadata-all-cohorts-v1c",
+        "table": "metadata_all_cohorts_v1c",
+        "grain": "one internal V1c image-metadata row describing the attributes of one extracted breast-imaging DICOM image instance, carrying repeated patient and exam projections and serialized per-image region-of-interest collections",
+        "columns": [
+          {
+            "name": "AcquisitionContextSequence",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "AcquisitionTime",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_AnatomicRegionSequence_CodeMeaning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_AnatomicRegionSequence_CodeValue",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_AnatomicRegionSequence_CodingSchemeDesignator",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "AnodeTargetMaterial",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "BitsAllocated",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "BitsStored",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "BodyPartExamined",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "BodyPartThickness",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "BreastImplantPresent",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "BurnedInAnnotation",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Columns",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "CompressionForce",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ContentTime",
+            "physical_type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "DetectorBinning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorConditionsNominalFlag",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorTemperature",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "DetectorType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DistanceSourceToDetector",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "DistanceSourceToPatient",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "EntranceDose",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "EntranceDoseInmGy",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "EstimatedRadiographicMagnificationFactor",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "Exposure",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ExposureControlMode",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ExposureControlModeDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ExposureInuAs",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ExposureTime",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ExposureTimeInuS",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "FieldOfViewHorizontalFlip",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "FieldOfViewOrigin",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "FieldOfViewRotation",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "FilterMaterial",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "FilterThicknessMaximum",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "FilterThicknessMinimum",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "FilterType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "FocalSpots",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "Grid",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "HalfValueLayer",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "HighBit",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ImageLaterality",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ImageType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ImagerPixelSpacing",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ImagesInAcquisition",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "InstanceNumber",
+            "physical_type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "IssuerOfPatientID",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "KVP",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "LossyImageCompression",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "Manufacturer",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ManufacturerModelName",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Modality",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "OrganDose",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "OrganExposed",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PaddleDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PatientAge",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PatientOrientation",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PatientSex",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PerformedProcedureStepDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PerformedProcedureStepStartTime",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_PerformedProtocolCodeSequence_CodeMeaning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_PerformedProtocolCodeSequence_CodeValue",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_PerformedProtocolCodeSequence_CodingSchemeDesignator",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PhotometricInterpretation",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PixelIntensityRelationship",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PixelIntensityRelationshipSign",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "PixelPaddingValue",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "PixelRepresentation",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "PixelSpacing",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PositionerPrimaryAngle",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "PositionerType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PresentationIntentType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PresentationLUTShape",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ProcedureCodeSequence_CodeMeaning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ProcedureCodeSequence_CodeValue",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ProcedureCodeSequence_CodingSchemeDesignator",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ProcedureCodeSequence_CodingSchemeVersion",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ProtocolName",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "QualityControlImage",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "RelativeXRayExposure",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "RescaleIntercept",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "RescaleSlope",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "RescaleType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Rows",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "SamplesPerPixel",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "SeriesDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "SeriesNumber",
+            "physical_type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "SeriesTime",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "SoftwareVersions",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_SourceImageSequence_0_PurposeOfReferenceCodeSequence_CodeMeaning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_SourceImageSequence_0_PurposeOfReferenceCodeSequence_CodeValue",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_SourceImageSequence_0_PurposeOfReferenceCodeSequence_CodingSchemeDesignator",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_SourceImageSequence_SpatialLocationsPreserved",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "SpecificCharacterSet",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "StudyDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "StudyID",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "StudyTime",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "TimeOfLastDetectorCalibration",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_ViewCodeSequence_CodeMeaning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ViewCodeSequence_CodeValue",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ViewCodeSequence_CodingSchemeDesignator",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ViewCodeSequence_ViewModifierCodeSequence",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ViewPosition",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "WindowCenter",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "WindowWidth",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "XRayTubeCurrent",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "has_pix_array",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "category",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PositionerPrimaryAngleDirection",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "PixelPaddingRangeLimit",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_ViewCodeSequence_0_ViewModifierCodeSequence_CodeMeaning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ViewCodeSequence_0_ViewModifierCodeSequence_CodeValue",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_ViewCodeSequence_0_ViewModifierCodeSequence_CodingSchemeDesignator",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "AcquisitionDeviceProcessingCode",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "AcquisitionDeviceProcessingDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DerivationDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorConfiguration",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "FieldOfViewDimensions",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "FieldOfViewShape",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Laterality",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Sensitivity",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ConversionType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_RelatedSeriesSequence_0_PurposeOfReferenceCodeSequence_CodeMeaning",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_RelatedSeriesSequence_0_PurposeOfReferenceCodeSequence_CodeValue",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_RelatedSeriesSequence_0_PurposeOfReferenceCodeSequence_CodingSchemeDesignator",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "CollimatorLeftVerticalEdge",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "CollimatorLowerHorizontalEdge",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "CollimatorRightVerticalEdge",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "CollimatorShape",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "CollimatorUpperHorizontalEdge",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "CommentsOnRadiationDose",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorActiveDimensions",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorActiveShape",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorElementPhysicalSize",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorElementSpacing",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DistanceSourceToEntrance",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ExposureStatus",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_BitsAllocated",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_BitsStored",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_Columns",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_HighBit",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_PhotometricInterpretation",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_PixelRepresentation",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_Rows",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "0_IconImageSequence_SamplesPerPixel",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "VOILUTFunction",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "WindowCenterWidthExplanation",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "DetectorDescription",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "png_path",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "empi_anon",
+            "physical_type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "acc_anon",
+            "physical_type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "study_date_anon",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "cohort_num",
+            "physical_type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "FillerOrderNumberImagingServiceRequest",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "LateralityDeriveFlag",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "ImageLateralityFinal",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "FinalImageType",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "spot_mag",
+            "physical_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "png_folder_path",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "png_filename",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "anon_dicom_path",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "acquisition_group_id",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ROI_coords",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ROI_frames",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "ROI_depth_derived",
+            "physical_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "num_ROI",
+            "physical_type": "int64",
+            "nullable": true
+          }
+        ],
+        "keys": [
+          {
+            "id": "internal-v2.metadata-v1c.patient-locator",
+            "columns": [
+              "empi_anon"
+            ],
+            "kind": "natural",
+            "uniqueness": "not_unique",
+            "completeness": "complete",
+            "evidence": [
+              "observed_v2_values"
+            ],
+            "caveats": [
+              "The anonymized identifier repeats across the patient's image rows and remains patient-level.",
+              "Alignment with the clinical table's anonymized patient identifier is expected but was not verified in this phase."
+            ]
+          },
+          {
+            "id": "internal-v2.metadata-v1c.exam-locator",
+            "columns": [
+              "acc_anon"
+            ],
+            "kind": "natural",
+            "uniqueness": "not_unique",
+            "completeness": "complete",
+            "evidence": [
+              "observed_v2_values"
+            ],
+            "caveats": [
+              "The accession repeats across the exam's image rows and remains exam-level.",
+              "An accession value in this extraction does not by itself determine one patient identifier, so a patient consistency check is required."
+            ]
+          },
+          {
+            "id": "internal-v2.metadata-v1c.image-file-locator",
+            "columns": [
+              "anon_dicom_path"
+            ],
+            "kind": "technical",
+            "uniqueness": "unique",
+            "completeness": "incomplete",
+            "evidence": [
+              "observed_v2_values"
+            ],
+            "caveats": [
+              "This is a technical file reference, not clinical image identity, and it is release-local to this extraction.",
+              "It is not represented on every row, so it cannot serve as a complete row key."
+            ]
+          },
+          {
+            "id": "internal-v2.metadata-v1c.dicom-position-locator",
+            "columns": [
+              "acc_anon",
+              "SeriesNumber",
+              "InstanceNumber"
+            ],
+            "kind": "technical",
+            "uniqueness": "not_unique",
+            "completeness": "complete",
+            "evidence": [
+              "observed_v2_values"
+            ],
+            "caveats": [
+              "DICOM series and instance numbers do not distinguish one image row within an accession, including among rows that carry a file locator."
+            ]
+          },
+          {
+            "id": "internal-v2.metadata-v1c.acquisition-group-locator",
+            "columns": [
+              "acquisition_group_id"
+            ],
+            "kind": "technical",
+            "uniqueness": "not_unique",
+            "completeness": "complete",
+            "evidence": [
+              "observed_v2_values"
+            ],
+            "caveats": [
+              "The group deliberately spans several image rows and is nested within one accession.",
+              "It is not a region-of-interest grouping."
+            ]
+          }
+        ],
+        "caveats": [
+          "The artifact is delimited text with no embedded column schema: recorded physical types are assessed parse types from a deterministic full-file text scan, not a source-declared schema.",
+          "Because the artifact declares no nullability, every column is conservatively recorded as nullable; this is not a statement about observed missingness.",
+          "The artifact declares no numeric width, so every integer-parsable column is recorded at the widest deterministic integer type rather than a narrower assessed magnitude.",
+          "A few inventoried columns yield no parsable value in this extraction, so their parse type defaults to text and their meaning is unresolved.",
+          "Region-of-interest information is serialized in per-row collections; this table is not one row per region of interest.",
+          "This extraction is internal V1c and covers a shorter period and a smaller patient set than the internal clinical V2 table; absence of an exam here is not absence of images.",
+          "The extraction is mammography-centred; represented non-mammographic source modality values do not establish systematic ultrasound or MRI image coverage, and no future modality column is modelled.",
+          "Some rows represent secondary-capture or screen-save images and the burned-in-annotation attribute can be affirmative, so pixel data can contain burned-in text.",
+          "DICOM time-of-day attributes are numerically parsable, so a numeric parse discards zero padding and any fractional-second form; they remain inventoried and unmapped.",
+          "A DICOM patient-age attribute and an imaging-service-request order number are inventoried; their anonymization treatment and internal meaning are not established, so they remain unmapped.",
+          "Detailed DICOM acquisition, dose, detector, collimator, geometry, windowing, and icon-image attributes remain inventoried without mappings rather than mapped from a recognizable attribute name."
+        ]
       }
     ],
     "relationship_bindings": [
@@ -7067,6 +9288,136 @@
         "claim_refs": [
           "internal-v2.magview-representation-context#linked-accession-surface"
         ]
+      },
+      {
+        "id": "internal-v2.binding.relationship.exam-image",
+        "kind": "hierarchy",
+        "source": {
+          "table": "magview_all_cohorts_PACS_v2_anon",
+          "columns": [
+            "acc_anon"
+          ],
+          "completeness": "required"
+        },
+        "target": {
+          "table": "metadata_all_cohorts_v1c",
+          "columns": [
+            "acc_anon"
+          ]
+        },
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "zero_or_more"
+        },
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "caveats": [
+          "The internal V1c image-metadata extraction is incomplete relative to internal clinical V2: it covers a shorter period and a smaller patient set.",
+          "A clinical V2 exam can therefore have no matching V1c image row.",
+          "An unmatched clinical exam is not evidence that the exam had no images.",
+          "An inner join on the accession discards clinical V2 exams outside V1c coverage.",
+          "Physical linkage does not establish image availability for all internal V2 exams.",
+          "Physical cardinality is many-to-many because the clinical table repeats exam rows and the metadata table holds many image rows per exam; each image still belongs to one exam clinically.",
+          "The clinical endpoint is taken from the Phase 1 inventory; no cross-table match measurement was performed and the clinical table was not read for this binding."
+        ],
+        "join_hazards": [
+          "Both endpoints repeat the accession, so an accession join multiplies clinical association rows against image rows; declare a grouping and de-duplication policy before joining.",
+          "Use the anonymized patient identifier as a consistency check rather than assuming agreement: an accession value in the V1c extraction does not by itself determine one patient identifier.",
+          "Image laterality may be used only as a consistency check; it is not the imaging-finding or procedure side and must not be made a join-identity component.",
+          "Do not derive an image-availability flag, a no-image cohort, or an exclusion rule from join outcomes."
+        ],
+        "semantic_relationships": [
+          "clinical.exam-image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#version-boundary",
+          "internal-v2.v1c-metadata-context#coverage-is-not-image-absence",
+          "internal-v2.v1c-metadata-context#patient-and-exam-projection",
+          "internal-v2.v1c-metadata-context#image-row-grain"
+        ]
+      },
+      {
+        "id": "internal-v2.binding.relationship.patient-image-consistency",
+        "kind": "reference",
+        "source": {
+          "table": "magview_all_cohorts_PACS_v2_anon",
+          "columns": [
+            "empi_anon"
+          ],
+          "completeness": "required"
+        },
+        "target": {
+          "table": "metadata_all_cohorts_v1c",
+          "columns": [
+            "empi_anon"
+          ]
+        },
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "zero_or_more"
+        },
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "caveats": [
+          "This route exists to check patient agreement on an accession join; it is not an independent image-attachment route.",
+          "Cross-artifact alignment of the two anonymized patient identifiers is expected but was not verified in this phase, because the clinical table was not read.",
+          "V1c patient coverage is narrower than internal clinical V2, so an unmatched patient is outside extraction coverage."
+        ],
+        "join_hazards": [
+          "Joining on the patient identifier alone crosses every exam and image of that patient; always combine it with the accession."
+        ],
+        "semantic_relationships": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#patient-and-exam-projection",
+          "internal-v2.v1c-metadata-context#version-boundary"
+        ]
+      },
+      {
+        "id": "internal-v2.binding.relationship.image-region-of-interest",
+        "kind": "hierarchy",
+        "source": {
+          "table": "metadata_all_cohorts_v1c",
+          "columns": [
+            "anon_dicom_path"
+          ],
+          "completeness": "optional"
+        },
+        "target": {
+          "table": "metadata_all_cohorts_v1c",
+          "columns": [
+            "anon_dicom_path"
+          ]
+        },
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "exactly_one"
+        },
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "caveats": [
+          "The relationship is realized by row co-location rather than by a key join: an image row's region-of-interest collections are carried in that same row.",
+          "One image row carries zero or more regions and each region belongs to exactly one image row, preserving the semantic rule that a region has exactly one source image.",
+          "The endpoint locator is technical and is not represented on every row, so it is neither image identity nor region identity.",
+          "There is no separate region-of-interest table and none should be inferred."
+        ],
+        "join_hazards": [
+          "Exploding the serialized collections multiplies image rows; the resulting region rows have positional order only and no identifier.",
+          "Do not join regions across image rows of one acquisition group; cross-image correspondence is not represented."
+        ],
+        "semantic_relationships": [
+          "clinical.image-region-of-interest"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-attached-to-image",
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-identity-and-provenance-unresolved",
+          "internal-v2.roi-context#roi-cross-image-correspondence-absent"
+        ]
       }
     ],
     "relationship_binding_paths": []
@@ -7093,11 +9444,15 @@
           "image region"
         ],
         "claim_refs": [
-          "internal-v2.roi-context#roi-attached-to-image"
+          "internal-v2.roi-context#roi-attached-to-image",
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-geometry-unresolved",
+          "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
         ],
         "caveats": [
-          "Geometry, coordinate system, annotation provenance, and physical storage are not yet cataloged.",
-          "Future linkage of corresponding ROIs across simultaneous FFDM, DBT, and synthetic 2D acquisitions is separate from source-image attachment.",
+          "The internal V1c physical representation is a serialized per-image collection; coordinate axis order, coordinate reference frame, and region provenance remain unresolved.",
+          "No region identifier is represented: a region is addressable only by its position within one image row's aligned collections.",
+          "Future linkage of corresponding regions across simultaneous FFDM, DBT, and synthetic 2D acquisitions is separate from source-image attachment and is not represented in internal V1c.",
           "A represented region of interest is not automatically equivalent to a clinical imaging finding."
         ]
       },
@@ -8370,6 +10725,1460 @@
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
+      },
+      "internal-v2.image.dicom_file_locator": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Anonymized DICOM file locator",
+        "definition": "Technical reference to the anonymized DICOM file for one internal V1c image row.",
+        "feature_kind": "technical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "image file path",
+          "DICOM locator",
+          "image file reference"
+        ],
+        "caveats": [
+          "A file locator is a technical reference and is not clinical image identity.",
+          "It distinguishes rows wherever represented but is not represented on every row and is release-local."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.png_render_locator": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Rendered image locator component",
+        "definition": "Technical reference component for a rendered raster version of an internal V1c image row.",
+        "feature_kind": "technical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "png path",
+          "rendered image path",
+          "image render locator"
+        ],
+        "caveats": [
+          "Represented on only part of the extraction and not a general rendered-image inventory.",
+          "A missing component is not evidence that no rendering exists.",
+          "Its relationship to the anonymized DICOM locator is not established."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.dicom_study_identifier": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source DICOM study identifier",
+        "definition": "Technical study identifier carried on an internal V1c image row.",
+        "feature_kind": "technical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "study id",
+          "DICOM study identifier"
+        ],
+        "caveats": [
+          "This is a short study identifier attribute, not a study instance identifier, and its relationship to the accession is not established.",
+          "It does not distinguish one image row."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "objects": [],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.dicom_series_number": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source DICOM series number",
+        "definition": "Technical series number carried on an internal V1c image row.",
+        "feature_kind": "technical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "series number",
+          "DICOM series"
+        ],
+        "caveats": [
+          "Series and instance numbers together do not distinguish one image row within an accession."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.dicom_instance_number": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source DICOM instance number",
+        "definition": "Technical instance number carried on an internal V1c image row.",
+        "feature_kind": "technical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "instance number",
+          "DICOM instance"
+        ],
+        "caveats": [
+          "Series and instance numbers together do not distinguish one image row within an accession."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.acquisition_group_identifier": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Derived acquisition-group identifier",
+        "definition": "Pipeline-derived identifier grouping internal V1c image rows that the extraction treats as one acquisition group within an accession.",
+        "feature_kind": "technical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "acquisition group",
+          "image grouping",
+          "simultaneous acquisition"
+        ],
+        "caveats": [
+          "The construction rule is not established.",
+          "A group is nested within one accession, can contain several derived image types and view positions, and does not mix a represented left and right laterality.",
+          "It is not a region-of-interest correspondence representation."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "objects": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#acquisition-grouping"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.source_modality": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source DICOM image modality",
+        "definition": "Modality recorded on the source DICOM instance for one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "exam"
+        ],
+        "search_terms": [
+          "image modality",
+          "DICOM modality",
+          "source modality"
+        ],
+        "caveats": [
+          "This image-level modality is separate from the exam-level modality description bound on the clinical table.",
+          "It is not the derived mammographic image-type classification."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#modality-surface",
+          "internal-v2.v1c-metadata-context#image-type-distinctions"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "vocabulary": "internal-v2.vocabulary.image.source_modality"
+      },
+      "internal-v2.image.dicom_image_type": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source DICOM image-type attribute",
+        "definition": "Serialized multi-valued source DICOM image-type attribute for one internal V1c image row.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "image type",
+          "DICOM image type",
+          "derived primary",
+          "original primary"
+        ],
+        "caveats": [
+          "The value is a serialized sequence of source tokens; its element count varies and empty elements occur.",
+          "Token meanings are source-system specific and are not interpreted here.",
+          "This attribute, not the derived classification, separates contrast-enhanced, stereotactic, post-biopsy, scout, and screen-save acquisitions."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-type-distinctions"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.derived_image_type": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Derived mammographic image-type classification",
+        "definition": "Pipeline-derived classification of the mammographic acquisition form represented by one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "mammography"
+        ],
+        "search_terms": [
+          "final image type",
+          "FFDM",
+          "tomosynthesis",
+          "DBT",
+          "synthetic 2D",
+          "C-view",
+          "derived image type"
+        ],
+        "caveats": [
+          "The classification separates mammographic acquisition forms only; every non-mammographic source modality falls into the residual class.",
+          "It is not exhaustive: source image-type tokens equivalent to a named class also occur under the residual class."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-type-distinctions",
+          "internal-v2.v1c-metadata-context#modality-surface"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "vocabulary": "internal-v2.vocabulary.image.derived_image_type"
+      },
+      "internal-v2.image.view_position": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Image view position",
+        "definition": "Represented mammographic projection or view for one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "mammography"
+        ],
+        "search_terms": [
+          "view position",
+          "projection",
+          "CC view",
+          "MLO view",
+          "view code"
+        ],
+        "caveats": [
+          "No view code dictionary is established for internal V1c; represented values include untrimmed, lowercase, and specimen radiography variants, so comparison needs explicit normalization.",
+          "The plain view-position attribute and the view code-sequence meaning are separate occurrences and are not reconciled.",
+          "View position is separate from image laterality."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-type-distinctions"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.view_modifier": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Image view modifier",
+        "definition": "Represented view-modifier meaning applied to one internal V1c image row's projection.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging",
+          "mammography"
+        ],
+        "search_terms": [
+          "view modifier",
+          "spot compression",
+          "magnification view",
+          "implant displaced"
+        ],
+        "caveats": [
+          "Represented as a source code meaning rather than a governed internal code list.",
+          "Only one modifier occurrence is inventoried; a source sequence may carry more."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.spot_magnification_flag": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Derived spot or magnification indicator",
+        "definition": "Pipeline-derived indicator marking an internal V1c image row as a spot-compression or magnification acquisition.",
+        "feature_kind": "flag",
+        "domains": [
+          "imaging",
+          "mammography"
+        ],
+        "search_terms": [
+          "spot compression",
+          "magnification",
+          "spot mag flag"
+        ],
+        "caveats": [
+          "Only the affirmative state is represented, and the affirmative state does not occur on tomosynthesis-classified rows.",
+          "A missing value is not a negative determination.",
+          "The flag does not distinguish spot compression from magnification."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.source_laterality": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source DICOM laterality attribute",
+        "definition": "Laterality recorded on a source DICOM laterality attribute for one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "breast_side"
+        ],
+        "search_terms": [
+          "image laterality",
+          "DICOM laterality",
+          "source laterality"
+        ],
+        "caveats": [
+          "Two separate source laterality attributes are inventoried; they sit at different DICOM levels and are not reconciled here.",
+          "A bilateral source value is represented and is not resolved into the derived final image laterality.",
+          "Image laterality is not the imaging-finding or procedure side."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#laterality-roles"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "vocabulary": "internal-v2.breast.side"
+      },
+      "internal-v2.image.derived_laterality": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Derived final image laterality",
+        "definition": "Pipeline-resolved laterality assigned to one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "breast_side"
+        ],
+        "search_terms": [
+          "final image laterality",
+          "image side",
+          "derived laterality"
+        ],
+        "caveats": [
+          "Only left and right are represented; a bilateral source laterality yields no derived value.",
+          "It is not always represented even where a source laterality attribute is, and a missing value is not bilateral.",
+          "Public documentation describes a correspondence with the clinical side column; that correspondence is a linkage hint, not an equality with finding or procedure side."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#laterality-roles"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "vocabulary": "internal-v2.vocabulary.image.derived_laterality"
+      },
+      "internal-v2.image.laterality_derivation_flag": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Image-laterality derivation indicator",
+        "definition": "Represented indicator accompanying the derived final image laterality of one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "breast_side",
+          "technical"
+        ],
+        "search_terms": [
+          "laterality derive flag",
+          "laterality provenance",
+          "derived laterality source"
+        ],
+        "caveats": [
+          "The intended meaning of each represented value is not established; only structural association with the source and derived laterality fields was observed.",
+          "The indicator is itself sometimes absent, including on rows whose derived laterality is represented, so it is not a total provenance record."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "unresolved"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#laterality-roles"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "vocabulary": "internal-v2.vocabulary.image.laterality_derivation_flag"
+      },
+      "internal-v2.image.body_part_examined": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source body part examined",
+        "definition": "Body part recorded on the source DICOM instance for one internal V1c image row.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "body part examined",
+          "anatomic region"
+        ],
+        "caveats": [
+          "Represented values vary in case and include a bilateral form, so comparison needs explicit normalization.",
+          "It does not carry image laterality."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.presentation_intent": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source presentation intent",
+        "definition": "Whether the source DICOM instance for one internal V1c image row is intended for presentation or for further processing.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "presentation intent",
+          "for presentation",
+          "for processing"
+        ],
+        "caveats": [
+          "Not represented for tomosynthesis-classified or screen-save classified rows, so presentation intent cannot be assumed for them.",
+          "The pixel-handling consequence of each represented value is not established here."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-type-distinctions"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.photometric_interpretation": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source photometric interpretation",
+        "definition": "Represented source DICOM photometric interpretation governing the displayed polarity of one internal V1c image row's pixel data.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "photometric interpretation",
+          "monochrome",
+          "pixel polarity"
+        ],
+        "caveats": [
+          "Both represented monochrome values occur, so display polarity must be resolved per image rather than assumed.",
+          "The polarity implied by each value is not asserted here and must be resolved against the DICOM standard before rendering."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.pixel_representation": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source pixel representation",
+        "definition": "Represented source DICOM pixel-representation value for one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "pixel representation",
+          "signed pixels",
+          "unsigned pixels"
+        ],
+        "caveats": [
+          "The signedness implied by the represented value is not asserted here."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.pixel_matrix_dimension": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Pixel matrix dimension",
+        "definition": "Size of one axis of the pixel matrix of an internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "image rows",
+          "image columns",
+          "image size",
+          "pixel matrix"
+        ],
+        "caveats": [
+          "The row and column axes are separate occurrences of this concept and are distinguished by an axis qualifier.",
+          "Region-of-interest rectangles are not guaranteed to lie inside these dimensions."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.pixel_bit_depth": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Pixel bit-depth attribute",
+        "definition": "Represented source DICOM bit-depth attribute of an internal V1c image row's pixel data.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "bits allocated",
+          "bits stored",
+          "high bit",
+          "bit depth"
+        ],
+        "caveats": [
+          "Three separate bit-depth attributes are occurrences of this concept and are distinguished by an attribute qualifier."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.samples_per_pixel": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Samples per pixel",
+        "definition": "Represented number of samples per pixel for an internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "samples per pixel",
+          "channels"
+        ],
+        "caveats": [],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.images_in_acquisition": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Images in acquisition",
+        "definition": "Represented source DICOM count of images belonging to the acquisition that produced an internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "images in acquisition",
+          "acquisition size"
+        ],
+        "caveats": [
+          "This is not a multiframe frame count; no inventoried column states a frame count, so it bounds no region-of-interest frame index.",
+          "It is not represented on every row."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.pixel_spacing": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Pixel spacing attribute",
+        "definition": "Serialized source DICOM pixel-spacing attribute for one internal V1c image row.",
+        "feature_kind": "text",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "pixel spacing",
+          "imager pixel spacing",
+          "image resolution"
+        ],
+        "caveats": [
+          "The value is a serialized pair; delimiter and unit semantics are not documented in the extraction.",
+          "Two separate spacing attributes are occurrences of this concept and are not reconciled with one another."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.compression_force": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Compression force",
+        "definition": "Represented source DICOM compression force applied for one internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "mammography"
+        ],
+        "search_terms": [
+          "compression force",
+          "compression"
+        ],
+        "caveats": [
+          "The unit is not documented in the extraction."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.body_part_thickness": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Compressed body part thickness",
+        "definition": "Represented source DICOM compressed thickness of the imaged body part for one internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "mammography"
+        ],
+        "search_terms": [
+          "body part thickness",
+          "compressed breast thickness"
+        ],
+        "caveats": [
+          "The unit is not documented in the extraction."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.tube_voltage_kvp": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "X-ray tube voltage",
+        "definition": "Represented source DICOM peak kilovoltage for one internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "kVp",
+          "tube voltage",
+          "exposure technique"
+        ],
+        "caveats": [],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.entrance_dose_mgy": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Entrance dose in milligray",
+        "definition": "Represented source DICOM entrance dose in milligray for one internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "entrance dose",
+          "radiation dose",
+          "mGy"
+        ],
+        "caveats": [
+          "Other represented dose and exposure attributes remain unmapped because their units and internal meaning are not established."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.device_manufacturer": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Acquisition device manufacturer",
+        "definition": "Represented manufacturer of the device that produced one internal V1c image row.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "manufacturer",
+          "device vendor",
+          "scanner manufacturer"
+        ],
+        "caveats": [
+          "Represented values include image-processing and secondary-capture vendors as well as acquisition-system vendors."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.device_model": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Acquisition device model",
+        "definition": "Represented model name of the device that produced one internal V1c image row.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "device model",
+          "scanner model",
+          "manufacturer model name"
+        ],
+        "caveats": [
+          "Represented values include non-mammographic and workstation models."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.device_software_versions": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Acquisition device software versions",
+        "definition": "Serialized represented software versions of the device that produced one internal V1c image row.",
+        "feature_kind": "text",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "software versions",
+          "device firmware"
+        ],
+        "caveats": [
+          "The value is a serialized sequence of vendor-specific component versions and is not parsed here."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.detector_type": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Detector type",
+        "definition": "Represented source DICOM detector type for one internal V1c image row.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "detector type",
+          "direct detector",
+          "storage phosphor"
+        ],
+        "caveats": [
+          "Represented values include film and storage acquisition forms as well as direct digital detection."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.breast_implant_present": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Breast implant present attribute",
+        "definition": "Represented source DICOM indication of whether a breast implant is present for one internal V1c image row.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "mammography"
+        ],
+        "search_terms": [
+          "breast implant present",
+          "implant"
+        ],
+        "caveats": [
+          "This is an image-level acquisition attribute and is not a clinical implant finding or history.",
+          "It is not represented on every row."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.burned_in_annotation_flag": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Burned-in annotation attribute",
+        "definition": "Represented source DICOM indication of whether one internal V1c image row's pixel data contains burned-in annotation.",
+        "feature_kind": "coded",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "burned in annotation",
+          "burned-in text",
+          "pixel annotation"
+        ],
+        "caveats": [
+          "The affirmative state is represented, so pixel data can contain burned-in text and must be handled before redistribution or model input.",
+          "The attribute is a source declaration and is not a verification."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.dicom_conversion_type": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Source conversion type",
+        "definition": "Represented source DICOM conversion type for one internal V1c image row.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "conversion type",
+          "secondary capture",
+          "synthetic image"
+        ],
+        "caveats": [
+          "Per-value meanings are not established here; the attribute is used only to show that secondary-capture and screen-save rows occur."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.extraction_category_flag": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Extraction category flag",
+        "definition": "Pipeline-assigned extraction category recorded on one internal V1c image row.",
+        "feature_kind": "categorical",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "extraction category",
+          "no image category",
+          "pipeline category"
+        ],
+        "caveats": [
+          "The intended meaning of each represented value is not established, and the non-default value must not be read as evidence that no image exists for that row.",
+          "The represented values are strongly associated with the derived image-type classification rather than distributed across it."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "unresolved"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "vocabulary": "internal-v2.vocabulary.image.extraction_category"
+      },
+      "internal-v2.image.pixel_array_present_flag": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Pixel-array determination flag",
+        "definition": "Pipeline flag recording a pixel-array determination for one internal V1c image row.",
+        "feature_kind": "flag",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "has pixel array",
+          "pixel data present",
+          "pixel array flag"
+        ],
+        "caveats": [
+          "Only the negative state is represented, so a missing value must not be read as pixel data being present.",
+          "Its intended meaning and the pass that produced it are not established."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "unresolved"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.region_of_interest_count": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Region-of-interest count on an image",
+        "definition": "Represented number of regions of interest carried by one internal V1c image row.",
+        "feature_kind": "numeric",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "number of ROIs",
+          "ROI count",
+          "regions per image"
+        ],
+        "caveats": [
+          "The count describes the row's serialized collections and is not a clinical finding count.",
+          "Zero is represented and accompanies empty collections."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-serialized-collections"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.roi.coordinate_collection": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Region-of-interest coordinate collection",
+        "definition": "Serialized collection of four-element integer rectangles, one per region of interest carried by an internal V1c image row.",
+        "feature_kind": "text",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "ROI coordinates",
+          "ROI bounding box",
+          "ROI geometry",
+          "ROI rectangle"
+        ],
+        "caveats": [
+          "Each rectangle is a lower-bound pair followed by the matching upper-bound pair, but whether the first axis is the row axis or the column axis is not established for internal V1c.",
+          "Components can be negative or exceed the pixel matrix, so a rectangle must be clamped explicitly before cropping.",
+          "The collection is aligned by position with the frame-index and depth-derivation collections; position is not region identity."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "unresolved"
+        ],
+        "objects": [
+          "region_of_interest"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-geometry-unresolved"
+        ],
+        "missing_states": [
+          {
+            "id": "empty-collection",
+            "representation": "empty serialized collection",
+            "meaning": "No region of interest is represented for the image row",
+            "claim_refs": [
+              "internal-v2.roi-context#roi-serialized-collections"
+            ],
+            "caveats": [
+              "An empty collection is not evidence that the image was never reviewed or contains no abnormality."
+            ]
+          }
+        ],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.roi.frame_index_collection": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Region-of-interest frame-index collection",
+        "definition": "Serialized collection of zero-based frame-index lists, one per region of interest carried by an internal V1c image row.",
+        "feature_kind": "text",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "ROI frames",
+          "ROI frame indices",
+          "tomosynthesis slice",
+          "ROI depth"
+        ],
+        "caveats": [
+          "Aligned by position with the coordinate collection when represented; a region's frame list may hold several non-contiguous indices.",
+          "Represented for two-dimensional and synthetic two-dimensional rows as well as tomosynthesis rows, so it is not a tomosynthesis-only field.",
+          "No inventoried column states a frame count, so no upper bound is established."
+        ],
+        "evidence": [
+          "observed_v2_values"
+        ],
+        "objects": [
+          "region_of_interest"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+        ],
+        "missing_states": [
+          {
+            "id": "empty-frame-collection",
+            "representation": "empty serialized collection alongside represented regions of interest",
+            "meaning": "No frame indices are represented for the row's regions",
+            "claim_refs": [
+              "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+            ],
+            "caveats": [
+              "An empty frame collection means absent frame information, not frame zero."
+            ]
+          }
+        ],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.roi.depth_derivation_flag_collection": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Region-of-interest depth-derivation flag collection",
+        "definition": "Serialized collection of one boolean per region of interest recording whether that region's depth information was derived.",
+        "feature_kind": "flag",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "ROI depth derived",
+          "ROI depth flag",
+          "derived ROI depth"
+        ],
+        "caveats": [
+          "Its length agrees with the represented region count and with the frame-index collection when frames are represented.",
+          "The affirmative state occurs only alongside represented frame indices.",
+          "It records that depth information was derived, not who or what produced the region."
+        ],
+        "evidence": [
+          "observed_v2_values",
+          "inference"
+        ],
+        "objects": [
+          "region_of_interest"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
       }
     },
     "semantic_relationships": {
@@ -8395,7 +12204,7 @@
         "attribution": "A represented region of interest is attached to one represented image.",
         "attribution_limitations": [
           "The relationship does not establish equivalence between an ROI and a clinical finding.",
-          "The physical image and ROI identifiers are not yet cataloged."
+          "Internal V1c represents no region identifier, so a region is identified only by its position within one image row's collections."
         ],
         "temporal_qualification": "No independent ROI event or availability time is currently asserted.",
         "temporal_semantics": [],
@@ -8408,10 +12217,13 @@
           "image annotation relationship"
         ],
         "claim_refs": [
-          "internal-v2.roi-context#roi-attached-to-image"
+          "internal-v2.roi-context#roi-attached-to-image",
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-cross-image-correspondence-absent"
         ],
         "caveats": [
-          "Physical tables, identifiers, geometry, and linkage implementation remain deferred to the ROI phase."
+          "The internal V1c physical route is row co-location on the image-metadata table, not a join to a separate region-of-interest table.",
+          "Correspondence among regions on separate images of one acquisition group remains future work."
         ]
       },
       "internal-v2.clinical.procedure-pathology-specimen": {
@@ -8560,7 +12372,55 @@
     },
     "temporal_semantics": {},
     "aggregations": {},
-    "guardrails": {},
+    "guardrails": {
+      "internal-v2.guardrail.absent-image-metadata-is-not-image-absence": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "title": "Missing image metadata is not missing imaging",
+        "statement": "Do not treat a clinical exam without a matching internal V1c image-metadata row, or an image row without a rendered-image locator or enrichment flag, as evidence that no image exists.",
+        "rationale": "The paired image-metadata extraction is internal V1c and covers a narrower period and patient set than internal clinical V2, and its locator and enrichment columns are represented on only part of the extraction.",
+        "category": "interpretation_limit",
+        "priority": "high",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "objects": [
+          "image",
+          "imaging_exam"
+        ],
+        "concepts": [],
+        "semantic_relationships": [
+          "clinical.exam-image"
+        ],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "coverage": [
+          "coverage.internal-v2.v1c-image-modality-coverage"
+        ],
+        "domains": [
+          "imaging",
+          "exam"
+        ],
+        "search_terms": [
+          "no images for exam",
+          "missing image metadata",
+          "image availability",
+          "unmatched exam"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#coverage-is-not-image-absence",
+          "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+        ],
+        "caveats": [
+          "An image-availability indicator would need evidence this profile does not supply."
+        ]
+      }
+    },
     "coverage": {
       "coverage.internal-v2.specimen-collection-time": {
         "availability": {
@@ -8630,25 +12490,30 @@
         },
         "subject_kind": "topic",
         "subject": "internal-v2.roi-context",
-        "status": "not_cataloged",
+        "status": "supported",
         "scope": "profile_specific",
         "profiles": [
           "internal-v2"
         ],
-        "summary": "The internal V2 semantic model includes image-attached regions of interest, but their tables, columns, geometry, identifiers, and physical relationships have not yet been cataloged.",
+        "summary": "Internal V1c region-of-interest information is now physically cataloged: the count, coordinate, frame-index, and depth-derivation columns live on the image-metadata table, their collections are aligned by position, and the empty-collection representation is recorded; coordinate axis order, per-region identity, and region provenance remain unresolved.",
         "domains": [
           "imaging"
         ],
         "search_terms": [
           "internal V2 ROI binding",
           "ROI table",
-          "ROI columns"
+          "ROI columns",
+          "ROI serialization"
         ],
         "claim_refs": [
-          "internal-v2.roi-context#roi-attached-to-image"
+          "internal-v2.roi-context#roi-attached-to-image",
+          "internal-v2.roi-context#roi-serialized-collections",
+          "internal-v2.roi-context#roi-geometry-unresolved",
+          "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
         ],
         "caveats": [
-          "Do not infer a table name, image key, coordinate system, or geometry representation from this semantic record."
+          "The image-metadata table is not one row per region of interest.",
+          "Cross-image region correspondence is still not represented."
         ]
       },
       "coverage.internal-v2.pathology-severity-to-side": {
@@ -8800,6 +12665,134 @@
         ],
         "caveats": [
           "Absence of represented pathology is not proof of disease absence or adequate negative follow-up."
+        ]
+      },
+      "coverage.internal-v2.v1c-roi-coordinate-geometry": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "concept",
+        "subject": "internal-v2.roi.coordinate_collection",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "Internal V1c region-of-interest rectangles are four-element integer lower-bound and upper-bound pairs, but which axis comes first is not established and components can fall outside the pixel matrix.",
+        "domains": [
+          "imaging"
+        ],
+        "search_terms": [
+          "ROI coordinate order",
+          "ROI bounding box",
+          "ROI geometry",
+          "ROI coordinate system"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-geometry-unresolved"
+        ],
+        "caveats": [
+          "Resolve the axis order and clamp to the pixel matrix before cropping or rendering a region."
+        ]
+      },
+      "coverage.internal-v2.v1c-image-instance-identity": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "clinical_object",
+        "subject": "image",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "Internal V1c inventories no DICOM instance identifier, so the profile records no clinical image instance identity; the anonymized DICOM file locator is a technical, incomplete, release-local row locator.",
+        "domains": [
+          "imaging",
+          "identity",
+          "technical"
+        ],
+        "search_terms": [
+          "image identity",
+          "SOP instance identifier",
+          "image key",
+          "image locator"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+        ],
+        "caveats": [
+          "Do not promote a file locator or a DICOM series and instance number pair to clinical image identity."
+        ]
+      },
+      "coverage.internal-v2.v1c-image-modality-coverage": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "topic",
+        "subject": "internal-v2.v1c-metadata-context",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "The internal V1c image surface is mammography-centred; represented non-mammographic modality values do not establish systematic ultrasound or MRI image coverage, and full-period extraction is still in progress.",
+        "domains": [
+          "imaging",
+          "exam"
+        ],
+        "search_terms": [
+          "ultrasound images",
+          "MRI images",
+          "image modality coverage",
+          "image extraction progress"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#modality-surface",
+          "internal-v2.v1c-metadata-context#future-extraction"
+        ],
+        "caveats": [
+          "Absence of a modality from this extraction is not absence from internal clinical V2 or from the imaging archive.",
+          "No future modality column, encoding, or table is modelled."
+        ]
+      },
+      "coverage.internal-v2.v1c-dicom-attribute-interpretation": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "topic",
+        "subject": "internal-v2.v1c-metadata-context",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "Many inventoried internal V1c DICOM acquisition, dose, detector, collimator, geometry, windowing, icon-image, order-number, patient-age, and time-of-day attributes remain unmapped because their internal meaning and anonymization treatment are not established.",
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "unmapped DICOM attributes",
+          "acquisition parameters",
+          "DICOM time of day",
+          "uninterpreted image columns"
+        ],
+        "claim_refs": [],
+        "caveats": [
+          "A recognizable DICOM attribute name is not evidence for an internal interpretation; these columns stay inventoried and unmapped rather than guessed."
         ]
       }
     }

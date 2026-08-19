@@ -79,4 +79,6 @@ distributions must not enter tracked files. The V1 Open Data dictionary and
 [public EMBED documentation](https://docs.hitilab.com/datasets/embed) are useful
 but historical and non-comprehensive; compare them, and the V2 Open Data
 legend, against internal V2 source data before asserting profile behavior. The
-dedicated source-profile verifier remains limited to Parquet footer schemas.
+dedicated source-profile verifier remains limited to Parquet footer schemas, so a
+delimited-text artifact such as the internal V1c image metadata is outside its
+scope and its recorded physical types are assessed parse types.

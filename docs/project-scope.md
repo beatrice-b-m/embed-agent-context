@@ -35,8 +35,12 @@ released public representation and `catalog/profiles/internal-v2.json` is the
 non-default working internal profile. Its Phase 1 binding inventories the wide
 MagView clinical table. Procedure-level information is supported, while
 specimen-level presence, completeness, reliability, identity, and cardinality
-remain unresolved. Image metadata and image/ROI physical bindings remain
-deferred to Phase 2. `catalog/catalog-set.json` selects bundled defaults.
+remain unresolved. Its Phase 2 binding inventories the internal V1c
+image-metadata table and binds image, co-located patient, exam, and
+image-derived side, DICOM-attribute, modality, enrichment, and serialized
+region-of-interest representations; the clinical surface is internal V2 while
+the paired image metadata is internal V1c and deliberately narrower.
+`catalog/catalog-set.json` selects bundled defaults.
 Together they must
 remain:
 
@@ -66,8 +70,9 @@ patient
     └── imaging exam
         ├── breast side
         ├── image
-        │   └── region of interest (internal-v2 semantic contribution;
-        │       physical binding deferred to Phase 2)
+        │   └── region of interest (internal-v2 contribution; bound to the
+        │       internal V1c image-metadata table as serialized per-image
+        │       collections)
         └── imaging finding
             └── imaging interpretation / recommendation
                 └── linked procedure
@@ -107,11 +112,22 @@ physical schema of `magview_all_cohorts_PACS_v2_anon` and binds each supported
 clinical object independently despite their wide-row co-location. It also adds
 profile-scoped specimen, staging, biomarker, nodal, and source-workflow
 meaning, but specimen-level fields remain an unreliable, unresolved surface
-that current internal operations should not depend on. The profile establishes
-that each ROI has exactly one required source image; those semantics are not
-evidence for image metadata or ROI table names, geometry, coordinate systems,
-identifiers, or physical joins, and cross-image ROI grouping remains later
-work. Those physical surfaces remain Phase 2 work.
+that current internal operations should not depend on.
+
+Internal-v2 Phase 2 adds a second physical table, the internal V1c
+image-metadata extraction, at one row per extracted DICOM image instance. It
+binds the image object, co-located patient, exam, and image-derived breast-side
+projections, and a cross-table accession route for the exam-to-image
+relationship. Each ROI still has exactly one required source image; the ROI
+physical representation is a serialized per-image collection with positionally
+aligned count, coordinate, frame-index, and depth-derivation fields, so the
+table is not one row per ROI and carries no ROI identifier. ROI coordinate axis
+order and reference frame, per-region provenance, and cross-image ROI grouping
+remain unresolved or future work. Because the paired image metadata is internal
+V1c rather than V2, its period and patient coverage are narrower than the
+clinical table: an unmatched clinical exam records missing extraction coverage,
+never an exam without images, and no future ultrasound or MRI extraction is
+modelled.
 
 ## Breast-cancer outcome focus
 
@@ -422,7 +438,10 @@ investigation code and outputs must remain ignored or outside the checkout, and
 staged changes must be reviewed for accidental source content.
 
 The dedicated source-profile verifier remains intentionally narrower: it reads
-Parquet footer schemas only and does not perform semantic investigation.
+Parquet footer schemas only and does not perform semantic investigation. A
+profile may bind an artifact it cannot read, such as the internal V1c
+delimited-text image metadata, whose recorded physical types are assessed parse
+types stated as such in the table caveats.
 
 The incomplete alpha context system and Cortex knowledge-base notes are design
 and hazard-discovery inputs, not runtime dependencies or unreviewed clinical

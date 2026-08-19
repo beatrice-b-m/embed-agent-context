@@ -48,11 +48,23 @@ finding identity is accession plus finding number. Procedure-level information
 is supported; specimen-level presence, completeness, reliability, identity,
 and cardinality remain unresolved. Profile-owned specimen, staging, biomarker,
 nodal, registry-reference, and source-workflow semantics remain available only
-to `internal-v2`. The profile's
-`region_of_interest` object and image-to-ROI relationship remain semantic-only;
-each ROI has exactly one required source image, while image metadata, DICOM
-attributes, image identity and enrichments, future cross-image ROI grouping,
-and all image/ROI physical bindings are deferred to Phase 2.
+to `internal-v2`.
+
+The same profile's Phase 2 binding adds a second, independent physical schema:
+the internal V1c `metadata_all_cohorts_v1c` image-metadata table at one row per
+extracted DICOM image instance. It binds the `image` object, the profile's
+`region_of_interest` object, co-located patient, exam, and image-derived
+breast-side projections, a cross-table accession route for the exam-to-image
+relationship, and a same-table route for the image-to-ROI relationship. Each ROI
+still has exactly one required source image, but the physical representation is a
+serialized per-image collection, so no ROI row grain, ROI identifier, or
+cross-image ROI grouping is asserted. Source DICOM modality, the source DICOM
+image-type attribute, the pipeline-derived mammographic image-type
+classification, view position, and image laterality stay separate mappings.
+Because the clinical surface is internal V2 while the paired image metadata is
+internal V1c, the profile records the version boundary explicitly: coverage is
+narrower, and an unmatched clinical exam means missing extraction coverage
+rather than an exam without images.
 
 ## Physical schemas and mappings
 
@@ -61,6 +73,14 @@ name, physical type, and schema nullability once. Table grain is optional,
 descriptive text rather than a closed global enum. Keys and physical
 relationship endpoints resolve against this inventory. A physical column may
 remain unmapped while its meaning is investigated.
+
+The inventory shape does not require an embedded source schema. When an artifact
+declares none, as with the internal V1c delimited-text image metadata, the
+recorded physical types are assessed parse types from a deterministic reader and
+every column is conservatively nullable; the table caveats state that basis so a
+parse assessment is never mistaken for a source-declared schema. Relationship
+endpoints still require exactly equal physical types, so parse assessment must
+not narrow an integer column to an observed magnitude.
 
 Feature bindings are semantic mappings, not column declarations. Each mapping
 has a stable ID, table, column, concept, and status:

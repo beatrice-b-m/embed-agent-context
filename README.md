@@ -364,11 +364,27 @@ and cardinality remain unresolved and should not be relied upon. A represented
 pathology-severity value `6` is invalid or unexpected, not a clinical category.
 Unclear columns remain in the physical inventory without manufactured
 mappings, and absent curated Open V2 aggregates are not projected onto the
-internal table. The profile also retains one-source-image-per-ROI semantics,
-but image metadata, DICOM attributes, image identity and enrichments, future
-cross-image ROI grouping, and all image and ROI physical bindings remain
-deferred to Phase 2. Load `internal-v2` explicitly; it is not part of the
-public default manifest.
+internal table. Load `internal-v2` explicitly; it is not part of the public
+default manifest.
+
+The same profile also binds a second physical table, `metadata_all_cohorts_v1c`,
+whose rows describe one extracted breast-imaging DICOM image instance each. It
+carries the `image` object, co-located patient, exam, and image-derived
+breast-side projections, DICOM-derived attributes, pipeline-derived
+classifications, enrichment flags, and serialized per-image regions of
+interest. Its physical types are assessed parse types rather than an embedded
+schema, and every column is conservatively nullable. There is an important and
+deliberate version boundary: the clinical surface is internal V2 while the
+currently paired image metadata is internal **V1c**, which covers a shorter
+period and a smaller patient set. A clinical V2 exam with no matching image row
+is therefore outside current extraction coverage and is **not** an exam without
+images; an inner accession join silently discards those exams. The image
+surface is mammography-centred, full-period extraction is still in progress,
+and no future ultrasound or MRI columns are modelled. Regions of interest are
+serialized collections on the image row rather than one row per region: the
+count, coordinate, frame-index, and depth-derivation collections are aligned by
+position, no region identifier exists, and the coordinate axis order and
+reference frame remain unresolved.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal

@@ -130,7 +130,7 @@ class CatalogSetSchemaTests(unittest.TestCase):
             )
         )
 
-    def test_internal_v2_profile_combines_magview_bindings_with_unbound_roi_semantics(
+    def test_internal_v2_profile_combines_magview_and_v1c_image_bindings(
         self,
     ) -> None:
         profile_schema = self.documents["profile"][0]
@@ -152,23 +152,76 @@ class CatalogSetSchemaTests(unittest.TestCase):
         binding = internal_profile["profile_binding"]
         self.assertEqual(
             [table["table"] for table in binding["tables"]],
-            ["magview_all_cohorts_PACS_v2_anon"],
+            ["magview_all_cohorts_PACS_v2_anon", "metadata_all_cohorts_v1c"],
         )
-        self.assertEqual(len(binding["tables"][0]["columns"]), 152)
+        tables = {table["table"]: table for table in binding["tables"]}
+        self.assertEqual(
+            len(tables["magview_all_cohorts_PACS_v2_anon"]["columns"]), 152
+        )
+        metadata = tables["metadata_all_cohorts_v1c"]
+        self.assertEqual(len(metadata["columns"]), 166)
+        self.assertEqual(
+            len({column["name"] for column in metadata["columns"]}), 166
+        )
+        self.assertTrue(all(column["nullable"] for column in metadata["columns"]))
+        self.assertEqual(
+            {column["physical_type"] for column in metadata["columns"]},
+            {"string", "double", "int64"},
+        )
         self.assertTrue(binding["feature_bindings"])
         self.assertTrue(binding["object_bindings"])
         self.assertTrue(binding["relationship_bindings"])
+        image_side = {
+            item["object"]: item
+            for item in binding["object_bindings"]
+            if item["object"] in {"image", "region_of_interest"}
+        }
+        self.assertEqual(set(image_side), {"image", "region_of_interest"})
         self.assertTrue(
-            {"image", "region_of_interest"}.isdisjoint(
-                item["object"] for item in binding["object_bindings"]
+            all(
+                item["table"] == "metadata_all_cohorts_v1c"
+                for item in image_side.values()
             )
         )
-        self.assertFalse(
+        for item in image_side.values():
+            self.assertNotIn("instance_identity", item)
+        self.assertTrue(
             any(
                 "clinical.image-region-of-interest"
                 in item["semantic_relationships"]
                 for item in binding["relationship_bindings"]
             )
+        )
+        exam_image = next(
+            item
+            for item in binding["relationship_bindings"]
+            if item["id"] == "internal-v2.binding.relationship.exam-image"
+        )
+        self.assertEqual(
+            exam_image["source"]["table"], "magview_all_cohorts_PACS_v2_anon"
+        )
+        self.assertEqual(
+            exam_image["target"]["table"], "metadata_all_cohorts_v1c"
+        )
+        self.assertEqual(
+            exam_image["cardinality"],
+            {
+                "targets_per_source": "zero_or_more",
+                "sources_per_target": "zero_or_more",
+            },
+        )
+        roi_coverage = internal_profile["contributions"]["coverage"][
+            "coverage.internal-v2.roi-physical-binding"
+        ]
+        self.assertEqual(roi_coverage["status"], "supported")
+        self.assertNotIn(
+            "not_cataloged",
+            {
+                record["status"]
+                for record in internal_profile["contributions"][
+                    "coverage"
+                ].values()
+            },
         )
         self.assertIn(
             "6",
