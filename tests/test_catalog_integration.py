@@ -126,6 +126,44 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             if item.object == "breast_imaging_episode"
         )
         self.assertEqual(episode.authority, "reference")
+        patient = next(
+            item for item in binding.object_bindings if item.object == "patient"
+        )
+        self.assertTrue(patient.instance_identity.longitudinal_identity)
+        finding = next(
+            item
+            for item in binding.object_bindings
+            if item.object == "imaging_finding"
+        )
+        self.assertEqual(
+            finding.instance_identity.columns,
+            ("acc_anon", "numfind"),
+        )
+        specimen = next(
+            item
+            for item in binding.object_bindings
+            if item.object == "pathology_specimen"
+        )
+        self.assertEqual(specimen.completeness, "unknown")
+        self.assertEqual(specimen.authority, "unspecified")
+        self.assertIsNone(specimen.instance_identity)
+        statuses_by_column = {
+            item.column: item.status for item in binding.feature_bindings
+        }
+        self.assertEqual(statuses_by_column["studydate_anon"], "direct")
+        self.assertEqual(statuses_by_column["procdate_anon"], "direct")
+        self.assertEqual(statuses_by_column["pdate_anon"], "ambiguous")
+        self.assertEqual(
+            statuses_by_column["cancer_outcome_registry_id"],
+            "conditional",
+        )
+        roi_relationship = internal.semantic_relationships[
+            "clinical.image-region-of-interest"
+        ]
+        self.assertEqual(
+            roi_relationship.sources_per_target,
+            "exactly_one",
+        )
 
         expected_objects = {
             "patient",

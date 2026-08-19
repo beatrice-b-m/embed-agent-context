@@ -352,13 +352,23 @@ migrated. Update authored modules before loading them with software `0.10.0`.
 The non-default `internal-v2` working profile now inventories the wide
 `magview_all_cohorts_PACS_v2_anon` clinical table and binds distinct patient,
 partial-episode, exam, breast-side, finding, interpretation, procedure,
-specimen, and pathology objects alongside supported workflow meanings. Unclear
-columns remain in the physical inventory without manufactured
+putative specimen, and pathology objects alongside supported workflow meanings.
+Within this profile, `empi_anon` supports longitudinal patient identity,
+linked accessions are co-occurring exams in one imaging episode rather than
+prior or follow-up exams, and `(acc_anon, numfind)` identifies one clinical
+finding. Patient dates share one patient-specific anonymization shift;
+`studydate_anon` and `procdate_anon` are exam and procedure occurrence times,
+while `pdate_anon` remains provisional. Procedure-level information is
+supported, but specimen-level presence, completeness, reliability, identity,
+and cardinality remain unresolved and should not be relied upon. A represented
+pathology-severity value `6` is invalid or unexpected, not a clinical category.
+Unclear columns remain in the physical inventory without manufactured
 mappings, and absent curated Open V2 aggregates are not projected onto the
-internal table. The profile also retains image-attached ROI semantics, but
-image metadata, DICOM attributes, image identity and enrichments, and all image
-and ROI physical bindings remain deferred to Phase 2. Load `internal-v2`
-explicitly; it is not part of the public default manifest.
+internal table. The profile also retains one-source-image-per-ROI semantics,
+but image metadata, DICOM attributes, image identity and enrichments, future
+cross-image ROI grouping, and all image and ROI physical bindings remain
+deferred to Phase 2. Load `internal-v2` explicitly; it is not part of the
+public default manifest.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal

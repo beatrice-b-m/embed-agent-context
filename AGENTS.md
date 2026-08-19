@@ -26,7 +26,9 @@ versioned in lockstep with the core distribution.
   V2 profile, its qualifications, evidence, coverage, and physical bindings.
 - `catalog/profiles/internal-v2.json` is the non-default working internal
   profile. Its Phase 1 binding covers the wide MagView clinical table; its
-  image-attached ROI contribution remains semantic-only pending Phase 2.
+  procedure-level representation is supported, its specimen-level reliability
+  and identity remain unresolved, and its image-attached ROI contribution
+  remains semantic-only pending Phase 2.
 - `catalog/catalog-set.json` selects the bundled semantic and default profile
   modules; version-matched schemas are standalone structural contracts.
 - `embed_context/catalog.py` implements strict parsing, cross-reference,

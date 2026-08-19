@@ -184,8 +184,36 @@ class CatalogSetSchemaTests(unittest.TestCase):
         }
         self.assertEqual(
             pathology_claims["path-severity-five-six-disagreement"]["status"],
-            "contradicted",
+            "reconciled",
         )
+        self.assertEqual(
+            internal_profile["vocabularies"][
+                "internal-v2.pathology.severity"
+            ]["codes"]["6"],
+            "Invalid or unexpected source value",
+        )
+        patient = next(
+            item
+            for item in binding["object_bindings"]
+            if item["object"] == "patient"
+        )
+        self.assertTrue(patient["instance_identity"]["longitudinal_identity"])
+        finding = next(
+            item
+            for item in binding["object_bindings"]
+            if item["object"] == "imaging_finding"
+        )
+        self.assertEqual(
+            finding["instance_identity"]["columns"],
+            ["acc_anon", "numfind"],
+        )
+        specimen = next(
+            item
+            for item in binding["object_bindings"]
+            if item["object"] == "pathology_specimen"
+        )
+        self.assertEqual(specimen["completeness"], "unknown")
+        self.assertNotIn("instance_identity", specimen)
 
         all_ids = [
             record["id"]

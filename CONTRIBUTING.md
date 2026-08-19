@@ -33,10 +33,12 @@ This setup and the baseline test suite need no EMBED data. Read
   vocabulary, qualification, and physical-binding inventory.
 - `catalog/profiles/internal-v2.json` is the non-default working internal
   profile. Phase 1 inventories the wide `magview_all_cohorts_PACS_v2_anon`
-  clinical table, binds its supported clinical objects and meanings, and
-  contributes internal-only specimen, staging, biomarker, nodal, and
-  source-workflow semantics. Image metadata and image/ROI physical bindings
-  remain deferred to Phase 2.
+  clinical table, binds its supported patient, episode, finding, date,
+  procedure, pathology, and registry-reference meanings, and contributes
+  internal-only specimen, staging, biomarker, nodal, and source-workflow
+  semantics. Procedure information is supported; specimen-level reliability,
+  identity, completeness, and cardinality are unresolved. Image metadata and
+  image/ROI physical bindings remain deferred to Phase 2.
 - `catalog/catalog-set.json` selects bundled defaults; each document type has
   a standalone version-matched JSON Schema shape contract.
 - `embed_context/catalog.py` adds strict semantic, cross-reference, scope, and

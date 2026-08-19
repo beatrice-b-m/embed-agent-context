@@ -41,12 +41,18 @@ relationship because images occur across EMBED representations. The
 non-default `internal-v2` profile now inventories the wide
 `magview_all_cohorts_PACS_v2_anon` clinical table and binds its co-located
 patient, partial-episode, exam, side, finding, interpretation, procedure,
-specimen, pathology-observation, and pathology-diagnosis objects independently.
-Profile-owned specimen, staging, biomarker, nodal, and source-workflow
-semantics remain available only to `internal-v2`. The profile's
+putative specimen, pathology-observation, and pathology-diagnosis objects
+independently. The patient identifier persists longitudinally within the
+profile, linked accessions are co-occurring same-episode exams, and clinical
+finding identity is accession plus finding number. Procedure-level information
+is supported; specimen-level presence, completeness, reliability, identity,
+and cardinality remain unresolved. Profile-owned specimen, staging, biomarker,
+nodal, registry-reference, and source-workflow semantics remain available only
+to `internal-v2`. The profile's
 `region_of_interest` object and image-to-ROI relationship remain semantic-only;
-image metadata, DICOM attributes, image identity and enrichments, and all
-image/ROI physical bindings are deferred to Phase 2.
+each ROI has exactly one required source image, while image metadata, DICOM
+attributes, image identity and enrichments, future cross-image ROI grouping,
+and all image/ROI physical bindings are deferred to Phase 2.
 
 ## Physical schemas and mappings
 
@@ -80,8 +86,13 @@ descriptive navigation and do not create a table-graph cycle.
 The internal Phase 1 MagView binding exercises this wide-table model directly:
 one physical row can project several clinical objects, and repeated finding or
 procedure associations do not collapse those objects into one row-grain
-identity. Curated Open V2 aggregate columns that are absent internally remain
-unbound rather than being recreated from semantic similarity.
+identity. Patient dates share one patient-specific shift; exam and procedure
+occurrence dates are confirmed while pathology-report time remains provisional.
+Historical code meanings remain applicable unless superseded, alphabetic codes
+may be trimmed and uppercased for comparison, and pathology-severity value `6`
+is invalid or unexpected rather than a clinical category. Curated Open V2
+aggregate columns that are absent internally remain unbound rather than being
+recreated from semantic similarity.
 
 ## Extensions and composition
 

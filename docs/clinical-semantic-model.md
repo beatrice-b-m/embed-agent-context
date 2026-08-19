@@ -37,13 +37,18 @@ The initial graph distinguishes:
 The shared graph includes acquired images and their relationship to imaging
 exams. The non-default internal-v2 profile now binds the Phase 1 wide MagView
 clinical table to separate patient, partial-episode, exam, breast-side, finding,
-interpretation, procedure, specimen, pathology-observation, and
-pathology-diagnosis objects. Its profile-owned specimen, staging, biomarker,
-nodal, and source-workflow semantics do not become portable merely because
-they share the wide table. The profile also retains regions of interest
-attached to images as semantic-only content: image metadata and all image/ROI
-geometry, coordinates, identifiers, tables, and joins remain deferred to Phase
-2, and an ROI is not equated with a clinical finding.
+interpretation, procedure, putative specimen, pathology-observation, and
+pathology-diagnosis objects. Procedure-level information is supported, but the
+presence, completeness, reliability, identity, and cardinality of specimen-level
+information remain unresolved; current internal operations should not depend on
+that specimen surface. Profile-owned staging, biomarker, nodal, and
+source-workflow semantics do not become portable merely because they share the
+wide table. The profile also retains regions of interest attached to images as
+semantic-only content: each ROI originates on exactly one required source image,
+while image metadata, geometry, coordinates, identifiers, tables, joins, and
+future grouping of corresponding ROIs across simultaneous FFDM, DBT, and
+synthetic 2D acquisitions remain deferred to Phase 2. An ROI is not equated
+with a clinical finding.
 
 An object does not imply a dedicated table. In open-v2, procedure, pathology
 observation, diagnosis, and report-date fields can be co-located on a
@@ -58,6 +63,16 @@ after the documented reserved synthetic value is excluded. It does not persist
 across accessions, episodes, or modalities, and multiple physical rows may
 represent one finding. This instance identity is separate from row keys and
 technical export indices.
+
+Internal-v2 uses the same accession-plus-finding-number clinical identity;
+side is a finding attribute rather than an identity component. Physical rows
+may repeat that identity for multiple procedure or pathology attachments.
+Conflicting side or exam-level attributes across those rows are data-quality
+errors rather than new clinical identities. `empi_anon` persists across the
+patient's internal V2 records and supports longitudinal traversal. Linked
+accessions are explicitly linked co-occurring exams in one imaging episode,
+such as diagnostic mammography and ultrasound, and never represent prior or
+follow-up exams.
 
 Laterality meaning is occurrence-specific. A null finding-side occurrence can
 represent bilateral where reviewed evidence supports that meaning, while a
@@ -80,10 +95,11 @@ closed represented code set:
 | `5` | Non-breast cancer |
 
 Lower values are more severe. The six codes are not automatically two
-analysis classes, and the catalog does not recommend combining them. The
-internal-v2 profile preserves an additional represented code `6` as unresolved
-because historical public documentation and the current internal descriptor
-associations disagree over the code-5/code-6 meanings.
+analysis classes, and the catalog does not recommend combining them. In
+internal-v2, code `5` is also non-breast cancer. Any represented code `6` is an
+invalid or unexpected source value outside the governed clinical scale; it must
+be excluded or explicitly flagged rather than ordered or assigned a diagnosis
+group.
 
 In particular, `5` represents non-breast cancer; it is not benign pathology,
 a healthy state, or absence of malignancy.
@@ -130,6 +146,14 @@ timestamp. All represented dates use a consistent per-patient anonymization
 shift, preserving within-patient ordering and date differences while
 obscuring absolute calendar values.
 
+Internal-v2 likewise applies one consistent patient-specific shift to all
+patient date values, preserving within-patient ordering and differences.
+`studydate_anon` is exam occurrence time, `procdate_anon` is procedure
+occurrence time, and `age_at_study_anon` is derived from the shifted birth and
+study dates with ages 90 years or older top-coded to 89. `pdate_anon` is
+believed to be pathology-report documentation time but remains provisional;
+`dt_final_anon` and `dt_rel_anon` remain unmapped.
+
 No time is labeled as a universal diagnosis date. An analysis must choose an
 anchor according to the question and must exclude information unavailable at
 that anchor when leakage matters. Procedure, report, and other date semantics
@@ -150,9 +174,9 @@ Internal-v2 Phase 1 maps its represented finding-associated pathology severity
 without binding Open V2's curated side- and exam-level aggregate columns, and
 it has no supplied patient-level severity aggregate. A downstream grouping
 that seeks the most severe represented value must declare its linkage and
-grain, handle null and unresolved code `6` explicitly, and use the minimum over
-the governed comparable values. It is analyst-defined, not a supplied internal
-feature or universal default.
+grain, handle null and invalid or unexpected code `6` explicitly, and use the
+minimum over the governed comparable values. It is analyst-defined, not a
+supplied internal feature or universal default.
 
 A new finding-level reduction across attributed pathology occurrences requires
 an analyst-declared policy because attribution is optional and many-to-many. No

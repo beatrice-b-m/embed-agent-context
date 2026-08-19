@@ -33,7 +33,9 @@ meaning. Profiles and extensions may add availability-scoped meaning alongside
 their physical representation; `catalog/profiles/open-v2.json` owns the
 released public representation and `catalog/profiles/internal-v2.json` is the
 non-default working internal profile. Its Phase 1 binding inventories the wide
-MagView clinical table; image metadata and image/ROI physical bindings remain
+MagView clinical table. Procedure-level information is supported, while
+specimen-level presence, completeness, reliability, identity, and cardinality
+remain unresolved. Image metadata and image/ROI physical bindings remain
 deferred to Phase 2. `catalog/catalog-set.json` selects bundled defaults.
 Together they must
 remain:
@@ -104,9 +106,12 @@ including the public data. Internal-v2 Phase 1 inventories the complete
 physical schema of `magview_all_cohorts_PACS_v2_anon` and binds each supported
 clinical object independently despite their wide-row co-location. It also adds
 profile-scoped specimen, staging, biomarker, nodal, and source-workflow
-meaning. The profile's image-attached ROI semantics are not evidence for image
-metadata or ROI table names, geometry, coordinate systems, identifiers, or
-physical joins; those physical surfaces remain Phase 2 work.
+meaning, but specimen-level fields remain an unreliable, unresolved surface
+that current internal operations should not depend on. The profile establishes
+that each ROI has exactly one required source image; those semantics are not
+evidence for image metadata or ROI table names, geometry, coordinate systems,
+identifiers, or physical joins, and cross-image ROI grouping remains later
+work. Those physical surfaces remain Phase 2 work.
 
 ## Breast-cancer outcome focus
 
@@ -134,7 +139,7 @@ because the represented scale is inverse. Internal-v2 Phase 1 maps the actual
 finding-associated severity occurrence but does not copy Open V2's curated
 side- or exam-level aggregate columns and has no supplied patient-level
 aggregate. Any downstream reduction must declare grouping, attribution,
-multiplicity, and time; handle null and the unresolved internal code `6`
+multiplicity, and time; handle null and invalid or unexpected internal code `6`
 explicitly; and, when selecting the most severe among governed comparable
 values, use the minimum. The catalog does not choose that operation as a
 universal default.

@@ -15,12 +15,13 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "maintainer-confirmed:internal-v2-roi-model",
-      "version_scope": "Internal EMBED V2 working profile; semantic existence and image attachment only.",
+      "version_scope": "Internal EMBED V2 working profile; semantic existence, required single-source-image attachment, and future simultaneous-acquisition linkage direction.",
       "profiles": [
         "internal-v2"
       ],
       "notes": [
-        "Does not establish physical table, column, geometry, identity, or cardinality details."
+        "Confirms that every ROI originates on exactly one source image and cannot exist without that source-image attachment.",
+        "Does not establish physical table, column, geometry, identifier, or future cross-image grouping details."
       ]
     },
     "internal-v2.magview-phase1-maintainer-confirmation": {
@@ -37,6 +38,22 @@
         "Confirms that Phase 1 covers only the wide MagView clinical table.",
         "Confirms that image metadata, DICOM attributes, image identity, enrichments, and regions of interest remain outside Phase 1.",
         "Confirms that downstream exam- or patient-level reductions are analyst-defined and use the minimum represented severity because lower scores are more severe."
+      ]
+    },
+    "internal-v2.magview-maintainer-clarifications": {
+      "title": "Internal V2 MagView maintainer clarifications",
+      "kind": "maintainer_confirmed",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "maintainer-confirmed:internal-v2-magview-clarifications",
+      "version_scope": "Internal EMBED V2 patient identity, imaging-episode linkage, finding identity, date deidentification, procedure reliability, specimen uncertainty, categorical normalization, pathology severity, and registry linkage semantics.",
+      "profiles": [
+        "internal-v2"
+      ],
+      "notes": [
+        "Confirms that empi_anon persists across a patient's records within internal V2 and supports longitudinal traversal.",
+        "Confirms that linked accessions are explicitly linked co-occurring exams in one imaging episode and never prior or follow-up exams.",
+        "Confirms accession-plus-finding-number clinical finding identity, per-patient date shifting, age derivation and top-coding, exam and procedure event-date meanings, procedure-level reliability, specimen-level uncertainty, supported code normalization, code-5 meaning, invalid code-6 handling, and cancer-registry reference semantics."
       ]
     },
     "internal-v2.magview-footer-schema": {
@@ -176,13 +193,14 @@
       "claims": [
         {
           "id": "roi-attached-to-image",
-          "statement": "The internal V2 working representation includes regions of interest attached to images.",
+          "statement": "Each internal V2 region of interest originates on exactly one source image and cannot exist without that source-image attachment.",
           "status": "verified",
           "sources": [
             "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
-            "No physical representation or geometry semantics are asserted."
+            "No physical representation or geometry semantics are asserted.",
+            "Linking corresponding or normalized ROIs across simultaneously acquired FFDM, DBT, and synthetic 2D images is a separate future semantic and physical surface."
           ]
         }
       ],
@@ -220,7 +238,8 @@
         "exam.accession_identifier",
         "imaging.finding_number",
         "imaging.linked_accession_identifier",
-        "internal-v2.exam.accession_source_type"
+        "internal-v2.exam.accession_source_type",
+        "internal-v2.technical.cancer_registry_record_identifier"
       ],
       "related_tables": [
         {
@@ -264,7 +283,7 @@
         },
         {
           "id": "finding-procedure-repetition",
-          "statement": "A represented accession-side-finding tuple can occupy multiple rows while procedure, pathology, specimen, or finding-descriptor values differ.",
+          "statement": "A represented accession-plus-finding-number identity can occupy multiple rows while procedure, pathology, putative specimen, or finding-descriptor values differ.",
           "status": "reconciled",
           "sources": [
             "internal-v2.magview-grain-observation",
@@ -278,54 +297,95 @@
         },
         {
           "id": "finding-identity-scope",
-          "statement": "Accession, finding side, and finding number provide the supported internal finding locator, but the tuple can be incomplete, repeated, and does not persist longitudinally.",
+          "statement": "Accession and finding number provide the supported internal clinical finding identity; side is a finding attribute rather than part of that identity, and repeated physical rows may represent the same finding.",
           "status": "verified",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-grain-observation",
             "internal-v2.magview-footer-schema"
           ],
           "caveats": [
-            "Finding numbers can recur on different sides within an accession.",
+            "Cross-side reuse or other conflicts for one accession-plus-finding-number identity are data-quality issues rather than distinct supported identities.",
             "The reserved negative finding-number representation is not an ordinary finding identity."
           ]
         },
         {
           "id": "finding-number-scope-disagreement",
-          "statement": "Public structure documentation describes finding number as unique within an exam, while internal V2 can represent the same finding number on different sides of one accession and therefore requires side in the supported locator.",
-          "status": "contradicted",
+          "statement": "Public structure documentation and internal maintainer knowledge agree that finding number is unique within an exam; source rows that reuse one finding number across conflicting sides are treated as data-quality exceptions.",
+          "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-grain-observation",
             "hitilab.embed.structure.public-representation"
           ],
           "caveats": [
-            "This disagreement is specific to the internal representation and does not redefine the public release.",
-            "The internal accession-side-finding locator can still be incomplete and repeated."
+            "Physical rows may still repeat the accession-plus-finding-number identity across procedure or pathology attachments.",
+            "Conflicting repeated attributes remain data-quality issues without a supplied repair rule."
           ]
         },
         {
           "id": "linked-accession-surface",
-          "statement": "Linked accession, linked source type, and linked-study flag are represented, but the link is optional, can dangle, can vary across repeated finding rows, and is not row-wise equivalent to the flag.",
+          "statement": "A populated linked accession explicitly identifies a co-occurring exam in the same imaging episode, such as paired diagnostic mammography and ultrasound; it never represents a prior or follow-up exam.",
           "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-footer-schema",
             "internal-v2.v2-open-legend-comparison",
             "internal-v2.magview-grain-observation"
           ],
           "caveats": [
-            "The linked reference does not establish prior-versus-follow-up direction.",
-            "Do not repair one linkage field from another."
+            "The referenced accession may be absent from the assessed MagView artifact even though the source link is meaningful.",
+            "Do not use linked accessions for longitudinal prior-or-subsequent exam search."
           ]
         },
         {
-          "id": "repeated-object-inconsistency",
-          "statement": "Some repeated birth-date-like and age-at-exam occurrences disagree within their proposed patient or exam identity scope.",
+          "id": "linked-study-flag-meaning",
+          "statement": "The linked-study flag is believed to indicate whether an exam has any linked same-episode study, while linkedaccession_anon supplies the explicit linked accession when populated.",
           "status": "unverified",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-grain-observation"
           ],
           "caveats": [
-            "This is a binding-quality warning, not an empirical summary or a corrected value policy.",
-            "Do not choose a repeated value without a declared reconciliation rule."
+            "Do not infer or repair one field solely from the other until the flag semantics are verified."
+          ]
+        },
+        {
+          "id": "patient-attribute-variation",
+          "statement": "Repeated patient attributes can differ across time because a patient attribute may change or because of data quality; selecting the most recent value requires an explicit as-of time and must not leak future information into an earlier analysis.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications",
+            "internal-v2.magview-grain-observation"
+          ],
+          "caveats": [
+            "The catalog does not select a universal latest-row policy.",
+            "A task-specific current-value analysis may use the latest value available by its declared as-of time."
+          ]
+        },
+        {
+          "id": "exam-attribute-inconsistency",
+          "statement": "Exam-level values should agree across repeated rows for one accession; disagreements are data-quality errors without a known systematic resolution pattern.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications",
+            "internal-v2.magview-grain-observation"
+          ],
+          "caveats": [
+            "Do not choose a repeated exam value without a declared data-quality rule."
+          ]
+        },
+        {
+          "id": "cancer-registry-reference",
+          "statement": "The cancer_outcome_registry_id column is a technical reference to a separate Georgia cancer-registry-derived pathology table and is meaningful only with empi_anon; it is not itself a cancer diagnosis or outcome.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications",
+            "internal-v2.magview-footer-schema"
+          ],
+          "caveats": [
+            "The separate registry table and its physical relationship are outside the current Phase 1 profile binding.",
+            "Registry linkage can identify represented Georgia diagnoses that were not necessarily diagnosed at Emory."
           ]
         }
       ],
@@ -380,31 +440,33 @@
       "claims": [
         {
           "id": "procedure-pathology-attachment",
-          "statement": "Procedure fields can occur without attached pathology, while represented pathology occurs with procedure information; no durable procedure identifier or one-to-one attachment is established.",
+          "statement": "Procedure-level information is a reliable internal V2 surface: when one finding has multiple attached procedures, repeated finding rows differ in procedure-level fields such as procedure date and type; no durable procedure identifier or one-to-one pathology attachment is established.",
           "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-pathology-observation",
             "hitilab.embed.overview.pathology-attribution",
             "hitilab.embed.structure.public-representation"
           ],
           "caveats": [
             "Finding side and biopsy side can differ and retain distinct roles.",
-            "A complete composite procedure signature is only a physical locator, not clinical identity."
+            "Procedure date and procedure type are supported distinguishing fields, but the available table supplies no durable procedure identifier."
           ]
         },
         {
           "id": "specimen-surface",
-          "statement": "Internal MagView represents a procedure-associated pathology specimen surface with a source-scoped specimen number, descriptor slots, measurements, staging, biomarkers, margins, and nodal observations.",
-          "status": "reconciled",
+          "statement": "Internal MagView contains columns labeled as specimen, staging, biomarker, margin, and nodal information, but available evidence does not establish that specimen-level representation is present reliably or completely enough for specimen-level operations.",
+          "status": "unresolved",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-footer-schema",
             "internal-v2.v1-open-dictionary-comparison",
             "internal-v2.v2-open-legend-comparison",
             "internal-v2.magview-pathology-observation"
           ],
           "caveats": [
-            "The specimen number is not globally unique and can repeat across physical rows.",
-            "No complete durable specimen identity or specimen-collection timestamp is established."
+            "Do not rely on the specimen number or specimen-associated fields as a complete specimen representation.",
+            "No complete durable specimen identity, specimen cardinality, or specimen-collection timestamp is established."
           ]
         },
         {
@@ -423,23 +485,25 @@
         },
         {
           "id": "path-severity-six",
-          "statement": "The internal source represents pathology severity code 6 with a not-otherwise-specified descriptor, but the governed clinical severity meaning of that code is unresolved and it is not part of the canonical Open V2 0-through-5 vocabulary.",
-          "status": "unresolved",
+          "statement": "Any represented internal pathology severity value 6 is invalid or unexpected and is not a clinical severity category; the governed internal scale is the canonical 0-through-5 vocabulary.",
+          "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.v2-open-legend-comparison",
             "internal-v2.public-embed-overview",
             "internal-v2.magview-pathology-observation"
           ],
           "caveats": [
-            "Do not treat code 6 as unattached pathology; null is the separate attachment state.",
-            "Do not assign code 6 a diagnosis group without maintainer review."
+            "Exclude or explicitly flag code 6 as invalid data rather than ordering or grouping it clinically.",
+            "Null remains the separate unattached-pathology state."
           ]
         },
         {
           "id": "path-severity-five-six-disagreement",
-          "statement": "Historical public documentation assigns classic severity code 5 to negative or normal tissue and code 6 to non-breast cancer, while the internal descriptor associations align code 5 with the governed Open V2 non-breast-cancer category and leave internal code 6 unresolved.",
-          "status": "contradicted",
+          "statement": "Historical public documentation assigns classic severity code 5 to negative or normal tissue and code 6 to non-breast cancer, while internal maintainer knowledge and descriptor associations establish code 5 as non-breast cancer and code 6 as invalid or unexpected.",
+          "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.public-embed-overview",
             "internal-v2.open-v2-profile-comparison",
             "internal-v2.v1-open-dictionary-comparison",
@@ -447,8 +511,8 @@
             "internal-v2.magview-pathology-observation"
           ],
           "caveats": [
-            "Code 5 is retained only after reconciling its represented descriptor meanings with the governed Open V2 category.",
-            "Code 6 is not silently assigned the historical non-breast-cancer meaning."
+            "Code 5 is the supported non-breast-cancer category.",
+            "Code 6 must not be normalized into any clinical severity category."
           ]
         },
         {
@@ -472,7 +536,7 @@
           ],
           "caveats": [
             "This is not a supplied internal feature, executable workflow, or universal default.",
-            "Null and unresolved code 6 require explicit handling rather than silent ordering."
+            "Null and invalid or unexpected code 6 require explicit handling rather than silent ordering."
           ]
         },
         {
@@ -538,9 +602,10 @@
       "claims": [
         {
           "id": "legend-continuity",
-          "statement": "The represented core MagView exam, assessment, laterality, imaging-descriptor, procedure, and pathology code families largely retain the candidate meanings shared by the V1 dictionary and V2 Open legend.",
+          "statement": "Internal V2 feature codes retain their historical MagView meanings unless a profile-specific claim explicitly supersedes or invalidates a meaning.",
           "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.v1-open-dictionary-comparison",
             "internal-v2.v2-open-legend-comparison",
             "internal-v2.magview-coded-value-observation"
@@ -548,6 +613,18 @@
           "caveats": [
             "The comparison dictionaries do not establish exhaustive internal domains.",
             "Profile-local vocabularies preserve source tokens rather than normalizing them across releases."
+          ]
+        },
+        {
+          "id": "code-normalization",
+          "statement": "Alphabetic internal MagView codes may be compared after trimming surrounding whitespace and uppercasing; normalization does not assign meanings to otherwise unexplained tokens or split composed strings.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications"
+          ],
+          "caveats": [
+            "The original source representation remains part of the physical occurrence.",
+            "Delimiter, ordering, repetition, and composition semantics remain field specific and unresolved where documented."
           ]
         },
         {
@@ -605,7 +682,7 @@
       "profiles": [
         "internal-v2"
       ],
-      "summary": "The table exposes study, procedure, and pathology-report date-like fields, but historical sources disagree on some event meanings and no specimen-collection or universal availability timestamp is supported.",
+      "summary": "The table exposes confirmed exam- and procedure-occurrence dates plus a provisional pathology-report date; no specimen-collection or universal availability timestamp is supported.",
       "domains": [
         "exam",
         "procedure",
@@ -636,27 +713,62 @@
       "claims": [
         {
           "id": "study-date-disagreement",
-          "statement": "The V2 comparison legend labels studydate_anon as an exam date, while public classic-table documentation describes the corresponding study date as report-signing time that may differ from image acquisition.",
-          "status": "contradicted",
+          "statement": "Internal V2 studydate_anon represents exam occurrence time; this profile-specific maintainer interpretation supersedes historical public classic-table wording that described a corresponding field as report-signing time.",
+          "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.v2-open-legend-comparison",
             "internal-v2.public-embed-overview"
           ],
           "caveats": [
-            "Do not interpret the occurrence as image-acquisition time without additional evidence."
+            "Exam occurrence does not necessarily mean the acquisition time of any particular image."
           ]
         },
         {
           "id": "procedure-date-disagreement",
-          "statement": "The comparison dictionaries label procdate_anon as procedure date, while public classic-table documentation describes the corresponding field as pathology-result time.",
-          "status": "contradicted",
+          "statement": "Internal V2 procdate_anon represents procedure occurrence time; this profile-specific maintainer interpretation supersedes historical public classic-table wording that described a corresponding field as pathology-result time.",
+          "status": "reconciled",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.v1-open-dictionary-comparison",
             "internal-v2.v2-open-legend-comparison",
             "internal-v2.public-embed-overview"
           ],
           "caveats": [
-            "The mapping remains ambiguous and is not used as a fallback for pathology-report time."
+            "Do not substitute this procedure event time for pathology-report or specimen-collection time."
+          ]
+        },
+        {
+          "id": "patient-date-shift",
+          "statement": "All internal V2 patient date values are shifted by one consistent patient-specific delta, so absolute dates are not literal while within-patient ordering and time differences remain reliable.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications"
+          ],
+          "caveats": [
+            "The shift does not establish event meaning for an otherwise undocumented date-like column."
+          ]
+        },
+        {
+          "id": "age-at-study-derivation",
+          "statement": "Internal V2 age_at_study_anon is derived from the consistently shifted patient birth and study dates; ages 90 years or older are top-coded to 89.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications"
+          ],
+          "caveats": [
+            "Repeated age values may still contain ordinary data-quality inconsistencies."
+          ]
+        },
+        {
+          "id": "pathology-report-date-provisional",
+          "statement": "Internal V2 pdate_anon is believed to represent pathology-report documentation time, but this interpretation has lower maintainer confidence and the field is rarely used in current internal workflows.",
+          "status": "unverified",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications"
+          ],
+          "caveats": [
+            "Retain this occurrence as ambiguous until its meaning is independently confirmed."
           ]
         },
         {
@@ -700,12 +812,13 @@
         "id": "breast_imaging_episode"
       },
       "applicability": "unresolved",
-      "summary": "Linked accessions support partial episode navigation, but no canonical internal episode identity or complete episode construction is established.",
+      "summary": "Linked accessions identify explicitly linked co-occurring exams in one imaging episode, but no canonical internal episode identity or complete episode construction is established.",
       "claim_refs": [
         "internal-v2.magview-representation-context#linked-accession-surface"
       ],
       "caveats": [
-        "The link can dangle, vary across repeated rows, and does not specify temporal direction."
+        "The link can dangle; conflicting values across repeated rows are data-quality errors, and the link must never be interpreted as a prior-or-follow-up exam relationship.",
+        "The separate linked-study flag meaning remains unverified."
       ]
     },
     "internal-v2.qualification.clinical_object.imaging_finding": {
@@ -715,14 +828,30 @@
         "id": "imaging_finding"
       },
       "applicability": "supported",
-      "summary": "The table represents imaging findings through an accession-side-finding locator that can occupy multiple physical rows.",
+      "summary": "The table represents imaging findings through accession-plus-finding-number identity that can occupy multiple physical rows; side is an attribute rather than an identity component.",
       "claim_refs": [
         "internal-v2.magview-representation-context#wide-association-grain",
         "internal-v2.magview-representation-context#finding-identity-scope",
         "internal-v2.magview-representation-context#finding-procedure-repetition"
       ],
       "caveats": [
-        "The locator is not persistent across accessions and does not uniquely identify a physical row."
+        "The identity is not persistent across accessions and does not uniquely identify a physical row.",
+        "Conflicting repeated side values are data-quality errors rather than distinct finding identities."
+      ]
+    },
+    "internal-v2.qualification.clinical_object.procedure": {
+      "id": "internal-v2.qualification.clinical_object.procedure",
+      "subject": {
+        "kind": "clinical_object",
+        "id": "procedure"
+      },
+      "applicability": "supported",
+      "summary": "Procedure-level information is a reliable internal V2 surface, and multiple procedures attached to one finding occupy separate repeated finding rows with differing procedure fields.",
+      "claim_refs": [
+        "internal-v2.magview-pathology-context#procedure-pathology-attachment"
+      ],
+      "caveats": [
+        "No durable procedure identifier or universal one-to-one pathology attachment is established."
       ]
     },
     "internal-v2.qualification.clinical_object.pathology_specimen": {
@@ -731,12 +860,13 @@
         "kind": "clinical_object",
         "id": "pathology_specimen"
       },
-      "applicability": "supported",
-      "summary": "Internal MagView represents specimen-scoped pathology characterization without a durable specimen key.",
+      "applicability": "unresolved",
+      "summary": "Specimen-labeled columns exist, but specimen-level presence, completeness, reliability, identity, and cardinality are not established for internal V2 operations.",
       "claim_refs": [
         "internal-v2.magview-pathology-context#specimen-surface"
       ],
       "caveats": [
+        "Do not rely on specimen-level fields for current internal V2 operations.",
         "Specimen number is source scoped and can repeat across rows."
       ]
     },
@@ -747,14 +877,45 @@
         "id": "pathology.severity"
       },
       "applicability": "interpretation_limit",
-      "summary": "The internal occurrence reuses the inverse-severity concept for a descriptor-derived row-level projection; code 6 remains unresolved and null is unattached pathology.",
+      "summary": "The internal occurrence reuses the inverse-severity concept for a descriptor-derived row-level projection; code 5 is non-breast cancer, code 6 is invalid or unexpected, and null is unattached pathology.",
       "claim_refs": [
         "internal-v2.magview-pathology-context#path-severity-derived-occurrence",
         "internal-v2.magview-pathology-context#path-severity-six",
         "internal-v2.magview-pathology-context#path-severity-five-six-disagreement"
       ],
       "caveats": [
-        "Do not coerce code 6 or null into a governed diagnosis group."
+        "Exclude or explicitly flag code 6 as invalid rather than ordering it clinically.",
+        "Do not coerce null into a governed diagnosis group."
+      ]
+    },
+    "internal-v2.qualification.concept.demographics.birth_date": {
+      "id": "internal-v2.qualification.concept.demographics.birth_date",
+      "subject": {
+        "kind": "concept",
+        "id": "demographics.birth_date"
+      },
+      "applicability": "supported",
+      "summary": "Internal patient date values use one consistent patient-specific shift, preserving within-patient ordering and time differences while obscuring absolute dates.",
+      "claim_refs": [
+        "internal-v2.magview-temporal-context#patient-date-shift"
+      ],
+      "caveats": [
+        "Repeated patient attributes can still vary or contain data-quality errors."
+      ]
+    },
+    "internal-v2.qualification.concept.demographics.age_at_exam": {
+      "id": "internal-v2.qualification.concept.demographics.age_at_exam",
+      "subject": {
+        "kind": "concept",
+        "id": "demographics.age_at_exam"
+      },
+      "applicability": "supported",
+      "summary": "Internal age_at_study_anon is derived from consistently shifted birth and study dates, with ages 90 years or older top-coded to 89.",
+      "claim_refs": [
+        "internal-v2.magview-temporal-context#age-at-study-derivation"
+      ],
+      "caveats": [
+        "Repeated values can still contain ordinary data-quality inconsistencies."
       ]
     },
     "internal-v2.qualification.aggregation.pathology-observation-severity": {
@@ -838,13 +999,14 @@
         "kind": "temporal_semantic",
         "id": "time.exam-event"
       },
-      "applicability": "interpretation_limit",
-      "summary": "Study date is represented, but historical sources disagree on exam-event versus report-signing interpretation and it is not image-acquisition time.",
+      "applicability": "supported",
+      "summary": "Internal studydate_anon represents exam occurrence time and participates in the consistent patient-specific date shift.",
       "claim_refs": [
-        "internal-v2.magview-temporal-context#study-date-disagreement"
+        "internal-v2.magview-temporal-context#study-date-disagreement",
+        "internal-v2.magview-temporal-context#patient-date-shift"
       ],
       "caveats": [
-        "Use only under a declared study-date interpretation."
+        "Exam occurrence does not necessarily identify acquisition time for a particular image."
       ]
     },
     "internal-v2.qualification.temporal_semantic.time.procedure-event": {
@@ -853,13 +1015,30 @@
         "kind": "temporal_semantic",
         "id": "time.procedure-event"
       },
-      "applicability": "unresolved",
-      "summary": "Procedure-date meaning conflicts with historical public documentation describing pathology-result time.",
+      "applicability": "supported",
+      "summary": "Internal procdate_anon represents procedure occurrence time and participates in the consistent patient-specific date shift.",
       "claim_refs": [
-        "internal-v2.magview-temporal-context#procedure-date-disagreement"
+        "internal-v2.magview-temporal-context#procedure-date-disagreement",
+        "internal-v2.magview-temporal-context#patient-date-shift"
       ],
       "caveats": [
         "Do not substitute this occurrence for pathology-report or specimen-collection time."
+      ]
+    },
+    "internal-v2.qualification.temporal_semantic.time.pathology-report-documentation": {
+      "id": "internal-v2.qualification.temporal_semantic.time.pathology-report-documentation",
+      "subject": {
+        "kind": "temporal_semantic",
+        "id": "time.pathology-report-documentation"
+      },
+      "applicability": "unresolved",
+      "summary": "Internal pdate_anon is believed to represent pathology-report documentation time, but the interpretation remains provisional because maintainer confidence is limited.",
+      "claim_refs": [
+        "internal-v2.magview-temporal-context#pathology-report-date-provisional",
+        "internal-v2.magview-temporal-context#patient-date-shift"
+      ],
+      "caveats": [
+        "Do not substitute this provisional occurrence for procedure or specimen-collection time."
       ]
     },
     "internal-v2.qualification.temporal_semantic.time.specimen-collection": {
@@ -1226,7 +1405,7 @@
         "P": "Probably benign",
         "S": "Suspicious",
         "X": "No Assessment",
-        "s": "Unresolved internal source code"
+        "s": "Suspicious after supported case normalization"
       },
       "availability": {
         "scope": "profiles",
@@ -2445,13 +2624,12 @@
       "parsing": "atomic",
       "evidence": [
         "maintainer_confirmed",
-        "observed_v2_values",
-        "unresolved"
+        "observed_v2_values"
       ],
       "caveats": [
         "The scale is inverse: lower values represent more severe pathology.",
-        "Historical public documentation uses a conflicting code-5/code-6 scheme; the internal code-5 meaning is reconciled through associated descriptor meanings and the governed Open V2 category.",
-        "Code 6 is represented internally but is not assigned a governed clinical category.",
+        "Historical public documentation uses a conflicting code-5/code-6 scheme; internal maintainer knowledge establishes code 5 as non-breast cancer.",
+        "Any represented code 6 is invalid or unexpected and must not be ordered or grouped as a clinical severity category.",
         "Null means no pathology is attached and is not a benign or negative category.",
         "Descriptor slots may be present when severity is null."
       ],
@@ -2462,7 +2640,7 @@
         "3": "Borderline lesion",
         "4": "Benign finding",
         "5": "Non-breast cancer",
-        "6": "Unresolved internal severity category"
+        "6": "Invalid or unexpected source value"
       }
     },
     "internal-v2.pathology.surgery_type": {
@@ -3403,9 +3581,9 @@
         "table": "magview_all_cohorts_PACS_v2_anon",
         "column": "studydate_anon",
         "concept": "exam.study_date",
-        "status": "ambiguous",
+        "status": "direct",
         "notes": [
-          "V2 legend and historical public documentation disagree on exam-event versus report-signing interpretation."
+          "Profile-specific maintainer confirmation establishes exam occurrence time and a consistent patient-specific anonymization shift."
         ]
       },
       {
@@ -3428,6 +3606,9 @@
         "column": "modality_desc",
         "concept": "exam.modality",
         "status": "direct",
+        "notes": [
+          "This is the preferred internal V2 modality occurrence; the separate modality column remains unmapped."
+        ],
         "vocabulary": "internal-v2.exam.modality"
       },
       {
@@ -3635,18 +3816,18 @@
           {
             "representation": "N",
             "meaning": "Flag is not asserted",
-            "status": "reconciled",
+            "status": "unverified",
             "claim_refs": [
-              "internal-v2.magview-coded-values-context#legend-continuity"
+              "internal-v2.magview-representation-context#linked-study-flag-meaning"
             ],
             "caveats": []
           },
           {
             "representation": "Y",
             "meaning": "Flag is asserted",
-            "status": "reconciled",
+            "status": "unverified",
             "claim_refs": [
-              "internal-v2.magview-coded-values-context#legend-continuity"
+              "internal-v2.magview-representation-context#linked-study-flag-meaning"
             ],
             "caveats": []
           }
@@ -3681,14 +3862,12 @@
         "occurrence_interpretations": [
           {
             "representation": "s",
-            "meaning": "Unresolved lowercase assessment source code",
-            "status": "unresolved",
+            "meaning": "Suspicious after supported uppercase and surrounding-whitespace normalization",
+            "status": "reconciled",
             "claim_refs": [
-              "internal-v2.magview-coded-values-context#unlisted-source-codes"
+              "internal-v2.magview-coded-values-context#code-normalization"
             ],
-            "caveats": [
-              "Do not silently normalize this token to uppercase S."
-            ]
+            "caveats": []
           }
         ],
         "vocabulary": "internal-v2.imaging.assessment"
@@ -4291,12 +4470,14 @@
         "occurrence_interpretations": [
           {
             "representation": "6",
-            "meaning": "Represented internal severity category with unresolved governed clinical meaning",
-            "status": "unresolved",
+            "meaning": "Invalid or unexpected source value outside the governed clinical severity scale",
+            "status": "reconciled",
             "claim_refs": [
               "internal-v2.magview-pathology-context#path-severity-six"
             ],
-            "caveats": []
+            "caveats": [
+              "Exclude or explicitly flag this value rather than assigning or ordering it as a diagnosis group."
+            ]
           },
           {
             "representation": "null",
@@ -4313,13 +4494,26 @@
         "vocabulary": "internal-v2.pathology.severity"
       },
       {
+        "id": "internal-v2.binding.feature.internal-v2.technical.cancer_registry_record_identifier.cancer-outcome-registry-id",
+        "table": "magview_all_cohorts_PACS_v2_anon",
+        "column": "cancer_outcome_registry_id",
+        "concept": "internal-v2.technical.cancer_registry_record_identifier",
+        "status": "conditional",
+        "qualifiers": {
+          "composite_with": "empi_anon"
+        },
+        "notes": [
+          "This technical reference is meaningful only as the tuple (empi_anon, cancer_outcome_registry_id) against the separate registry-derived table; it is not itself an outcome."
+        ]
+      },
+      {
         "id": "internal-v2.binding.feature.pathology.procedure_date.procdate-anon",
         "table": "magview_all_cohorts_PACS_v2_anon",
         "column": "procdate_anon",
         "concept": "pathology.procedure_date",
-        "status": "ambiguous",
+        "status": "direct",
         "notes": [
-          "V2 legend and historical public documentation disagree on procedure-event versus pathology-result interpretation."
+          "Profile-specific maintainer confirmation establishes procedure occurrence time and a consistent patient-specific anonymization shift."
         ]
       },
       {
@@ -4327,7 +4521,10 @@
         "table": "magview_all_cohorts_PACS_v2_anon",
         "column": "pdate_anon",
         "concept": "pathology.report_date",
-        "status": "direct"
+        "status": "ambiguous",
+        "notes": [
+          "Believed to represent pathology-report documentation time, but the interpretation remains provisional and the field is rarely used in current internal workflows."
+        ]
       },
       {
         "id": "internal-v2.binding.feature.pathology.biopsy_type.type",
@@ -4956,10 +5153,11 @@
         "authority": "preferred",
         "derivation": "projected",
         "claim_refs": [
-          "internal-v2.magview-representation-context#wide-association-grain"
+          "internal-v2.magview-representation-context#wide-association-grain",
+          "internal-v2.magview-representation-context#patient-attribute-variation"
         ],
         "caveats": [
-          "Patient-level attributes repeat across wide rows and can disagree; this binding supplies no reconciliation rule."
+          "Patient-level attributes repeat across wide rows and may change or disagree; any latest-value use requires an explicit as-of time."
         ],
         "instance_identity": {
           "columns": [
@@ -4968,7 +5166,7 @@
           "scope": "Release-scoped anonymized patient identity within the internal MagView table.",
           "reserved_exceptions": [],
           "rows_per_instance": "one_or_more",
-          "longitudinal_identity": false
+          "longitudinal_identity": true
         }
       },
       {
@@ -4987,7 +5185,7 @@
         ],
         "caveats": [
           "The optional linked accession is not a complete episode identity or construction rule.",
-          "The reference can dangle or vary across repeated finding rows."
+          "The reference can dangle; conflicting values across repeated rows are data-quality errors."
         ]
       },
       {
@@ -5001,10 +5199,11 @@
         "authority": "preferred",
         "derivation": "projected",
         "claim_refs": [
-          "internal-v2.magview-representation-context#wide-association-grain"
+          "internal-v2.magview-representation-context#wide-association-grain",
+          "internal-v2.magview-representation-context#exam-attribute-inconsistency"
         ],
         "caveats": [
-          "Exam attributes repeat at wide-row grain and can disagree without a supplied authority rule."
+          "Exam attributes should agree across repeated rows; conflicts are data-quality errors without a supplied repair rule."
         ],
         "instance_identity": {
           "columns": [
@@ -5067,10 +5266,9 @@
         "instance_identity": {
           "columns": [
             "acc_anon",
-            "side",
             "numfind"
           ],
-          "scope": "Ordinary finding locator within one accession and represented side.",
+          "scope": "Ordinary clinical finding identity within one imaging accession; side is an attribute rather than an identity component.",
           "reserved_exceptions": [
             {
               "column": "numfind",
@@ -5112,10 +5310,8 @@
         "table": "magview_all_cohorts_PACS_v2_anon",
         "columns": [
           "acc_anon",
-          "side",
           "numfind",
           "procdate_anon",
-          "pdate_anon",
           "type",
           "technique",
           "biopsite",
@@ -5130,16 +5326,14 @@
           "internal-v2.magview-pathology-context#procedure-pathology-attachment"
         ],
         "caveats": [
-          "The composite is a row locator rather than a durable procedure identity.",
-          "Procedure fields can be incomplete and one finding can have multiple represented procedure rows."
+          "The composite is a supported procedure-associated locator rather than a durable procedure identifier.",
+          "Procedure fields can be incomplete; one finding with multiple procedures occupies repeated rows that differ in procedure-level information."
         ],
         "instance_identity": {
           "columns": [
             "acc_anon",
-            "side",
             "numfind",
             "procdate_anon",
-            "pdate_anon",
             "type",
             "technique",
             "biopsite",
@@ -5147,7 +5341,7 @@
             "lymphsurg",
             "bside"
           ],
-          "scope": "Complete internal procedure-associated row locator within a finding context.",
+          "scope": "Internal procedure-associated locator within an accession-plus-finding-number context.",
           "reserved_exceptions": [],
           "rows_per_instance": "unknown",
           "longitudinal_identity": false
@@ -5171,36 +5365,17 @@
           "bside",
           "specnum"
         ],
-        "completeness": "partial",
-        "authority": "preferred",
+        "completeness": "unknown",
+        "authority": "unspecified",
         "derivation": "projected",
         "claim_refs": [
           "internal-v2.magview-pathology-context#specimen-surface"
         ],
         "caveats": [
+          "Specimen-level presence, completeness, reliability, identity, and cardinality are unresolved; current internal operations should not rely on this binding.",
           "Specimen number is source scoped, not globally unique, and can repeat across physical rows.",
           "No durable specimen identity or specimen-collection timestamp is established."
-        ],
-        "instance_identity": {
-          "columns": [
-            "acc_anon",
-            "side",
-            "numfind",
-            "procdate_anon",
-            "pdate_anon",
-            "type",
-            "technique",
-            "biopsite",
-            "surgery",
-            "lymphsurg",
-            "bside",
-            "specnum"
-          ],
-          "scope": "Procedure-associated specimen representation within an internal finding context.",
-          "reserved_exceptions": [],
-          "rows_per_instance": "unknown",
-          "longitudinal_identity": false
-        }
+        ]
       },
       {
         "id": "internal-v2.pathology_observation.magview",
@@ -5222,7 +5397,7 @@
         "authority": "preferred",
         "derivation": "projected",
         "claim_refs": [
-          "internal-v2.magview-pathology-context#specimen-surface",
+          "internal-v2.magview-pathology-context#procedure-pathology-attachment",
           "internal-v2.magview-pathology-context#path-severity-derived-occurrence"
         ],
         "caveats": [
@@ -5252,7 +5427,7 @@
         ],
         "caveats": [
           "The row-level severity is descriptor derived and not a supplied reduction across every row linked to one finding.",
-          "Severity code 6 and regional-node TNM code meanings remain unresolved."
+          "Severity code 6 is invalid or unexpected, and regional-node TNM code meanings remain unresolved."
         ]
       }
     ],
@@ -6060,7 +6235,6 @@
             "id": "internal-v2.magview.finding-locator",
             "columns": [
               "acc_anon",
-              "side",
               "numfind"
             ],
             "kind": "natural",
@@ -6071,12 +6245,38 @@
               "observed_v2_values"
             ],
             "caveats": [
-              "The locator can repeat while finding descriptors, procedures, pathology, or specimen fields differ.",
-              "Null laterality and a reserved negative finding number prevent unconditional identity."
+              "The clinical identity can occupy repeated rows while procedure, pathology, or descriptor fields differ.",
+              "A reserved negative finding number and data-quality conflicts prevent unconditional physical-row uniqueness."
             ]
           },
           {
-            "id": "internal-v2.magview.procedure-row-locator",
+            "id": "internal-v2.magview.procedure-locator",
+            "columns": [
+              "acc_anon",
+              "numfind",
+              "procdate_anon",
+              "type",
+              "technique",
+              "biopsite",
+              "surgery",
+              "lymphsurg",
+              "bside"
+            ],
+            "kind": "natural",
+            "uniqueness": "unknown",
+            "completeness": "incomplete",
+            "evidence": [
+              "release_schema",
+              "maintainer_confirmed",
+              "observed_v2_values"
+            ],
+            "caveats": [
+              "Procedure date and type help distinguish multiple procedures attached to one finding, but no durable procedure identifier or universal unique tuple is established.",
+              "Incomplete procedure fields prevent unconditional use of this locator."
+            ]
+          },
+          {
+            "id": "internal-v2.magview.procedure-specimen-row-locator",
             "columns": [
               "acc_anon",
               "side",
@@ -6100,13 +6300,15 @@
             ],
             "caveats": [
               "Uniqueness applies only when every component is represented and does not establish durable clinical procedure or specimen identity.",
+              "This specimen-associated physical row locator must not be mistaken for the supported procedure locator.",
               "Most procedure-associated rows cannot use this complete locator."
             ]
           }
         ],
         "caveats": [
           "No complete durable physical-row key is established.",
-          "Repeated patient- or exam-level values can disagree; the profile supplies no row-selection or repair policy.",
+          "Repeated patient attributes may vary over time and require an explicit as-of-time choice; repeated exam attributes should agree and conflicts are data-quality errors without a supplied repair policy.",
+          "The modality_desc occurrence is preferred; modality remains unmapped because its relationship to modality_desc is unknown.",
           "Unmapped columns remain physically inventoried because their clinical meaning is unresolved or outside supported Phase 1 evidence."
         ]
       }
@@ -6855,10 +7057,11 @@
           "observed_v2_values"
         ],
         "caveats": [
-          "The optional linked accession can dangle and has no governed direction or complete episode semantics."
+          "The optional linked accession can dangle, and conflicting repeated values are data-quality errors; the reference does not by itself construct a complete imaging episode.",
+          "It represents a co-occurring same-episode exam and must not be used as a prior-or-follow-up link."
         ],
         "join_hazards": [
-          "Do not inner-join away dangling references or infer link presence solely from linked_study_flag."
+          "Do not inner-join away dangling references or infer the explicit accession solely from linked_study_flag."
         ],
         "semantic_relationships": [],
         "claim_refs": [
@@ -6878,8 +7081,8 @@
           ]
         },
         "label": "Image region of interest",
-        "definition": "One represented spatial region associated with a breast-imaging image.",
-        "grain": "one represented region of interest on one image",
+        "definition": "One represented spatial region originating on exactly one breast-imaging source image.",
+        "grain": "one represented region of interest on exactly one source image",
         "domains": [
           "imaging"
         ],
@@ -6893,7 +7096,8 @@
           "internal-v2.roi-context#roi-attached-to-image"
         ],
         "caveats": [
-          "Geometry, coordinate system, annotation provenance, multiplicity, and physical storage are not yet cataloged.",
+          "Geometry, coordinate system, annotation provenance, and physical storage are not yet cataloged.",
+          "Future linkage of corresponding ROIs across simultaneous FFDM, DBT, and synthetic 2D acquisitions is separate from source-image attachment.",
           "A represented region of interest is not automatically equivalent to a clinical imaging finding."
         ]
       },
@@ -6905,8 +7109,8 @@
           ]
         },
         "label": "Pathology specimen",
-        "definition": "A represented tissue specimen with procedure-associated pathology descriptors and optional specimen, staging, biomarker, margin, or nodal characterization.",
-        "grain": "one represented pathology specimen association within an internal MagView finding/procedure context",
+        "definition": "A putative procedure-associated tissue-specimen representation whose presence, completeness, reliability, identity, and cardinality remain unresolved in internal MagView.",
+        "grain": "one putative pathology specimen association within an internal MagView finding/procedure context",
         "domains": [
           "pathology",
           "procedure"
@@ -6921,12 +7125,49 @@
           "internal-v2.magview-pathology-context#specimen-surface"
         ],
         "caveats": [
+          "Current internal V2 operations should not rely on specimen-level fields.",
           "No globally unique or durable specimen identity is established.",
-          "A specimen representation may repeat across physical rows and is not equivalent to one pathology descriptor slot."
+          "A putative specimen representation may repeat across physical rows and is not equivalent to one pathology descriptor slot."
         ]
       }
     },
     "concepts": {
+      "internal-v2.technical.cancer_registry_record_identifier": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Cancer-registry record identifier",
+        "definition": "Technical identifier for a record in a separate Georgia cancer-registry-derived pathology table, scoped jointly with the internal patient identifier.",
+        "feature_kind": "technical",
+        "domains": [
+          "pathology",
+          "technical"
+        ],
+        "search_terms": [
+          "cancer registry record identifier",
+          "Georgia cancer registry linkage",
+          "registry pathology reference"
+        ],
+        "evidence": [
+          "release_schema",
+          "maintainer_confirmed"
+        ],
+        "objects": [],
+        "claim_refs": [
+          "internal-v2.magview-representation-context#cancer-registry-reference"
+        ],
+        "caveats": [
+          "The value is meaningful only together with empi_anon.",
+          "It is not itself a cancer diagnosis, cancer outcome, or proof that diagnosis occurred at Emory.",
+          "The referenced registry table is not physically bound in Phase 1."
+        ],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
       "internal-v2.exam.accession_source_type": {
         "availability": {
           "scope": "profiles",
@@ -8170,7 +8411,7 @@
           "internal-v2.roi-context#roi-attached-to-image"
         ],
         "caveats": [
-          "Profile-specific evidence is still needed for physical linkage, identity, and cardinality verification."
+          "Physical tables, identifiers, geometry, and linkage implementation remain deferred to the ROI phase."
         ]
       },
       "internal-v2.clinical.procedure-pathology-specimen": {
@@ -8192,10 +8433,10 @@
           "source": "optional",
           "target": "optional"
         },
-        "attribution": "Procedure-associated representation of a tissue specimen.",
+        "attribution": "Putative procedure-associated representation of a tissue specimen.",
         "attribution_limitations": [
-          "No unique procedure or specimen identifier proves one-to-one attribution.",
-          "Incomplete procedure fields and repeated rows limit physical identity."
+          "Procedure-level information is reliable, but specimen-level presence, completeness, identity, and cardinality remain unresolved.",
+          "No unique specimen identifier proves one-to-one attribution."
         ],
         "temporal_qualification": "The specimen is downstream of tissue sampling or surgery; specimen-collection time is unsupported.",
         "temporal_semantics": [
@@ -8217,7 +8458,7 @@
           "internal-v2.magview-pathology-context#specimen-surface"
         ],
         "caveats": [
-          "The relationship is descriptive and not an executable specimen-matching rule."
+          "The relationship is unresolved and must not be used as a specimen-matching rule."
         ]
       },
       "internal-v2.clinical.pathology-specimen-observation": {
@@ -8233,16 +8474,16 @@
         "target_object": "pathology_observation",
         "cardinality": {
           "targets_per_source": "zero_or_more",
-          "sources_per_target": "zero_or_one"
+          "sources_per_target": "zero_or_more"
         },
         "optionality": {
           "source": "optional",
           "target": "optional"
         },
-        "attribution": "A pathology descriptor slot is recorded for a represented specimen association.",
+        "attribution": "A pathology descriptor slot may be co-located with a putative specimen association.",
         "attribution_limitations": [
           "Slot order and duplicate occurrences do not create clinical weight.",
-          "Specimen identity is source scoped and incomplete."
+          "Specimen presence, identity, completeness, reliability, and cardinality are unresolved."
         ],
         "temporal_qualification": "Descriptor observations are documented in the downstream pathology context.",
         "temporal_semantics": [
@@ -8264,7 +8505,7 @@
           "internal-v2.magview-pathology-context#path-severity-derived-occurrence"
         ],
         "caveats": [
-          "Row co-location does not prove a unique specimen-to-observation identity."
+          "Row co-location does not prove a specimen-to-observation attribution; current operations should not rely on this edge."
         ]
       },
       "internal-v2.clinical.pathology-specimen-diagnosis": {
@@ -8286,10 +8527,11 @@
           "source": "optional",
           "target": "optional"
         },
-        "attribution": "Specimen-associated descriptor observations and characterization support a represented pathology diagnosis state.",
+        "attribution": "Descriptor observations and characterization co-located with a putative specimen representation support a represented pathology diagnosis state.",
         "attribution_limitations": [
-          "A finding can carry several specimen or procedure rows with different severity states.",
-          "Unresolved descriptor and severity codes limit diagnosis interpretation."
+          "Specimen presence and attribution are unresolved and must not be required for diagnosis-level use.",
+          "A finding can carry several procedure or putative specimen rows with different severity states.",
+          "Invalid severity code 6 and unexplained descriptor codes require explicit handling."
         ],
         "temporal_qualification": "Diagnosis documentation is downstream of the imaging finding and procedure.",
         "temporal_semantics": [
@@ -8307,10 +8549,12 @@
           "specimen pathology severity"
         ],
         "claim_refs": [
+          "internal-v2.magview-pathology-context#specimen-surface",
           "internal-v2.magview-pathology-context#path-severity-derived-occurrence"
         ],
         "caveats": [
-          "No finding-level reduction across all linked rows is supplied."
+          "No finding-level reduction across all linked rows is supplied.",
+          "Current internal operations should not rely on the specimen endpoint of this relationship."
         ]
       }
     },

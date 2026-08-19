@@ -91,9 +91,15 @@ validation checks availability against loaded profiles and provenance scope.
 The `internal-v2` profile demonstrates this mechanism in two independent ways.
 Its Phase 1 binding maps the wide `magview_all_cohorts_PACS_v2_anon` clinical
 table to shared and profile-owned clinical semantics, including an internal
-pathology-specimen object. Its `region_of_interest` object and
+putative pathology-specimen object whose reliability and identity remain
+unresolved. It also records longitudinal patient identity, same-episode linked
+accessions, accession-plus-finding-number identity, date-shift and event-time
+meaning, supported procedure representation, categorical normalization,
+invalid pathology-severity value `6`, and a technical cancer-registry
+reference. Its `region_of_interest` object and
 `clinical.image-region-of-interest` relationship remain semantic-only. Phase 1
-leaves image metadata outside the profile binding, while explicit
+establishes one required source image per ROI but leaves image metadata and
+future cross-image ROI grouping outside the profile binding, while explicit
 `not_cataloged` coverage leaves ROI tables, columns, identifiers, geometry,
 coordinate systems, and physical linkage for Phase 2.
 
