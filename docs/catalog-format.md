@@ -178,6 +178,13 @@ concept. Optional occurrence interpretations retain value/null meaning,
 evidence status, claims, and caveats. Vocabulary selection remains
 mapping-specific.
 
+Evidence arrays use the release-neutral value `observed_source_values` when a
+record depends on targeted observations of the applicable source artifact. The
+record's profile scope, claim references, and cited source—not the controlled
+evidence token—identify whether that artifact is Open V2, internal V2, internal
+V1c, or another governed representation. The former
+`observed_v2_values` value is not a schema-v8 input.
+
 ### Object mappings and co-location
 
 Object bindings name an object, table, relevant columns, evidence, and optional

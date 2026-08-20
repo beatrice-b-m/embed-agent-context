@@ -137,7 +137,7 @@
       "enum": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "cross_table_check",
         "maintainer_confirmed",
         "inference",

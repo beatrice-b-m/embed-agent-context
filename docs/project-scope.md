@@ -389,6 +389,12 @@ Use each source for the claim it can actually support:
   [public EMBED documentation](https://docs.hitilab.com/datasets/embed) provide
   historical definitions and candidate value meanings.
 
+Use the controlled evidence value `observed_source_values` for targeted
+observations of a governed source artifact. It deliberately does not encode a
+release name: the containing profile, claim references, and cited source carry
+the V1c, V2, public, or internal version boundary. Do not use the former
+`observed_v2_values` value for schema-v8 content.
+
 The V1 dictionary and public documentation are non-comprehensive and primarily
 describe earlier EMBED releases. They are not authoritative for internal V2 on
 their own. Likewise, a value observed in internal V2 establishes occurrence,

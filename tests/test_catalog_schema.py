@@ -62,6 +62,23 @@ class CatalogSchemaContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.profile_validator.validate(whitespace)
 
+    def test_observed_source_evidence_is_release_neutral(self) -> None:
+        semantic = deepcopy(self.semantic)
+        semantic_concept = next(iter(semantic["concepts"].values()))
+        semantic_concept["evidence"] = ["observed_source_values"]
+        self.semantic_validator.validate(semantic)
+        semantic_concept["evidence"] = ["observed_v2_values"]
+        with self.assertRaises(ValidationError):
+            self.semantic_validator.validate(semantic)
+
+        profile = deepcopy(self.profile)
+        profile_vocabulary = next(iter(profile["vocabularies"].values()))
+        profile_vocabulary["evidence"] = ["observed_source_values"]
+        self.profile_validator.validate(profile)
+        profile_vocabulary["evidence"] = ["observed_v2_values"]
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(profile)
+
     def test_optional_semantic_collections_may_be_empty(self) -> None:
         semantic = deepcopy(self.semantic)
         for concept in semantic["concepts"].values():

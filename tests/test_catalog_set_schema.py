@@ -420,6 +420,27 @@ class CatalogSetSchemaTests(unittest.TestCase):
         validator = Draft202012Validator(self.extension_schema)
         validator.validate(extension)
 
+        with_source_observation = deepcopy(extension)
+        with_source_observation["contributions"]["concepts"][
+            "project.example.observed_feature"
+        ] = {
+            "label": "Observed feature",
+            "definition": "An example feature observed in a source artifact.",
+            "feature_kind": "categorical",
+            "domains": ["technical"],
+            "search_terms": ["observed feature"],
+            "caveats": [],
+            "evidence": ["observed_source_values"],
+            "objects": ["image"],
+        }
+        validator.validate(with_source_observation)
+
+        with_source_observation["contributions"]["concepts"][
+            "project.example.observed_feature"
+        ]["evidence"] = ["observed_v2_values"]
+        with self.assertRaises(ValidationError):
+            validator.validate(with_source_observation)
+
         invalid = deepcopy(extension)
         invalid["revisions"] = []
         with self.assertRaises(ValidationError):

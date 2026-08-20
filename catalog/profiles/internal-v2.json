@@ -1508,7 +1508,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1543,7 +1543,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1598,7 +1598,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1624,7 +1624,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1661,7 +1661,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1687,7 +1687,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1713,7 +1713,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1738,7 +1738,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1766,7 +1766,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1816,7 +1816,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1848,7 +1848,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1886,7 +1886,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1970,7 +1970,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -1999,7 +1999,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2045,7 +2045,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2104,7 +2104,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2138,7 +2138,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2165,7 +2165,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2193,7 +2193,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2233,7 +2233,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2290,7 +2290,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2335,7 +2335,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2362,7 +2362,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2387,7 +2387,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2414,7 +2414,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2444,7 +2444,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2469,7 +2469,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2495,7 +2495,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2524,7 +2524,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2550,7 +2550,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2583,7 +2583,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "caveats": [
@@ -2627,7 +2627,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2656,7 +2656,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2681,7 +2681,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2710,7 +2710,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2745,7 +2745,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -2771,7 +2771,7 @@
       "parsing": "shared_slot_dictionary",
       "evidence": [
         "maintainer_confirmed",
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend",
         "unresolved"
       ],
@@ -3016,7 +3016,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3053,7 +3053,7 @@
       "parsing": "atomic",
       "evidence": [
         "maintainer_confirmed",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The scale is inverse: lower values represent more severe pathology.",
@@ -3077,7 +3077,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3114,7 +3114,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3143,7 +3143,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3199,7 +3199,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3231,7 +3231,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3257,7 +3257,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3282,7 +3282,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3312,7 +3312,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3343,7 +3343,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3370,7 +3370,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3398,7 +3398,7 @@
       "completeness": "unknown",
       "parsing": "comma_composed_undocumented",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "release_legend"
       ],
       "caveats": [
@@ -3434,7 +3434,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3457,7 +3457,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3480,7 +3480,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3509,7 +3509,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3533,7 +3533,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3558,7 +3558,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3583,7 +3583,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3612,7 +3612,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3643,7 +3643,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3668,7 +3668,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3695,7 +3695,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3721,7 +3721,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "caveats": [
@@ -3744,7 +3744,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "caveats": [
@@ -3771,7 +3771,7 @@
       "parsing": "comma_composed_undocumented",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "Internal source tokens use uppercase forms of the comparison-dictionary codes.",
@@ -3796,7 +3796,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3820,7 +3820,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3856,7 +3856,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "caveats": [
@@ -3887,7 +3887,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "Internal source tokens use uppercase forms of the comparison-dictionary codes.",
@@ -3912,7 +3912,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3939,7 +3939,7 @@
       "parsing": "atomic",
       "evidence": [
         "release_legend",
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "The comparison dictionaries do not state that this code list is exhaustive.",
@@ -3961,7 +3961,7 @@
       "completeness": "open",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "inference"
       ],
       "caveats": [
@@ -3985,7 +3985,7 @@
       "completeness": "open",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "inference"
       ],
       "caveats": [
@@ -4013,7 +4013,7 @@
       "completeness": "open",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values"
+        "observed_source_values"
       ],
       "caveats": [
         "Only left and right are represented; a bilateral source laterality yields no derived value and a missing value is not bilateral.",
@@ -4036,7 +4036,7 @@
       "completeness": "closed",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "inference"
       ],
       "caveats": [
@@ -4060,7 +4060,7 @@
       "completeness": "open",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "caveats": [
@@ -4083,7 +4083,7 @@
       "completeness": "unknown",
       "parsing": "atomic",
       "evidence": [
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "caveats": [
@@ -7571,7 +7571,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "The anonymized identifier is release scoped and repeats across wide rows."
@@ -7587,7 +7587,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "The accession is source scoped and repeats for findings and downstream attachments."
@@ -7604,7 +7604,7 @@
             "completeness": "incomplete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "The clinical identity can occupy repeated rows while procedure, pathology, or descriptor fields differ.",
@@ -7630,7 +7630,7 @@
             "evidence": [
               "release_schema",
               "maintainer_confirmed",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "Procedure date and type help distinguish multiple procedures attached to one finding, but no durable procedure identifier or universal unique tuple is established.",
@@ -7658,7 +7658,7 @@
             "completeness": "incomplete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "Uniqueness applies only when every component is represented and does not establish durable clinical procedure or specimen identity.",
@@ -8520,7 +8520,7 @@
             "uniqueness": "not_unique",
             "completeness": "complete",
             "evidence": [
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "The anonymized identifier repeats across the patient's image rows and remains patient-level.",
@@ -8536,7 +8536,7 @@
             "uniqueness": "not_unique",
             "completeness": "complete",
             "evidence": [
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "The accession repeats across the exam's image rows and remains exam-level.",
@@ -8552,7 +8552,7 @@
             "uniqueness": "unique",
             "completeness": "incomplete",
             "evidence": [
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "This is a technical file reference, not clinical image identity, and it is release-local to this extraction.",
@@ -8571,7 +8571,7 @@
             "uniqueness": "not_unique",
             "completeness": "complete",
             "evidence": [
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "DICOM series and instance numbers do not distinguish one image row within an accession, including among rows that carry a file locator."
@@ -8586,7 +8586,7 @@
             "uniqueness": "not_unique",
             "completeness": "complete",
             "evidence": [
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "The group deliberately spans several image rows and is nested within one accession.",
@@ -8632,7 +8632,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "This same-table binding records represented clinical association, not a separate-table join or one-to-one attribution."
@@ -8669,7 +8669,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "This same-table binding records represented clinical association, not a separate-table join or one-to-one attribution."
@@ -8706,7 +8706,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "This same-table binding records represented clinical association, not a separate-table join or one-to-one attribution."
@@ -8743,7 +8743,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "This same-table binding records represented clinical association, not a separate-table join or one-to-one attribution."
@@ -8780,7 +8780,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "This same-table binding records represented clinical association, not a separate-table join or one-to-one attribution."
@@ -8819,7 +8819,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "This same-table binding records represented clinical association, not a separate-table join or one-to-one attribution."
@@ -8858,7 +8858,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "Finding side is the contextual side; it can differ from biopsy side and does not prove one-to-one pathology attribution."
@@ -8899,7 +8899,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "This same-table binding records represented clinical association, not a separate-table join or one-to-one attribution."
@@ -8940,7 +8940,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "Procedure attribution is optional and many-to-many at the supported physical locator."
@@ -8981,7 +8981,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "Co-location does not establish complete or one-to-one pathology attribution to the finding."
@@ -9022,7 +9022,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "No independent interpretation identity proves a one-to-one procedure recommendation."
@@ -9079,7 +9079,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "The complete procedure locator is optional and is not a durable clinical procedure key."
@@ -9136,7 +9136,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "Specimen number is source scoped and does not establish one-to-one procedure attribution."
@@ -9195,7 +9195,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "Descriptor slots are co-located with a specimen representation but no durable observation identity is supplied."
@@ -9254,7 +9254,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "The row-level diagnosis state is not a supplied reduction across all rows for a finding or specimen."
@@ -9313,7 +9313,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "Descriptor-derived severity can be absent even when descriptor slots are present."
@@ -9350,7 +9350,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "The optional linked accession can dangle, and conflicting repeated values are data-quality errors; the reference does not by itself construct a complete imaging episode.",
@@ -9385,7 +9385,7 @@
           "sources_per_target": "zero_or_more"
         },
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "caveats": [
@@ -9434,7 +9434,7 @@
           "sources_per_target": "zero_or_more"
         },
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "caveats": [
@@ -9472,7 +9472,7 @@
           "sources_per_target": "exactly_one"
         },
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "caveats": [
           "The relationship is realized by row co-location rather than by a key join: an image row's region-of-interest collections are carried in that same row.",
@@ -9624,7 +9624,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "imaging_exam"
@@ -9659,7 +9659,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "procedure"
@@ -9695,7 +9695,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "procedure",
@@ -9731,7 +9731,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -9763,7 +9763,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_diagnosis"
@@ -9797,7 +9797,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_diagnosis"
@@ -9831,7 +9831,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values",
+          "observed_source_values",
           "unresolved"
         ],
         "objects": [
@@ -9866,7 +9866,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_diagnosis"
@@ -9900,7 +9900,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_diagnosis"
@@ -9934,7 +9934,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_diagnosis"
@@ -10000,7 +10000,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10034,7 +10034,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10068,7 +10068,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10102,7 +10102,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10137,7 +10137,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10172,7 +10172,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10206,7 +10206,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10241,7 +10241,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10276,7 +10276,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values",
+          "observed_source_values",
           "unresolved"
         ],
         "objects": [
@@ -10311,7 +10311,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10346,7 +10346,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10381,7 +10381,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10417,7 +10417,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10452,7 +10452,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10487,7 +10487,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10522,7 +10522,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10555,7 +10555,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10588,7 +10588,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen"
@@ -10620,7 +10620,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10653,7 +10653,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10686,7 +10686,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10719,7 +10719,7 @@
         "caveats": [],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10754,7 +10754,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10789,7 +10789,7 @@
         ],
         "evidence": [
           "release_legend",
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "pathology_specimen",
@@ -10827,7 +10827,7 @@
           "An observed missing value means the image file is unavailable and is a data-quality defect."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [],
         "claim_refs": [
@@ -10874,7 +10874,7 @@
           "Its relationship to the anonymized DICOM locator is not established."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [],
         "claim_refs": [
@@ -10907,7 +10907,7 @@
           "It does not distinguish one image row."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "objects": [],
@@ -10938,7 +10938,7 @@
           "Series and instance numbers together do not distinguish one image row within an accession."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [],
         "claim_refs": [
@@ -10970,7 +10970,7 @@
           "Series and instance numbers together do not distinguish one image row within an accession."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [],
         "claim_refs": [
@@ -11005,7 +11005,7 @@
           "It is not a region-of-interest correspondence representation."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "objects": [],
@@ -11040,7 +11040,7 @@
           "It is not the derived mammographic image-type classification."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11079,7 +11079,7 @@
           "This attribute, not the derived classification, separates contrast-enhanced, stereotactic, post-biopsy, scout, and screen-save acquisitions."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11119,7 +11119,7 @@
           "It is not exhaustive: source image-type tokens equivalent to a named class also occur under the residual class."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "objects": [
@@ -11161,7 +11161,7 @@
           "View position is separate from image laterality."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11198,7 +11198,7 @@
           "Only one modifier occurrence is inventoried; a source sequence may carry more."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11233,7 +11233,7 @@
           "The flag does not distinguish spot compression from magnification."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "objects": [
@@ -11269,7 +11269,7 @@
           "Image laterality is not the imaging-finding or procedure side."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11307,7 +11307,7 @@
           "Public documentation describes a correspondence with the clinical side column; that correspondence is a linkage hint, not an equality with finding or procedure side."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "objects": [
@@ -11346,7 +11346,7 @@
           "The indicator is itself sometimes absent, including on rows whose derived laterality is represented, so it is not a total provenance record."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "unresolved"
         ],
         "objects": [
@@ -11382,7 +11382,7 @@
           "It does not carry image laterality."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11415,7 +11415,7 @@
           "The pixel-handling consequence of each represented value is not established here."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11451,7 +11451,7 @@
           "The polarity implied by each value is not asserted here and must be resolved against the DICOM standard before rendering."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11484,7 +11484,7 @@
           "The signedness implied by the represented value is not asserted here."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11519,7 +11519,7 @@
           "Region-of-interest rectangles are not guaranteed to lie inside these dimensions."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11553,7 +11553,7 @@
           "Three separate bit-depth attributes are occurrences of this concept and are distinguished by an attribute qualifier."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11583,7 +11583,7 @@
         ],
         "caveats": [],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11616,7 +11616,7 @@
           "It is not represented on every row."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11650,7 +11650,7 @@
           "Two separate spacing attributes are occurrences of this concept and are not reconciled with one another."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11682,7 +11682,7 @@
           "The unit is not documented in the extraction."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11714,7 +11714,7 @@
           "The unit is not documented in the extraction."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11745,7 +11745,7 @@
         ],
         "caveats": [],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11778,7 +11778,7 @@
           "Other represented dose and exposure attributes remain unmapped because their units and internal meaning are not established."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11811,7 +11811,7 @@
           "Represented values include image-processing and secondary-capture vendors as well as acquisition-system vendors."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11844,7 +11844,7 @@
           "Represented values include non-mammographic and workstation models."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11876,7 +11876,7 @@
           "The value is a serialized sequence of vendor-specific component versions and is not parsed here."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11909,7 +11909,7 @@
           "Represented values include film and storage acquisition forms as well as direct digital detection."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11942,7 +11942,7 @@
           "It is not represented on every row."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11977,7 +11977,7 @@
           "NO does not mean that the image contains no annotation; it means the source does not declare sufficient burned-in annotation to identify the patient and acquisition date."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -12025,7 +12025,7 @@
           "Per-value meanings are not established here; the attribute is used only to show that secondary-capture and screen-save rows occur."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -12059,7 +12059,7 @@
           "The represented values are strongly associated with the derived image-type classification rather than distributed across it."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "unresolved"
         ],
         "objects": [
@@ -12097,7 +12097,7 @@
           "Its intended meaning and the pass that produced it are not established."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "unresolved"
         ],
         "objects": [
@@ -12133,7 +12133,7 @@
           "Zero is represented and accompanies empty collections."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "objects": [
@@ -12171,7 +12171,7 @@
           "The collection is aligned by position with the frame-index and depth-derivation collections; position is not region identity."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "unresolved"
         ],
         "objects": [
@@ -12222,7 +12222,7 @@
           "No inventoried column states a frame count, so no upper bound is established."
         ],
         "evidence": [
-          "observed_v2_values"
+          "observed_source_values"
         ],
         "objects": [
           "region_of_interest"
@@ -12271,7 +12271,7 @@
           "It records that depth information was derived, not who or what produced the region."
         ],
         "evidence": [
-          "observed_v2_values",
+          "observed_source_values",
           "inference"
         ],
         "objects": [

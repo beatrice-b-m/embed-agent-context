@@ -388,6 +388,18 @@ class CatalogLoaderTests(unittest.TestCase):
         ] = {"nested": {"not": "scalar"}}
         self.assert_invalid(data, "must be a scalar descriptive value")
 
+    def test_observed_source_evidence_is_release_neutral(self) -> None:
+        data = cloned_catalog()
+        data["concepts"]["pathology.severity"]["evidence"] = [
+            "observed_source_values"
+        ]
+        Catalog.from_mapping(data)
+
+        data["concepts"]["pathology.severity"]["evidence"] = [
+            "observed_v2_values"
+        ]
+        self.assert_invalid(data, "unknown evidence values")
+
     def test_object_binding_can_be_table_level_but_must_resolve(self) -> None:
         data = cloned_catalog()
         data["profile_bindings"]["profile-a"]["object_bindings"][0][

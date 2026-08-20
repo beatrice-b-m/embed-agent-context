@@ -352,7 +352,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -379,7 +379,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -406,7 +406,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -433,7 +433,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -460,7 +460,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -562,7 +562,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -590,7 +590,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -619,7 +619,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -867,7 +867,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -894,7 +894,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -948,7 +948,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -1083,7 +1083,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -1136,7 +1136,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -1517,7 +1517,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -1553,7 +1553,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -1581,7 +1581,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -1640,7 +1640,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -1725,7 +1725,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -1862,7 +1862,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -1890,7 +1890,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -1947,7 +1947,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -2082,7 +2082,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -2248,7 +2248,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -2277,7 +2277,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -2444,7 +2444,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -2499,7 +2499,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -2609,7 +2609,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "unresolved"
       ],
       "objects": [
@@ -2748,7 +2748,7 @@
       "evidence": [
         "release_schema",
         "release_legend",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -2900,7 +2900,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -2975,7 +2975,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed"
       ],
       "objects": [
@@ -3027,7 +3027,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3055,7 +3055,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3083,7 +3083,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3111,7 +3111,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3139,7 +3139,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3167,7 +3167,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3195,7 +3195,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3223,7 +3223,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3251,7 +3251,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3279,7 +3279,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3307,7 +3307,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],
@@ -3335,7 +3335,7 @@
       ],
       "evidence": [
         "release_schema",
-        "observed_v2_values",
+        "observed_source_values",
         "maintainer_confirmed",
         "unresolved"
       ],

@@ -170,6 +170,11 @@ not override current source evidence, while observed occurrence alone does not
 prove clinical meaning or exhaustiveness. Only the reconciled, non-identifying,
 count-free conclusion enters the catalog.
 
+The controlled evidence value `observed_source_values` is intentionally
+release-neutral. Version and profile applicability come from the containing
+record and its claim-level source provenance. This keeps internal V1c evidence
+truthful without introducing a new controlled value for every source version.
+
 ## History
 
 [Architecture v7](architecture-v7.md) and the

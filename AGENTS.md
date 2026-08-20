@@ -68,6 +68,9 @@ clinical source data narrowly to answer a specific catalog question.
   they do not by themselves establish clinical meaning, exhaustiveness, or a
   preferred analysis policy. Reconcile them with maintainer knowledge,
   applicable legends, dictionaries, and documentation.
+- Use the release-neutral evidence value `observed_source_values` for targeted
+  source observations. The containing profile, claims, and sources carry the
+  V1c, V2, public, or internal version boundary.
 - The V1 Open Data dictionary and public EMBED documentation are historical,
   non-comprehensive references. The V2 Open Data legend is a closer comparison
   source, but none may be assumed to describe internal V2 without checking the

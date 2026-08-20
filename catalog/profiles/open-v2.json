@@ -6769,7 +6769,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "A patient may be represented by multiple exam rows."
@@ -7331,7 +7331,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "Uniqueness and completeness were verified for open-v2; no cross-release constraint is documented.",
@@ -7391,7 +7391,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "Accession plus report sequence does not uniquely identify every report row.",
@@ -7411,7 +7411,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "Adding patient and anonymized study date still does not yield a unique clinical key."
@@ -7427,7 +7427,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "This pandas serialization index is not current row position or a documented durable report identifier."
@@ -7536,7 +7536,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "Open-v2 has at most one represented risk row per accession, but no durable uniqueness constraint is documented."
@@ -7552,7 +7552,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "A patient may have risk rows for multiple accessions."
@@ -7641,7 +7641,7 @@
             "completeness": "incomplete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "Release uniqueness retained null side as a state; this is not a SQL uniqueness constraint over nullable columns.",
@@ -7658,7 +7658,7 @@
             "completeness": "complete",
             "evidence": [
               "release_schema",
-              "observed_v2_values"
+              "observed_source_values"
             ],
             "caveats": [
               "An accession may have multiple side-level rows."
@@ -8238,7 +8238,7 @@
         },
         "evidence": [
           "release_schema",
-          "observed_v2_values",
+          "observed_source_values",
           "inference",
           "unresolved"
         ],

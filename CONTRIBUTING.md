@@ -201,6 +201,11 @@ values and their supported meanings belong in the catalog. Keep temporary
 scripts and outputs ignored or outside the checkout, and never commit anything
 under `reference_files/`.
 
+Use `observed_source_values` for evidence established by a targeted source-data
+observation. The claim's source and profile scope carry the release boundary;
+the evidence value is intentionally neutral across internal V1c, internal V2,
+and public representations.
+
 For an exact footer-only comparison, maintainers may run:
 
 ```bash
