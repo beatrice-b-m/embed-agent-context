@@ -32,20 +32,21 @@ This setup and the baseline test suite need no EMBED data. Read
 - `catalog/profiles/open-v2.json` is the canonical Open V2 evidence, coverage,
   vocabulary, qualification, and physical-binding inventory.
 - `catalog/profiles/internal-v2.json` is the non-default working internal
-  profile. Phase 1 inventories the wide `magview_all_cohorts_PACS_v2_anon`
+  profile. It inventories the wide `magview_all_cohorts_PACS_v2_anon`
   clinical table, binds its supported patient, episode, finding, date,
   procedure, pathology, and registry-reference meanings, and contributes
   internal-only specimen, staging, biomarker, nodal, and source-workflow
   semantics. Procedure information is supported; specimen-level reliability,
-  identity, completeness, and cardinality are unresolved. Phase 2 inventories
+  identity, completeness, and cardinality are unresolved. It also inventories
   the internal V1c `metadata_all_cohorts_v1c` image-metadata table at one row
   per extracted DICOM image instance and binds the image object, co-located
   patient, exam, and image-derived side projections, image metadata concepts,
   the cross-table exam-to-image route, and serialized regions of interest. The
   clinical surface is internal V2 while the paired image metadata is internal
   V1c and narrower; region coordinate axis order and per-region identity remain
-  unresolved. The accession remains the distinct exam identifier when a
-  cross-patient association exposes a source defect; the anonymized DICOM
+  unresolved. Patient and exam identifiers share their cross-table namespaces;
+  each accession belongs to exactly one patient, and a cross-patient
+  association is an invalid data-quality error. The anonymized DICOM
   locator is intended for every extracted image, and an observed missing value
   means the image file is unavailable and is a data-quality defect.
 - `catalog/catalog-set.json` selects bundled defaults; each document type has

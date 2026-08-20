@@ -12,9 +12,9 @@ catalog-set manifest (schema 1)
 ```
 
 The public manifest selects `catalog/semantic/catalog.json` and the `open-v2`
-profile. `internal-v2` is bundled as a non-default working profile; its Phase 1
-binding covers the wide internal MagView clinical table and its Phase 2 binding
-adds the internal V1c image-metadata table. All schemas use JSON Schema
+profile. `internal-v2` is bundled as a non-default working profile; its binding
+covers the wide internal MagView clinical table and the internal V1c
+image-metadata table. All schemas use JSON Schema
 Draft 2020-12 and close authored objects with `additionalProperties: false`.
 
 Schema v8 has no legacy input mode. A schema-v6 monolith, semantic schema 7,
@@ -92,7 +92,7 @@ profile or extension contribution defaults to its target profile. Runtime
 validation checks availability against loaded profiles and provenance scope.
 
 The `internal-v2` profile demonstrates this mechanism in two independent ways.
-Its Phase 1 binding maps the wide `magview_all_cohorts_PACS_v2_anon` clinical
+Its MagView binding maps the wide `magview_all_cohorts_PACS_v2_anon` clinical
 table to shared and profile-owned clinical semantics, including an internal
 putative pathology-specimen object whose reliability and identity remain
 unresolved. It also records longitudinal patient identity, same-episode linked
@@ -101,7 +101,7 @@ meaning, supported procedure representation, categorical normalization,
 invalid pathology-severity value `6`, and a technical cancer-registry
 reference.
 
-Its Phase 2 binding adds the `metadata_all_cohorts_v1c` image-metadata table at
+Its image-metadata binding adds the `metadata_all_cohorts_v1c` table at
 one row per extracted DICOM image instance. That table carries the `image`
 object, the profile's `region_of_interest` object, co-located patient, exam, and
 image-derived breast-side projections, a cross-table accession route for
@@ -116,8 +116,9 @@ coverage, and cross-image ROI grouping is still absent. The paired image
 metadata is internal V1c while the clinical surface is internal V2, so the
 exam-to-image binding records incomplete coverage and states that an unmatched
 clinical exam is not an exam without images. The accession remains one distinct
-exam identifier even where a cross-patient association exposes a source
-data-quality defect. The anonymized DICOM locator is intended for every
+exam identifier in the shared cross-table namespace, belongs to exactly one
+patient, and treats a cross-patient association as an invalid data-quality
+error. The anonymized DICOM locator is intended for every
 extracted image; observed missing values mean the file is unavailable and keep
 the technical key physically incomplete. DICOM Burned In Annotation uses the
 standard `YES`, `NO`, and absent-attribute meanings and remains a source
@@ -128,6 +129,13 @@ declaration rather than pixel-data verification.
 A profile document has `profile_schema_version: 2`, one profile identity, a
 requirement for semantic schema 8, semantic contributions, sources, contexts,
 qualifications, vocabularies, and one physical `profile_binding`.
+
+Vocabulary `parsing` distinguishes atomic values from fields that need
+field-specific handling. `comma_delimited_unordered` means split the physical
+value on commas and interpret the resulting component codes without assigning
+meaning to their order or repetition. Unknown component meanings remain
+unknown. `comma_composed_undocumented` is reserved for comma-bearing values
+whose composition semantics have not been established.
 
 ### Physical table inventory
 

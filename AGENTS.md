@@ -25,18 +25,19 @@ versioned in lockstep with the core distribution.
 - `catalog/profiles/open-v2.json` is the source of truth for the released Open
   V2 profile, its qualifications, evidence, coverage, and physical bindings.
 - `catalog/profiles/internal-v2.json` is the non-default working internal
-  profile. Its Phase 1 binding covers the wide MagView clinical table; its
-  procedure-level representation is supported and its specimen-level
-  reliability and identity remain unresolved. Its Phase 2 binding adds the
-  internal V1c image-metadata table with image, co-located patient/exam/side,
+  profile. It covers the wide MagView clinical table; its procedure-level
+  representation is supported and its specimen-level reliability and identity
+  remain unresolved. It also covers the internal V1c image-metadata table with
+  image, co-located patient/exam/side,
   DICOM-attribute, modality, enrichment, and serialized region-of-interest
   representations. The clinical surface is internal V2 while the paired image
   metadata is internal V1c and deliberately narrower, so an unmatched clinical
   exam means missing extraction coverage rather than missing images. The
-  accession remains one distinct exam identifier despite cross-patient source
-  defects, and the anonymized DICOM locator is intended for every extracted
-  image; a missing locator means the image file is unavailable and is a
-  data-quality defect.
+  patient and exam identifiers share their cross-table namespaces, every
+  accession belongs to exactly one patient, and any cross-patient association
+  is a data-quality error. The anonymized DICOM locator is intended for every
+  extracted image; a missing locator means the image file is unavailable and
+  is a data-quality defect.
 - `catalog/catalog-set.json` selects the bundled semantic and default profile
   modules; version-matched schemas are standalone structural contracts.
 - `embed_context/catalog.py` implements strict parsing, cross-reference,

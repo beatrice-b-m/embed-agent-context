@@ -2997,7 +2997,7 @@
         "anonymized report text"
       ],
       "caveats": [
-        "No report content was read during Phase 1; content, blank behavior, and vocabulary are not characterized."
+        "No report content was read during the reviewed work; content, blank behavior, and vocabulary are not characterized."
       ],
       "evidence": [
         "release_schema",

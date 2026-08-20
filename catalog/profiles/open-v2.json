@@ -15,7 +15,7 @@
       "scope": "profile_specific",
       "locator_kind": "repository_path",
       "locator": "docs/open-v2-linkage-review.md",
-      "version_scope": "Retained open-v2 table, key, projection, relationship, and caveat conclusions derived during the schema-version-3 Phase 2 review.",
+      "version_scope": "Retained open-v2 table, key, projection, relationship, and caveat conclusions derived during the schema-version-3 review.",
       "profiles": [
         "open-v2"
       ],

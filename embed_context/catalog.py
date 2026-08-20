@@ -152,7 +152,12 @@ OBJECT_AUTHORITIES = frozenset(
 OBJECT_DERIVATIONS = frozenset({"projected", "derived", "source", "unknown"})
 VOCABULARY_COMPLETENESS = frozenset({"unknown", "open", "closed"})
 VOCABULARY_PARSING = frozenset(
-    {"atomic", "comma_composed_undocumented", "shared_slot_dictionary"}
+    {
+        "atomic",
+        "comma_composed_undocumented",
+        "comma_delimited_unordered",
+        "shared_slot_dictionary",
+    }
 )
 KEY_KINDS = frozenset({"natural", "technical"})
 KEY_UNIQUENESS = frozenset({"unique", "not_unique", "unknown"})

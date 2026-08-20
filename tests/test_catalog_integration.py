@@ -327,7 +327,8 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertIn("inner join", caveats)
         hazards = " ".join(exam_image.join_hazards)
         self.assertIn("consistency check", hazards)
-        self.assertIn("source defect", hazards)
+        self.assertIn("cross-patient accession association is invalid", hazards)
+        self.assertIn("must not be retained as a valid linkage", hazards)
         qualification = internal.qualifications[
             "internal-v2.qualification.semantic_relationship."
             "clinical.exam-image"

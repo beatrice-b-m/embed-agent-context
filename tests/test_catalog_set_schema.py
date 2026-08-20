@@ -243,7 +243,7 @@ class CatalogSetSchemaTests(unittest.TestCase):
             internal_profile["vocabularies"][
                 "internal-v2.pathology.severity"
             ]["codes"]["6"],
-            "Invalid or unexpected source value",
+            "Invalid source value with no expected meaning",
         )
         patient = next(
             item
@@ -259,6 +259,59 @@ class CatalogSetSchemaTests(unittest.TestCase):
         self.assertEqual(
             finding["instance_identity"]["columns"],
             ["acc_anon", "numfind"],
+        )
+        procedure = next(
+            item
+            for item in binding["object_bindings"]
+            if item["object"] == "procedure"
+        )
+        self.assertEqual(
+            procedure["instance_identity"]["columns"],
+            ["empi_anon", "procdate_anon", "type", "bside"],
+        )
+        self.assertEqual(
+            procedure["instance_identity"]["rows_per_instance"],
+            "one_or_more",
+        )
+        feature_by_column = {
+            item["column"]: item for item in binding["feature_bindings"]
+        }
+        side_meanings = {
+            item["representation"]: item
+            for item in feature_by_column["side"]["occurrence_interpretations"]
+        }
+        self.assertEqual(set(side_meanings), {"B", "null"})
+        self.assertTrue(
+            all(item["status"] == "verified" for item in side_meanings.values())
+        )
+        self.assertTrue(
+            all(
+                "both the left and right" in item["meaning"]
+                for item in side_meanings.values()
+            )
+        )
+        finding_number = feature_by_column["numfind"]
+        synthetic = finding_number["occurrence_interpretations"][0]
+        self.assertEqual(synthetic["representation"], "-9")
+        self.assertEqual(synthetic["status"], "verified")
+        self.assertIn("Synthetic contralateral", synthetic["meaning"])
+        self.assertEqual(
+            internal_profile["vocabularies"][
+                "internal-v2.mri.other_finding"
+            ]["parsing"],
+            "comma_delimited_unordered",
+        )
+        self.assertNotIn(
+            "C,G",
+            internal_profile["vocabularies"][
+                "internal-v2.mri.other_finding"
+            ]["codes"],
+        )
+        self.assertIn(
+            "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics",
+            internal_profile["contributions"]["concepts"][
+                "internal-v2.image.compression_force"
+            ]["claim_refs"],
         )
         specimen = next(
             item

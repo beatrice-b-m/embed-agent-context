@@ -35,7 +35,7 @@ The initial graph distinguishes:
 10. clinical risk-assessment rows.
 
 The shared graph includes acquired images and their relationship to imaging
-exams. The non-default internal-v2 profile now binds the Phase 1 wide MagView
+exams. The non-default internal-v2 profile now binds the wide MagView
 clinical table to separate patient, partial-episode, exam, breast-side, finding,
 interpretation, procedure, putative specimen, pathology-observation, and
 pathology-diagnosis objects. Procedure-level information is supported, but the
@@ -56,8 +56,10 @@ declares no image instance identity; the anonymized file locator is a technical,
 incomplete, release-local row locator. It is nevertheless intended to be
 defined for every extracted image: a missing value means the image file is
 unavailable and is a data-quality defect. `acc_anon` remains the identifier of
-one distinct exam across EMBED; a cross-patient association is a data-quality
-defect rather than a different exam identity.
+one distinct exam across EMBED and shares its namespace across the clinical and
+metadata tables; each accession belongs to exactly one patient, and a
+cross-patient association is an invalid data-quality error rather than a
+different exam identity.
 
 DICOM Burned In Annotation retains its standard meaning: it declares whether
 the image contains sufficient burned-in annotation to identify the patient and
@@ -99,18 +101,21 @@ technical export indices.
 Internal-v2 uses the same accession-plus-finding-number clinical identity;
 side is a finding attribute rather than an identity component. Physical rows
 may repeat that identity for multiple procedure or pathology attachments.
-Conflicting side or exam-level attributes across those rows are data-quality
-errors rather than new clinical identities. `empi_anon` persists across the
+Every exam-level attribute is invariant within an accession, and conflicting
+side or exam-level attributes across rows are data-quality errors rather than
+new clinical identities. Finding number `-9` is the synthetic contralateral
+BI-RADS 1/`N` finding added when a bilateral exam has only a unilateral
+non-negative finding row. `empi_anon` persists across the
 patient's internal V2 records and supports longitudinal traversal. Linked
 accessions are explicitly linked co-occurring exams in one imaging episode,
 such as diagnostic mammography and ultrasound, and never represent prior or
 follow-up exams.
 
-Laterality meaning is occurrence-specific. A null finding-side occurrence can
-represent bilateral where reviewed evidence supports that meaning, while a
-null biopsy or procedure side means unknown rather than bilateral. Side-level
-records and wide projections retain their own reviewed or unresolved
-interpretations.
+Laterality meaning is occurrence-specific. A null finding-side occurrence is
+bilateral and equivalent to `B`; both project to the left and right unilateral
+breast-side identities. A null biopsy or procedure side means unknown rather
+than bilateral. Side-level records and wide projections retain their own
+reviewed or unresolved interpretations.
 
 ## Pathology outcome states
 
@@ -129,7 +134,7 @@ closed represented code set:
 Lower values are more severe. The six codes are not automatically two
 analysis classes, and the catalog does not recommend combining them. In
 internal-v2, code `5` is also non-breast cancer. Any represented code `6` is an
-invalid or unexpected source value outside the governed clinical scale; it must
+an invalid source value with no expected meaning outside the governed clinical scale; it must
 be excluded or explicitly flagged rather than ordered or assigned a diagnosis
 group.
 
@@ -178,8 +183,9 @@ timestamp. All represented dates use a consistent per-patient anonymization
 shift, preserving within-patient ordering and date differences while
 obscuring absolute calendar values.
 
-Internal-v2 likewise applies one consistent patient-specific shift to all
-patient date values, preserving within-patient ordering and differences.
+Internal-v2 applies one consistent patient-specific shift to every anonymized
+date value across EMBED tables and dataset versions, preserving within-patient
+ordering and differences.
 `studydate_anon` is exam occurrence time, `procdate_anon` is procedure
 occurrence time, and `age_at_study_anon` is derived from the shifted birth and
 study dates with ages 90 years or older top-coded to 89. `pdate_anon` is
@@ -202,11 +208,13 @@ two supplied rollups is recorded through profile-specific coverage and result
 feature bindings; `provided` does not imply that every future profile contains
 the same fields.
 
-Internal-v2 Phase 1 maps its represented finding-associated pathology severity
-without binding Open V2's curated side- and exam-level aggregate columns, and
+Internal-v2 maps its represented finding-associated pathology severity
+as the most severe group selected by the extraction's fixed mapping over the
+ten pathology descriptor slots, without binding Open V2's curated side- and exam-level aggregate columns, and
 it has no supplied patient-level severity aggregate. A downstream grouping
 that seeks the most severe represented value must declare its linkage and
-grain, handle null and invalid or unexpected code `6` explicitly, and use the
+grain, treat null severity with any populated descriptor and code `6` as
+data-quality errors, and use the
 minimum over the governed comparable values. It is analyst-defined, not a
 supplied internal feature or universal default.
 

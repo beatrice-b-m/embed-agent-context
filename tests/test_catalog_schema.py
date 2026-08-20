@@ -62,6 +62,18 @@ class CatalogSchemaContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.profile_validator.validate(whitespace)
 
+    def test_unordered_comma_delimited_vocabulary_parsing_is_controlled(
+        self,
+    ) -> None:
+        profile = deepcopy(self.profile)
+        vocabulary = next(iter(profile["vocabularies"].values()))
+        vocabulary["parsing"] = "comma_delimited_unordered"
+        self.profile_validator.validate(profile)
+
+        vocabulary["parsing"] = "comma_delimited"
+        with self.assertRaises(ValidationError):
+            self.profile_validator.validate(profile)
+
     def test_observed_source_evidence_is_release_neutral(self) -> None:
         semantic = deepcopy(self.semantic)
         semantic_concept = next(iter(semantic["concepts"].values()))

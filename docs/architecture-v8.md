@@ -44,13 +44,16 @@ patient, partial-episode, exam, side, finding, interpretation, procedure,
 putative specimen, pathology-observation, and pathology-diagnosis objects
 independently. The patient identifier persists longitudinally within the
 profile, linked accessions are co-occurring same-episode exams, and clinical
-finding identity is accession plus finding number. Procedure-level information
-is supported; specimen-level presence, completeness, reliability, identity,
-and cardinality remain unresolved. Profile-owned specimen, staging, biomarker,
+finding identity is accession plus finding number. Null and `B` finding sides
+are bilateral and project to both unilateral side identities; finding number
+`-9` is the synthetic contralateral negative finding. Within one patient, a
+complete procedure-date, type, and biopsy-side tuple identifies one procedure.
+Specimen-level presence, completeness, reliability, identity, and cardinality
+remain unresolved. Profile-owned specimen, staging, biomarker,
 nodal, registry-reference, and source-workflow semantics remain available only
 to `internal-v2`.
 
-The same profile's Phase 2 binding adds a second, independent physical schema:
+The same profile adds a second, independent physical schema:
 the internal V1c `metadata_all_cohorts_v1c` image-metadata table at one row per
 extracted DICOM image instance. It binds the `image` object, the profile's
 `region_of_interest` object, co-located patient, exam, and image-derived
@@ -65,7 +68,9 @@ Because the clinical surface is internal V2 while the paired image metadata is
 internal V1c, the profile records the version boundary explicitly: coverage is
 narrower, and an unmatched clinical exam means missing extraction coverage
 rather than an exam without images. The accession remains the distinct exam
-identifier despite cross-patient source defects. The anonymized DICOM locator
+identifier in the shared cross-table namespace and each accession belongs to
+exactly one patient; cross-patient associations are invalid data-quality
+errors. The anonymized DICOM locator
 is the intended image-file reference, with observed absence treated as file
 unavailability and a data-quality defect. Standard DICOM Burned In Annotation
 semantics distinguish `YES`, `NO`, and absence without treating the source
@@ -108,14 +113,17 @@ independent axes describe `completeness`, `authority`, and `derivation`;
 objects bind to the same table. Same-table physical relationships are valid
 descriptive navigation and do not create a table-graph cycle.
 
-The internal Phase 1 MagView binding exercises this wide-table model directly:
+The internal MagView binding exercises this wide-table model directly:
 one physical row can project several clinical objects, and repeated finding or
 procedure associations do not collapse those objects into one row-grain
 identity. Patient dates share one patient-specific shift; exam and procedure
-occurrence dates are confirmed while pathology-report time remains provisional.
-Historical code meanings remain applicable unless superseded, alphabetic codes
-may be trimmed and uppercased for comparison, and pathology-severity value `6`
-is invalid or unexpected rather than a clinical category. Curated Open V2
+occurrence dates are confirmed while pathology-report time remains provisional;
+the same shift applies to every anonymized EMBED date across tables and dataset
+versions. Historical code meanings remain applicable unless superseded, all
+alphabetic codes may be trimmed and uppercased for comparison, and known
+comma-delimited fields have unordered component codes. Pathology-severity
+value `6`, or null severity with a populated descriptor, is a data-quality error
+rather than a clinical category. Curated Open V2
 aggregate columns that are absent internally remain unbound rather than being
 recreated from semantic similarity.
 

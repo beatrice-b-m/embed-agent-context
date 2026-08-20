@@ -32,10 +32,10 @@ pipelines, and analyses. It does not prescribe those designs.
 meaning. Profiles and extensions may add availability-scoped meaning alongside
 their physical representation; `catalog/profiles/open-v2.json` owns the
 released public representation and `catalog/profiles/internal-v2.json` is the
-non-default working internal profile. Its Phase 1 binding inventories the wide
+non-default working internal profile. Its binding inventories the wide
 MagView clinical table. Procedure-level information is supported, while
 specimen-level presence, completeness, reliability, identity, and cardinality
-remain unresolved. Its Phase 2 binding inventories the internal V1c
+remain unresolved. Its image-metadata binding inventories the internal V1c
 image-metadata table and binds image, co-located patient, exam, and
 image-derived side, DICOM-attribute, modality, enrichment, and serialized
 region-of-interest representations; the clinical surface is internal V2 while
@@ -107,14 +107,14 @@ Co-location is inferred from shared table mappings rather than authored as a
 representation role.
 
 The shared semantic catalog includes images because they are part of EMBED,
-including the public data. Internal-v2 Phase 1 inventories the complete
+including the public data. Internal-v2 inventories the complete
 physical schema of `magview_all_cohorts_PACS_v2_anon` and binds each supported
 clinical object independently despite their wide-row co-location. It also adds
 profile-scoped specimen, staging, biomarker, nodal, and source-workflow
 meaning, but specimen-level fields remain an unreliable, unresolved surface
 that current internal operations should not depend on.
 
-Internal-v2 Phase 2 adds a second physical table, the internal V1c
+Internal-v2 adds a second physical table, the internal V1c
 image-metadata extraction, at one row per extracted DICOM image instance. It
 binds the image object, co-located patient, exam, and image-derived breast-side
 projections, and a cross-table accession route for the exam-to-image
@@ -124,8 +124,9 @@ aligned count, coordinate, frame-index, and depth-derivation fields, so the
 table is not one row per ROI and carries no ROI identifier. ROI coordinate axis
 order and reference frame, per-region provenance, and cross-image ROI grouping
 remain unresolved or future work. `acc_anon` remains one distinct exam
-identifier across EMBED even when a source data-quality defect associates it
-with more than one patient identifier. The anonymized DICOM locator is intended
+identifier across EMBED, uses the same namespace in both tables, and belongs to
+exactly one `empi_anon`; a cross-patient association is an invalid data-quality
+error and must not be retained as a valid link. The anonymized DICOM locator is intended
 to be defined for every extracted image; a missing value means that image file
 is unavailable and is itself a data-quality defect. DICOM Burned In Annotation
 retains the standard source-declaration meaning for sufficient identifying
@@ -157,12 +158,14 @@ attribution can be optional or many-to-many. No foreign-key or deterministic
 backfill guarantee may be inferred from a matching physical tuple.
 
 Supplied Open V2 side- and exam-level pathology-severity rollups use the minimum
-because the represented scale is inverse. Internal-v2 Phase 1 maps the actual
-finding-associated severity occurrence but does not copy Open V2's curated
+because the represented scale is inverse. Internal-v2 maps the actual
+finding-associated severity occurrence produced by the extraction's fixed
+mapping over `path1` through `path10`, selecting the most severe linked group,
+but does not copy Open V2's curated
 side- or exam-level aggregate columns and has no supplied patient-level
 aggregate. Any downstream reduction must declare grouping, attribution,
-multiplicity, and time; handle null and invalid or unexpected internal code `6`
-explicitly; and, when selecting the most severe among governed comparable
+multiplicity, and time; treat null severity with any populated descriptor and
+internal code `6` as data-quality errors; and, when selecting the most severe among governed comparable
 values, use the minimum. The catalog does not choose that operation as a
 universal default.
 

@@ -24,19 +24,18 @@
         "Does not establish physical table, column, geometry, identifier, or future cross-image grouping details."
       ]
     },
-    "internal-v2.magview-phase1-maintainer-confirmation": {
-      "title": "Internal V2 MagView Phase 1 maintainer confirmation",
+    "internal-v2.magview-maintainer-confirmation": {
+      "title": "Internal V2 MagView maintainer confirmation",
       "kind": "maintainer_confirmed",
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
-      "locator": "maintainer-confirmed:internal-v2-magview-phase1",
-      "version_scope": "Internal EMBED V2 MagView clinical-table Phase 1 scope, finding-level pathology severity, absent curated aggregate columns, and analyst-defined inverse-severity reduction boundary.",
+      "locator": "maintainer-confirmed:internal-v2-magview",
+      "version_scope": "Internal EMBED V2 MagView clinical-table scope, finding-level pathology severity, absent curated aggregate columns, and analyst-defined inverse-severity reduction boundary.",
       "profiles": [
         "internal-v2"
       ],
       "notes": [
-        "Confirms that Phase 1 covers only the wide MagView clinical table.",
-        "Confirms that image metadata, DICOM attributes, image identity, enrichments, and regions of interest remain outside Phase 1.",
+        "Confirms the wide MagView clinical-table representation independently from the paired image-metadata representation.",
         "Confirms that downstream exam- or patient-level reductions are analyst-defined and use the minimum represented severity because lower scores are more severe."
       ]
     },
@@ -46,14 +45,15 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "maintainer-confirmed:internal-v2-magview-clarifications",
-      "version_scope": "Internal EMBED V2 patient identity, imaging-episode linkage, finding identity, date deidentification, procedure reliability, specimen uncertainty, categorical normalization, pathology severity, and registry linkage semantics.",
+      "version_scope": "Internal EMBED V2 patient identity, imaging-episode linkage, finding and procedure identity, date deidentification, procedure reliability, specimen uncertainty, categorical normalization, pathology severity, and registry linkage semantics.",
       "profiles": [
         "internal-v2"
       ],
       "notes": [
         "Confirms that empi_anon persists across a patient's records within internal V2 and supports longitudinal traversal.",
         "Confirms that linked accessions are explicitly linked co-occurring exams in one imaging episode and never prior or follow-up exams.",
-        "Confirms accession-plus-finding-number clinical finding identity, per-patient date shifting, age derivation and top-coding, exam and procedure event-date meanings, procedure-level reliability, specimen-level uncertainty, supported code normalization, code-5 meaning, invalid code-6 handling, and cancer-registry reference semantics."
+        "Confirms accession-plus-finding-number clinical finding identity, the synthetic contralateral negative finding-number representation, per-patient date shifting, age derivation and top-coding, exam and procedure event-date meanings, procedure identity within a patient by procedure date, type, and biopsy side, specimen-level uncertainty, supported code normalization, code-5 meaning, invalid code-6 handling, and cancer-registry reference semantics.",
+        "Confirms that every exam-level field is invariant across repeated rows for one accession and that conflicting repeated values are data-quality errors."
       ]
     },
     "internal-v2.magview-footer-schema": {
@@ -183,6 +183,19 @@
         "Does not establish that the internal extraction verified the source declaration against pixel data."
       ]
     },
+    "internal-v2.dicom-data-dictionary-standard": {
+      "title": "DICOM PS3.6 Data Dictionary",
+      "kind": "public_documentation",
+      "scope": "general_clinical",
+      "locator_kind": "url",
+      "locator": "https://dicom.nema.org/medical/dicom/current/output/html/part06.html",
+      "version_scope": "Current standard names and value representations for parsed DICOM data elements inventoried in internal V1c image metadata.",
+      "profiles": [],
+      "notes": [
+        "Parsed-out DICOM elements retain their standard element semantics unless an internal extraction claim documents a transformation.",
+        "This source does not assign standard semantics to pipeline-derived fields or establish extraction completeness, value validity, or pixel-data verification."
+      ]
+    },
     "internal-v2.v1c-metadata-artifact": {
       "title": "Internal V1c image-metadata artifact inventory",
       "kind": "supporting_internal",
@@ -264,12 +277,15 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "maintainer-confirmed:internal-v1c-image-metadata-identity-and-availability",
-      "version_scope": "Internal EMBED V1c image-metadata accession identity and anonymized DICOM locator expectations within the internal-v2 working profile.",
+      "version_scope": "Internal EMBED V1c image-metadata patient and accession identity, anonymized date shifting, DICOM element interpretation, and anonymized DICOM locator expectations within the internal-v2 working profile.",
       "profiles": [
         "internal-v2"
       ],
       "notes": [
-        "acc_anon is the exam identifier across EMBED; a cross-patient association is a data-quality defect and does not redefine the accession as several exams.",
+        "empi_anon and acc_anon were generated in the same anonymization process for the clinical tables and DICOM metadata; they support cross-table patient and exam identity.",
+        "acc_anon is the exam identifier across EMBED; a cross-patient association is a data-quality defect that must not be retained as a valid identity or linkage association and does not redefine the accession as several exams.",
+        "The same patient-specific date shift is applied consistently to every anonymized date value across EMBED tables and dataset versions.",
+        "Parsed-out DICOM elements retain the applicable standard DICOM element semantics; pipeline-derived fields require separate extraction evidence.",
         "anon_dicom_path is intended to be defined for every extracted image row; a missing value means the image file is unavailable and is a data-quality defect.",
         "The anonymized DICOM locator remains a technical, release-local reference and is not durable clinical image identity."
       ]
@@ -439,22 +455,20 @@
       "claims": [
         {
           "id": "authoritative-artifact",
-          "statement": "The Phase 1 internal clinical artifact is the physical table magview_all_cohorts_PACS_v2_anon.",
+          "statement": "The internal clinical artifact is the physical table magview_all_cohorts_PACS_v2_anon.",
           "status": "verified",
           "sources": [
-            "internal-v2.magview-phase1-maintainer-confirmation",
+            "internal-v2.magview-maintainer-confirmation",
             "internal-v2.magview-footer-schema"
           ],
-          "caveats": [
-            "The image metadata artifact is not part of this profile binding."
-          ]
+          "caveats": []
         },
         {
           "id": "wide-association-grain",
           "statement": "One internal MagView row is a denormalized clinical association rather than one patient, exam, finding, procedure, or diagnosis object.",
           "status": "reconciled",
           "sources": [
-            "internal-v2.magview-phase1-maintainer-confirmation",
+            "internal-v2.magview-maintainer-confirmation",
             "internal-v2.magview-footer-schema",
             "internal-v2.magview-grain-observation",
             "hitilab.embed.structure.public-representation"
@@ -489,7 +503,7 @@
           ],
           "caveats": [
             "Cross-side reuse or other conflicts for one accession-plus-finding-number identity are data-quality issues rather than distinct supported identities.",
-            "The reserved negative finding-number representation is not an ordinary finding identity."
+            "Finding number -9 is a synthetic contralateral negative finding rather than an ordinary source finding identity."
           ]
         },
         {
@@ -504,6 +518,18 @@
           "caveats": [
             "Physical rows may still repeat the accession-plus-finding-number identity across procedure or pathology attachments.",
             "Conflicting repeated attributes remain data-quality issues without a supplied repair rule."
+          ]
+        },
+        {
+          "id": "synthetic-contralateral-negative-finding",
+          "statement": "Finding number -9 identifies a synthetic contralateral BI-RADS 1 negative finding added when a bilateral exam contains a unilateral non-negative finding and no explicit finding row for the imaged contralateral breast.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications"
+          ],
+          "caveats": [
+            "The row represents an implied contralateral negative finding, not an originally documented source finding.",
+            "It is equivalent to the negative BI-RADS 1 or N state only in this synthetic contralateral context."
           ]
         },
         {
@@ -548,26 +574,27 @@
         },
         {
           "id": "exam-attribute-inconsistency",
-          "statement": "Exam-level values should agree across repeated rows for one accession; disagreements are data-quality errors without a known systematic resolution pattern.",
-          "status": "reconciled",
+          "statement": "Every exam-level field is invariant across repeated rows for one accession; disagreements are data-quality errors rather than alternative exam values.",
+          "status": "verified",
           "sources": [
             "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-grain-observation"
           ],
           "caveats": [
-            "Do not choose a repeated exam value without a declared data-quality rule."
+            "A conflicting repeated value must not be treated as a valid alternative value for the exam."
           ]
         },
         {
           "id": "cancer-registry-reference",
-          "statement": "The cancer_outcome_registry_id column is a technical reference to a separate Georgia cancer-registry-derived pathology table and is meaningful only with empi_anon; it is not itself a cancer diagnosis or outcome.",
+          "statement": "The cancer_outcome_registry_id column is a patient-local one-based sequence for entries in a separate Georgia cancer-registry-derived pathology table and is meaningful only together with empi_anon; it is not itself a cancer diagnosis or outcome.",
           "status": "verified",
           "sources": [
             "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-footer-schema"
           ],
           "caveats": [
-            "The separate registry table and its physical relationship are outside the current Phase 1 profile binding.",
+            "The separate registry table and its physical relationship are not yet included in the profile binding.",
+            "The first represented registry entry for a patient has identifier 1 and each subsequent entry increments that patient's identifier by one.",
             "Registry linkage can identify represented Georgia diagnoses that were not necessarily diagnosed at Emory."
           ]
         }
@@ -623,8 +650,8 @@
       "claims": [
         {
           "id": "procedure-pathology-attachment",
-          "statement": "Procedure-level information is a reliable internal V2 surface: when one finding has multiple attached procedures, repeated finding rows differ in procedure-level fields such as procedure date and type; no durable procedure identifier or one-to-one pathology attachment is established.",
-          "status": "reconciled",
+          "statement": "Procedure-level information is a reliable internal V2 surface: within a patient, each complete procedure-date, procedure-type, and biopsy-side tuple identifies one unique procedure, and repeated finding rows can attach several such procedures to one finding.",
+          "status": "verified",
           "sources": [
             "internal-v2.magview-maintainer-clarifications",
             "internal-v2.magview-pathology-observation",
@@ -633,7 +660,8 @@
           ],
           "caveats": [
             "Finding side and biopsy side can differ and retain distinct roles.",
-            "Procedure date and procedure type are supported distinguishing fields, but the available table supplies no durable procedure identifier."
+            "The tuple is release scoped, incomplete when any component is absent, and not a durable cross-release procedure identifier.",
+            "No universal one-to-one pathology attachment is established."
           ]
         },
         {
@@ -654,22 +682,22 @@
         },
         {
           "id": "path-severity-derived-occurrence",
-          "statement": "Internal path_severity is a supplied row-level inverse severity group deterministically associated with the unordered represented pathology descriptor set and projected onto the finding/procedure association; one finding tuple can carry more than one severity or attachment state across rows.",
-          "status": "reconciled",
+          "statement": "Internal path_severity is produced by the EMBED extraction through a fixed mapping from the path1 through path10 descriptor slots to pathology-type groups, selecting the most severe mapped pathology group linked to the finding and projecting that inverse-severity value onto the finding/procedure association row.",
+          "status": "verified",
           "sources": [
-            "internal-v2.magview-phase1-maintainer-confirmation",
+            "internal-v2.magview-maintainer-confirmation",
             "internal-v2.public-embed-overview",
             "internal-v2.magview-pathology-observation"
           ],
           "caveats": [
-            "The occurrence is not a supplied reduction across every procedure linked to a finding.",
-            "Descriptor slots can be present when severity is absent, so the profile does not prescribe backfilling severity."
+            "The occurrence is not a supplied reduction across every procedure row linked to a finding.",
+            "A null severity alongside any populated path1 through path10 descriptor is a data-quality error rather than a supported attachment state."
           ]
         },
         {
           "id": "path-severity-six",
-          "statement": "Any represented internal pathology severity value 6 is invalid or unexpected and is not a clinical severity category; the governed internal scale is the canonical 0-through-5 vocabulary.",
-          "status": "reconciled",
+          "statement": "Internal pathology severity value 6 is invalid, has no expected clinical meaning, and is not a historical internal category; the governed internal scale is the canonical 0-through-5 vocabulary.",
+          "status": "verified",
           "sources": [
             "internal-v2.magview-maintainer-clarifications",
             "internal-v2.v2-open-legend-comparison",
@@ -683,7 +711,7 @@
         },
         {
           "id": "path-severity-five-six-disagreement",
-          "statement": "Historical public documentation assigns classic severity code 5 to negative or normal tissue and code 6 to non-breast cancer, while internal maintainer knowledge and descriptor associations establish code 5 as non-breast cancer and code 6 as invalid or unexpected.",
+          "statement": "Historical public documentation assigns classic severity code 5 to negative or normal tissue and code 6 to non-breast cancer, while internal maintainer knowledge and descriptor associations establish code 5 as non-breast cancer and code 6 as invalid with no expected meaning.",
           "status": "reconciled",
           "sources": [
             "internal-v2.magview-maintainer-clarifications",
@@ -703,7 +731,7 @@
           "statement": "The internal MagView table supplies finding-associated path_severity but no side-, exam-, or patient-level pathology-severity aggregate columns.",
           "status": "verified",
           "sources": [
-            "internal-v2.magview-phase1-maintainer-confirmation",
+            "internal-v2.magview-maintainer-confirmation",
             "internal-v2.magview-footer-schema"
           ],
           "caveats": [
@@ -715,11 +743,11 @@
           "statement": "A downstream exam- or patient-level most-severe reduction is analyst defined: it must declare grouping and attribution and select the minimum represented severity because lower scores are more severe.",
           "status": "verified",
           "sources": [
-            "internal-v2.magview-phase1-maintainer-confirmation"
+            "internal-v2.magview-maintainer-confirmation"
           ],
           "caveats": [
             "This is not a supplied internal feature, executable workflow, or universal default.",
-            "Null and invalid or unexpected code 6 require explicit handling rather than silent ordering."
+            "Null severity with any populated descriptor and code 6 are data-quality errors rather than values to order silently."
           ]
         },
         {
@@ -800,14 +828,14 @@
         },
         {
           "id": "code-normalization",
-          "statement": "Alphabetic internal MagView codes may be compared after trimming surrounding whitespace and uppercasing; normalization does not assign meanings to otherwise unexplained tokens or split composed strings.",
+          "statement": "All alphabetic internal MagView codes may be compared after trimming surrounding whitespace and uppercasing; normalization does not assign meanings to otherwise unexplained tokens.",
           "status": "verified",
           "sources": [
             "internal-v2.magview-maintainer-clarifications"
           ],
           "caveats": [
             "The original source representation remains part of the physical occurrence.",
-            "Delimiter, ordering, repetition, and composition semantics remain field specific and unresolved where documented."
+            "Comma-delimited fields are split on commas; ordering and repetition do not change meaning."
           ]
         },
         {
@@ -821,20 +849,21 @@
           ],
           "caveats": [
             "Unexplained tokens are retained as unresolved rather than guessed or silently normalized.",
-            "Composed strings remain opaque because delimiter, ordering, and repetition semantics are not governed."
+            "Known comma-delimited strings may be tokenized without assigning meaning to unexplained component codes."
           ]
         },
         {
           "id": "laterality-roles",
-          "statement": "Finding side and biopsy side both represent left, right, and bilateral codes, but null meaning remains occurrence specific and finding-side and biopsy-side values can differ.",
-          "status": "reconciled",
+          "statement": "Finding side and biopsy side both represent left, right, and bilateral codes; in the clinical finding-side occurrence, null is equivalent to bilateral code B, while biopsy-side null remains unknown and finding-side and biopsy-side values can differ.",
+          "status": "verified",
           "sources": [
+            "internal-v2.magview-maintainer-clarifications",
             "internal-v2.v1-open-dictionary-comparison",
             "internal-v2.v2-open-legend-comparison",
             "internal-v2.magview-coded-value-observation"
           ],
           "caveats": [
-            "A null finding-side value is not universally asserted to mean bilateral in internal V2.",
+            "Finding-side B and null both project semantically to the left and right breast-side identities rather than creating a third bilateral breast-side identity.",
             "A null biopsy-side value must not be filled from finding side."
           ]
         },
@@ -923,10 +952,11 @@
         },
         {
           "id": "patient-date-shift",
-          "statement": "All internal V2 patient date values are shifted by one consistent patient-specific delta, so absolute dates are not literal while within-patient ordering and time differences remain reliable.",
+          "statement": "Every anonymized date value across EMBED tables and dataset versions uses one consistent patient-specific shift, so absolute dates are not literal while within-patient ordering and time differences remain reliable across the clinical and image-metadata tables.",
           "status": "verified",
           "sources": [
-            "internal-v2.magview-maintainer-clarifications"
+            "internal-v2.magview-maintainer-clarifications",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
             "The shift does not establish event meaning for an otherwise undocumented date-like column."
@@ -956,10 +986,10 @@
         },
         {
           "id": "unsupported-time-bindings",
-          "statement": "The assessed Phase 1 table has date-like exam, procedure, and pathology-report occurrences but no supported specimen-collection time or universal downstream-availability timestamp.",
+          "statement": "The assessed MagView clinical table has date-like exam, procedure, and pathology-report occurrences but no supported specimen-collection time or universal downstream-availability timestamp.",
           "status": "verified",
           "sources": [
-            "internal-v2.magview-phase1-maintainer-confirmation",
+            "internal-v2.magview-maintainer-confirmation",
             "internal-v2.magview-footer-schema"
           ],
           "caveats": [
@@ -971,7 +1001,7 @@
           "statement": "Co-location of imaging, procedure, pathology, and specimen fields in the MagView row does not establish that downstream information was available at imaging time.",
           "status": "reconciled",
           "sources": [
-            "internal-v2.magview-phase1-maintainer-confirmation",
+            "internal-v2.magview-maintainer-confirmation",
             "internal-v2.magview-grain-observation",
             "hitilab.embed.overview.pathology-attribution"
           ],
@@ -1132,16 +1162,41 @@
         },
         {
           "id": "patient-and-exam-projection",
-          "statement": "The patient identifier and the accession repeat across internal V1c image rows and remain patient-level and exam-level respectively; acc_anon identifies one exam across EMBED even when a data-quality defect associates that accession with more than one patient identifier.",
-          "status": "reconciled",
+          "statement": "The clinical and image-metadata tables use the same anonymized patient and exam identifier namespaces: empi_anon supports cross-table patient identity and acc_anon supports cross-table exam identity, while both repeat across internal V1c image rows at their patient and exam levels.",
+          "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
             "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
-            "Treat the patient identifier as a data-quality consistency check on an accession route rather than an exam-identity component.",
-            "A cross-patient accession association is a source defect to flag; it does not split or redefine the accession's exam identity.",
+            "Each accession must associate with exactly one patient; a cross-patient accession association is an invalid data-quality error that must not be retained as a valid identity or linkage association.",
+            "The patient identifier may be used both for cross-table patient identity and as a consistency check on an accession route, but it is not part of exam identity.",
             "Repetition across image rows is physical multiplicity, not clinical multiplicity."
+          ]
+        },
+        {
+          "id": "cross-table-date-alignment",
+          "statement": "Internal V1c study_date_anon represents the same exam event date as clinical studydate_anon and uses the same patient-specific anonymization shift applied to every anonymized EMBED date value.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.magview-maintainer-clarifications",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
+          ],
+          "caveats": [
+            "The V1c occurrence is text serialized rather than a parsed timestamp."
+          ]
+        },
+        {
+          "id": "parsed-dicom-element-semantics",
+          "statement": "Columns parsed directly from standard DICOM data elements retain the applicable DICOM element semantics; only pipeline-derived or transformed fields require separate extraction-specific interpretation.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.dicom-data-dictionary-standard",
+            "internal-v2.v1c-metadata-artifact",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
+          ],
+          "caveats": [
+            "Standard element semantics do not establish extraction completeness, internal value validity, anonymization treatment beyond confirmed shifted dates, or pixel-data verification."
           ]
         },
         {
@@ -1219,12 +1274,12 @@
         "id": "procedure"
       },
       "applicability": "supported",
-      "summary": "Procedure-level information is a reliable internal V2 surface, and multiple procedures attached to one finding occupy separate repeated finding rows with differing procedure fields.",
+      "summary": "Procedure-level information is a reliable internal V2 surface; within a patient, each complete procedure-date, procedure-type, and biopsy-side tuple identifies one unique procedure.",
       "claim_refs": [
         "internal-v2.magview-pathology-context#procedure-pathology-attachment"
       ],
       "caveats": [
-        "No durable procedure identifier or universal one-to-one pathology attachment is established."
+        "The tuple is incomplete when any component is absent, is not durable across releases, and does not establish a universal one-to-one pathology attachment."
       ]
     },
     "internal-v2.qualification.clinical_object.pathology_specimen": {
@@ -1250,7 +1305,7 @@
         "id": "pathology.severity"
       },
       "applicability": "interpretation_limit",
-      "summary": "The internal occurrence reuses the inverse-severity concept for a descriptor-derived row-level projection; code 5 is non-breast cancer, code 6 is invalid or unexpected, and null is unattached pathology.",
+      "summary": "The internal occurrence reuses the inverse-severity concept for an extraction-derived row-level projection from path1 through path10; code 5 is non-breast cancer, code 6 is invalid, and null requires every descriptor slot to be empty.",
       "claim_refs": [
         "internal-v2.magview-pathology-context#path-severity-derived-occurrence",
         "internal-v2.magview-pathology-context#path-severity-six",
@@ -1258,7 +1313,7 @@
       ],
       "caveats": [
         "Exclude or explicitly flag code 6 as invalid rather than ordering it clinically.",
-        "Do not coerce null into a governed diagnosis group."
+        "Do not coerce null into a governed diagnosis group; a populated descriptor alongside null severity is a data-quality error."
       ]
     },
     "internal-v2.qualification.concept.demographics.birth_date": {
@@ -1268,7 +1323,7 @@
         "id": "demographics.birth_date"
       },
       "applicability": "supported",
-      "summary": "Internal patient date values use one consistent patient-specific shift, preserving within-patient ordering and time differences while obscuring absolute dates.",
+      "summary": "Every anonymized date value across EMBED tables and dataset versions uses one consistent patient-specific shift, preserving within-patient ordering and time differences while obscuring absolute dates.",
       "claim_refs": [
         "internal-v2.magview-temporal-context#patient-date-shift"
       ],
@@ -1298,12 +1353,12 @@
         "id": "aggregation.pathology-observation-severity"
       },
       "applicability": "supported",
-      "summary": "The internal row supplies a deterministic inverse severity associated with its represented descriptor set.",
+      "summary": "The EMBED extraction supplies the most severe mapped inverse-severity group from the row's path1 through path10 descriptors.",
       "claim_refs": [
         "internal-v2.magview-pathology-context#path-severity-derived-occurrence"
       ],
       "caveats": [
-        "Descriptor slots can exist without a supplied severity, so the catalog does not prescribe backfilling."
+        "A populated descriptor alongside null severity is a data-quality error, not a supported state to backfill silently."
       ]
     },
     "internal-v2.qualification.aggregation.pathology-severity-to-finding": {
@@ -1421,7 +1476,7 @@
         "id": "time.specimen-collection"
       },
       "applicability": "unsupported",
-      "summary": "No supported specimen-collection timestamp is bound in the Phase 1 MagView table.",
+      "summary": "No supported specimen-collection timestamp is bound in the MagView clinical table.",
       "claim_refs": [
         "internal-v2.magview-temporal-context#unsupported-time-bindings"
       ],
@@ -1541,7 +1596,7 @@
     "internal-v2.breast.location": {
       "label": "Breast location codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -1549,7 +1604,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -1846,7 +1901,7 @@
     "internal-v2.imaging.change": {
       "label": "Finding-change codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -1854,7 +1909,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -1884,7 +1939,7 @@
     "internal-v2.imaging.recommendation": {
       "label": "Imaging recommendation codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -1892,7 +1947,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -1997,7 +2052,7 @@
     "internal-v2.mammography.calcification_morphology": {
       "label": "Calcification morphology codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -2005,7 +2060,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -2043,7 +2098,7 @@
     "internal-v2.mammography.consistent_with": {
       "label": "Consistent-with codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -2051,7 +2106,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -2102,7 +2157,7 @@
     "internal-v2.mammography.implant_finding": {
       "label": "Implant-finding codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -2110,7 +2165,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -2231,7 +2286,7 @@
     "internal-v2.mammography.other_finding": {
       "label": "Other mammographic-finding codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -2239,7 +2294,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -2288,7 +2343,7 @@
     "internal-v2.mri.associated_finding": {
       "label": "MRI associated-finding codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -2296,7 +2351,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -2385,7 +2440,7 @@
     "internal-v2.mri.delayed_kinetics": {
       "label": "MRI delayed-kinetics codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -2581,7 +2636,7 @@
       },
       "label": "MRI other-finding source codes",
       "completeness": "unknown",
-      "parsing": "atomic",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "unresolved"
@@ -2593,33 +2648,16 @@
       "codes": {
         "B": "Unresolved internal source code",
         "C": "Unresolved internal source code",
-        "C,G": "Unresolved internal source code",
-        "C,N": "Unresolved internal source code",
-        "C,P": "Unresolved internal source code",
         "G": "Unresolved internal source code",
         "H": "Unresolved internal source code",
-        "H,C": "Unresolved internal source code",
-        "H,C,L": "Unresolved internal source code",
-        "H,O": "Unresolved internal source code",
-        "H,P": "Unresolved internal source code",
         "I": "Unresolved internal source code",
-        "I,C": "Unresolved internal source code",
-        "I,C,N": "Unresolved internal source code",
         "L": "Unresolved internal source code",
-        "L,G": "Unresolved internal source code",
-        "L,R": "Unresolved internal source code",
         "M": "Unresolved internal source code",
         "N": "Unresolved internal source code",
         "O": "Unresolved internal source code",
         "P": "Unresolved internal source code",
-        "P,G": "Unresolved internal source code",
-        "P,R": "Unresolved internal source code",
         "R": "Unresolved internal source code",
-        "R,G": "Unresolved internal source code",
-        "Y": "Unresolved internal source code",
-        "Y,L": "Unresolved internal source code",
-        "Y,O,C": "Unresolved internal source code",
-        "Y,P": "Unresolved internal source code"
+        "Y": "Unresolved internal source code"
       }
     },
     "internal-v2.mri.pattern": {
@@ -3058,9 +3096,9 @@
       "caveats": [
         "The scale is inverse: lower values represent more severe pathology.",
         "Historical public documentation uses a conflicting code-5/code-6 scheme; internal maintainer knowledge establishes code 5 as non-breast cancer.",
-        "Any represented code 6 is invalid or unexpected and must not be ordered or grouped as a clinical severity category.",
+        "Any represented code 6 is invalid, has no expected meaning, and must not be ordered or grouped as a clinical severity category.",
         "Null means no pathology is attached and is not a benign or negative category.",
-        "Descriptor slots may be present when severity is null."
+        "A null severity with any populated descriptor slot is a data-quality error."
       ],
       "codes": {
         "0": "Invasive breast cancer",
@@ -3069,7 +3107,7 @@
         "3": "Borderline lesion",
         "4": "Benign finding",
         "5": "Non-breast cancer",
-        "6": "Invalid or unexpected source value"
+        "6": "Invalid source value with no expected meaning"
       }
     },
     "internal-v2.pathology.surgery_type": {
@@ -3112,7 +3150,7 @@
     "internal-v2.ultrasound.echotexture": {
       "label": "Ultrasound echotexture codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3120,7 +3158,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3141,7 +3179,7 @@
     "internal-v2.ultrasound.finding": {
       "label": "Ultrasound finding codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3149,7 +3187,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3197,7 +3235,7 @@
     "internal-v2.ultrasound.margins": {
       "label": "Ultrasound margin codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3205,7 +3243,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3229,7 +3267,7 @@
     "internal-v2.ultrasound.modifiers": {
       "label": "Ultrasound modifier codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3280,7 +3318,7 @@
     "internal-v2.ultrasound.posterior_features": {
       "label": "Ultrasound posterior-feature codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3288,7 +3326,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3310,7 +3348,7 @@
     "internal-v2.ultrasound.secondary_findings": {
       "label": "Ultrasound secondary-finding codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3318,7 +3356,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3341,7 +3379,7 @@
     "internal-v2.ultrasound.shape": {
       "label": "Ultrasound shape codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3349,7 +3387,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3368,7 +3406,7 @@
     "internal-v2.ultrasound.surrounding_tissue": {
       "label": "Ultrasound surrounding-tissue codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3376,7 +3414,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3396,7 +3434,7 @@
     "internal-v2.ultrasound.vascularity": {
       "label": "Ultrasound vascularity codes",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "observed_source_values",
         "release_legend"
@@ -3404,7 +3442,7 @@
       "caveats": [
         "The release legend does not state that this code list is exhaustive.",
         "Null semantics are not documented and must not be inferred from the code meanings.",
-        "Preserve the source string; delimiter, ordering, repetition, and composition semantics are not documented.",
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning, and preserve unexplained component codes.",
         "The Open V2 legend is a comparison source and is not assumed exhaustive for internal V2.",
         "Null and blank meanings remain physical-occurrence specific."
       ],
@@ -3490,11 +3528,11 @@
         "+": "Positive - immunoreactive tumor cells present",
         "L": "Less than 1% immunoreactive cells present",
         "-": "Negative - no immunoreactive tumor cells present",
-        "U": "result unkown",
+        "U": "Result unknown",
         "N": "Not performed",
         "A": "Performed on another specimen",
         "P": "Pending",
-        "R": "no residual invasive carcinoma after presurgucal therapy"
+        "R": "No residual invasive carcinoma after presurgical therapy"
       }
     },
     "internal-v2.vocabulary.pathology.extensive_intraductal_component_status": {
@@ -3597,7 +3635,7 @@
         "A": "performed on another specimen",
         "N": "not performed",
         "P": "pending",
-        "R": "no residual invasive carcinoma after presurgucal therapy"
+        "R": "No residual invasive carcinoma after presurgical therapy"
       }
     },
     "internal-v2.vocabulary.pathology.her2_ish_result": {
@@ -3768,14 +3806,14 @@
       },
       "label": "TNM descriptors",
       "completeness": "unknown",
-      "parsing": "comma_composed_undocumented",
+      "parsing": "comma_delimited_unordered",
       "evidence": [
         "release_legend",
         "observed_source_values"
       ],
       "caveats": [
         "Internal source tokens use uppercase forms of the comparison-dictionary codes.",
-        "Delimiter, ordering, and repetition semantics are not documented."
+        "Parse comma-delimited tokens; ordering and repetition do not change meaning."
       ],
       "codes": {
         "M": "Multiple foci",
@@ -4349,13 +4387,26 @@
         },
         "occurrence_interpretations": [
           {
-            "representation": "null",
-            "meaning": "Finding laterality is not represented for this occurrence; bilateral meaning is not established",
-            "status": "unresolved",
+            "representation": "B",
+            "meaning": "Bilateral finding side, projecting semantically to both the left and right breast-side identities for the exam",
+            "status": "verified",
             "claim_refs": [
               "internal-v2.magview-coded-values-context#laterality-roles"
             ],
-            "caveats": []
+            "caveats": [
+              "B does not create a third bilateral breast-side identity."
+            ]
+          },
+          {
+            "representation": "null",
+            "meaning": "Bilateral finding side, equivalent to source code B and projecting semantically to both the left and right breast-side identities for the exam",
+            "status": "verified",
+            "claim_refs": [
+              "internal-v2.magview-coded-values-context#laterality-roles"
+            ],
+            "caveats": [
+              "Null in this finding-side occurrence is not unknown laterality."
+            ]
           }
         ],
         "vocabulary": "internal-v2.breast.side"
@@ -4417,13 +4468,13 @@
         "occurrence_interpretations": [
           {
             "representation": "-9",
-            "meaning": "Reserved negative finding-number representation rather than an ordinary finding identity",
-            "status": "unresolved",
+            "meaning": "Synthetic contralateral BI-RADS 1 negative finding implied by a bilateral exam with a unilateral non-negative finding",
+            "status": "verified",
             "claim_refs": [
-              "internal-v2.magview-representation-context#finding-identity-scope"
+              "internal-v2.magview-representation-context#synthetic-contralateral-negative-finding"
             ],
             "caveats": [
-              "The internal Phase 1 evidence does not assign a more specific clinical meaning."
+              "This is an extraction-added finding rather than an originally documented source finding."
             ]
           }
         ]
@@ -5045,8 +5096,8 @@
         "occurrence_interpretations": [
           {
             "representation": "6",
-            "meaning": "Invalid or unexpected source value outside the governed clinical severity scale",
-            "status": "reconciled",
+            "meaning": "Invalid source value with no expected meaning outside the governed clinical severity scale",
+            "status": "verified",
             "claim_refs": [
               "internal-v2.magview-pathology-context#path-severity-six"
             ],
@@ -5056,13 +5107,13 @@
           },
           {
             "representation": "null",
-            "meaning": "No pathology severity is attached to this row occurrence",
+            "meaning": "No pathology severity or path1 through path10 descriptor is attached to this row occurrence",
             "status": "reconciled",
             "claim_refs": [
               "internal-v2.magview-pathology-context#path-severity-derived-occurrence"
             ],
             "caveats": [
-              "Null is not a benign, negative, or code-6 category."
+              "Null is not a benign, negative, or code-6 category; any populated descriptor alongside null severity is a data-quality error."
             ]
           }
         ],
@@ -5732,7 +5783,7 @@
         "concept": "exam.accession_identifier",
         "status": "direct",
         "notes": [
-          "The accession repeats across the exam's image rows and identifies one distinct exam; a cross-patient association is a data-quality defect."
+          "The accession repeats across the exam's image rows and identifies one distinct exam in the shared cross-table namespace; each accession belongs to exactly one patient and a cross-patient association is an invalid data-quality error."
         ]
       },
       {
@@ -5744,14 +5795,13 @@
         "occurrence_interpretations": [
           {
             "representation": "text-serialized date value",
-            "meaning": "Exam date as exported in the internal V1c image metadata",
-            "status": "unverified",
+            "meaning": "The same anonymized exam event date represented by clinical studydate_anon, exported as text in internal V1c image metadata",
+            "status": "verified",
             "claim_refs": [
-              "internal-v2.v1c-metadata-context#patient-and-exam-projection"
+              "internal-v2.v1c-metadata-context#cross-table-date-alignment"
             ],
             "caveats": [
-              "The value is text rather than a parsed timestamp, unlike the clinical table's exam-date projection.",
-              "Agreement with the clinical exam date and with its patient-specific anonymization shift was not verified in this phase."
+              "The value is text rather than a parsed timestamp, unlike the clinical table's exam-date projection."
             ]
           }
         ]
@@ -6407,16 +6457,28 @@
         "claim_refs": [
           "internal-v2.magview-coded-values-context#laterality-roles"
         ],
-        "caveats": [
-          "Null laterality prevents unconditional side identity and is not universally interpreted as bilateral."
+      "caveats": [
+        "Finding-side B and null are bilateral projections to both unilateral breast-side identities; neither creates a third bilateral identity."
         ],
         "instance_identity": {
           "columns": [
             "acc_anon",
             "side"
           ],
-          "scope": "Finding-side representation within one imaging accession when laterality is present.",
-          "reserved_exceptions": [],
+        "scope": "Unilateral left or right breast-side identity within one imaging accession; bilateral B and null occurrences project to both unilateral identities.",
+        "reserved_exceptions": [
+          {
+            "column": "side",
+            "representation": "B",
+            "meaning": "Bilateral finding-side occurrence that maps to both left and right breast-side identities.",
+            "claim_refs": [
+              "internal-v2.magview-coded-values-context#laterality-roles"
+            ],
+            "caveats": [
+              "Do not create a third bilateral breast-side identity."
+            ]
+          }
+        ],
           "rows_per_instance": "one_or_more",
           "longitudinal_identity": false
         }
@@ -6451,12 +6513,12 @@
             {
               "column": "numfind",
               "representation": "-9",
-              "meaning": "Reserved negative finding-number representation rather than an ordinary finding identity.",
-              "claim_refs": [
-                "internal-v2.magview-representation-context#finding-identity-scope"
-              ],
-              "caveats": [
-                "Its more specific internal clinical meaning remains unresolved."
+        "meaning": "Synthetic contralateral BI-RADS 1 negative finding added by the EMBED extraction.",
+        "claim_refs": [
+          "internal-v2.magview-representation-context#synthetic-contralateral-negative-finding"
+        ],
+        "caveats": [
+          "It is not an originally documented source finding."
               ]
             }
           ],
@@ -6486,8 +6548,9 @@
         "id": "internal-v2.procedure.magview",
         "object": "procedure",
         "table": "magview_all_cohorts_PACS_v2_anon",
-        "columns": [
-          "acc_anon",
+      "columns": [
+        "empi_anon",
+        "acc_anon",
           "numfind",
           "procdate_anon",
           "type",
@@ -6503,25 +6566,20 @@
         "claim_refs": [
           "internal-v2.magview-pathology-context#procedure-pathology-attachment"
         ],
-        "caveats": [
-          "The composite is a supported procedure-associated locator rather than a durable procedure identifier.",
-          "Procedure fields can be incomplete; one finding with multiple procedures occupies repeated rows that differ in procedure-level information."
+      "caveats": [
+        "Within a patient, procedure date, procedure type, and biopsy side identify one unique procedure.",
+        "The identity is incomplete when any component is absent and is not durable across releases; one finding with multiple procedures occupies repeated rows."
+      ],
+      "instance_identity": {
+        "columns": [
+          "empi_anon",
+          "procdate_anon",
+          "type",
+          "bside"
         ],
-        "instance_identity": {
-          "columns": [
-            "acc_anon",
-            "numfind",
-            "procdate_anon",
-            "type",
-            "technique",
-            "biopsite",
-            "surgery",
-            "lymphsurg",
-            "bside"
-          ],
-          "scope": "Internal procedure-associated locator within an accession-plus-finding-number context.",
-          "reserved_exceptions": [],
-          "rows_per_instance": "unknown",
+        "scope": "Release-scoped procedure identity; within one patient the identifying tuple is procedure date, procedure type, and biopsy side.",
+        "reserved_exceptions": [],
+        "rows_per_instance": "one_or_more",
           "longitudinal_identity": false
         }
       },
@@ -6605,7 +6663,7 @@
         ],
         "caveats": [
           "The row-level severity is descriptor derived and not a supplied reduction across every row linked to one finding.",
-          "Severity code 6 is invalid or unexpected, and regional-node TNM code meanings remain unresolved."
+          "Severity code 6 is invalid and has no expected meaning, while regional-node TNM code meanings remain unresolved."
         ]
       },
       {
@@ -6723,10 +6781,10 @@
           "internal-v2.v1c-metadata-context#patient-and-exam-projection",
           "internal-v2.v1c-metadata-context#version-boundary"
         ],
-        "caveats": [
-          "The patient identifier repeats across the patient's image rows and remains patient-level; row multiplicity is not clinical multiplicity.",
-          "The clinical table remains the preferred patient representation; this projection carries no patient attributes.",
-          "Alignment with the clinical table's anonymized patient identifier is expected but was not verified in this phase."
+      "caveats": [
+        "The patient identifier repeats across the patient's image rows and remains patient-level; row multiplicity is not clinical multiplicity.",
+        "The clinical table remains the preferred patient representation; this projection carries no patient attributes.",
+        "The identifier uses the same anonymization namespace as the clinical table and supports cross-table patient identity."
         ],
         "instance_identity": {
           "columns": [
@@ -6755,10 +6813,11 @@
           "internal-v2.v1c-metadata-context#version-boundary",
           "internal-v2.v1c-metadata-context#coverage-is-not-image-absence"
         ],
-        "caveats": [
-          "The accession repeats across the exam's image rows and remains exam-level.",
-          "acc_anon remains the identifier of one distinct exam across EMBED; association with more than one patient identifier is a data-quality defect rather than a different exam identity.",
-          "Use the patient identifier as a data-quality consistency check on an accession route, not as an exam-identity component.",
+      "caveats": [
+        "The accession repeats across the exam's image rows and remains exam-level.",
+        "acc_anon uses the same anonymization namespace as the clinical table and identifies one distinct exam across EMBED.",
+        "Association with more than one patient identifier is an invalid data-quality error and must not be retained as a valid identity or linkage association.",
+        "The patient identifier supports cross-table patient identity and consistency checking but is not an exam-identity component.",
           "Only an accession, an exam date, and a cohort number project here; the clinical table remains the preferred exam representation.",
           "Exam coverage is internal V1c and narrower than internal clinical V2."
         ],
@@ -6766,7 +6825,7 @@
           "columns": [
             "acc_anon"
           ],
-          "scope": "Accession-scoped exam projection within the internal V1c image-metadata extraction; not longitudinal and not verified equal to the clinical table's accession projection.",
+      "scope": "Cross-table accession-scoped exam identity shared by the internal V1c image metadata and clinical table; not longitudinal.",
           "reserved_exceptions": [],
           "rows_per_instance": "one_or_more",
           "longitudinal_identity": false
@@ -7614,18 +7673,13 @@
           {
             "id": "internal-v2.magview.procedure-locator",
             "columns": [
-              "acc_anon",
-              "numfind",
+              "empi_anon",
               "procdate_anon",
               "type",
-              "technique",
-              "biopsite",
-              "surgery",
-              "lymphsurg",
               "bside"
             ],
             "kind": "natural",
-            "uniqueness": "unknown",
+            "uniqueness": "unique",
             "completeness": "incomplete",
             "evidence": [
               "release_schema",
@@ -7633,8 +7687,8 @@
               "observed_source_values"
             ],
             "caveats": [
-              "Procedure date and type help distinguish multiple procedures attached to one finding, but no durable procedure identifier or universal unique tuple is established.",
-              "Incomplete procedure fields prevent unconditional use of this locator."
+              "Within one patient, each complete procedure-date, procedure-type, and biopsy-side tuple identifies one unique procedure.",
+              "Incomplete procedure fields prevent unconditional use of this locator, and the identity is not durable across releases."
             ]
           },
           {
@@ -7671,7 +7725,7 @@
           "No complete durable physical-row key is established.",
           "Repeated patient attributes may vary over time and require an explicit as-of-time choice; repeated exam attributes should agree and conflicts are data-quality errors without a supplied repair policy.",
           "The modality_desc occurrence is preferred; modality remains unmapped because its relationship to modality_desc is unknown.",
-          "Unmapped columns remain physically inventoried because their clinical meaning is unresolved or outside supported Phase 1 evidence."
+          "Unmapped columns remain physically inventoried because their clinical meaning is unresolved or outside supported evidence."
         ]
       },
       {
@@ -8524,7 +8578,7 @@
             ],
             "caveats": [
               "The anonymized identifier repeats across the patient's image rows and remains patient-level.",
-              "Alignment with the clinical table's anonymized patient identifier is expected but was not verified in this phase."
+              "The identifier uses the same anonymization namespace as the clinical table and supports cross-table patient identity."
             ]
           },
           {
@@ -8540,7 +8594,7 @@
             ],
             "caveats": [
               "The accession repeats across the exam's image rows and remains exam-level.",
-              "acc_anon remains the identifier of one distinct exam across EMBED; an association with more than one patient identifier is a data-quality defect."
+              "acc_anon remains the identifier of one distinct exam across EMBED and belongs to exactly one patient; an association with more than one patient identifier is an invalid data-quality error."
             ]
           },
           {
@@ -8604,8 +8658,8 @@
           "The extraction is mammography-centred; represented non-mammographic source modality values do not establish systematic ultrasound or MRI image coverage, and no future modality column is modelled.",
           "Some rows represent secondary-capture or screen-save images, and the DICOM Burned In Annotation attribute can declare that sufficient identifying annotation is present in the pixel data.",
           "DICOM time-of-day attributes are numerically parsable, so a numeric parse discards zero padding and any fractional-second form; they remain inventoried and unmapped.",
-          "A DICOM patient-age attribute and an imaging-service-request order number are inventoried; their anonymization treatment and internal meaning are not established, so they remain unmapped.",
-          "Detailed DICOM acquisition, dose, detector, collimator, geometry, windowing, and icon-image attributes remain inventoried without mappings rather than mapped from a recognizable attribute name."
+          "A DICOM patient-age attribute and an imaging-service-request order number are inventoried with their standard element meanings; their extraction-specific anonymization treatment remains unresolved.",
+          "Detailed DICOM acquisition, dose, detector, collimator, geometry, windowing, and icon-image attributes retain standard DICOM element semantics but remain inventoried without dedicated catalogue concepts or mappings."
         ]
       }
     ],
@@ -9043,16 +9097,9 @@
         "source": {
           "table": "magview_all_cohorts_PACS_v2_anon",
           "columns": [
-            "acc_anon",
-            "side",
-            "numfind",
+            "empi_anon",
             "procdate_anon",
-            "pdate_anon",
             "type",
-            "technique",
-            "biopsite",
-            "surgery",
-            "lymphsurg",
             "bside"
           ],
           "completeness": "optional"
@@ -9060,16 +9107,9 @@
         "target": {
           "table": "magview_all_cohorts_PACS_v2_anon",
           "columns": [
-            "acc_anon",
-            "side",
-            "numfind",
+            "empi_anon",
             "procdate_anon",
-            "pdate_anon",
             "type",
-            "technique",
-            "biopsite",
-            "surgery",
-            "lymphsurg",
             "bside"
           ]
         },
@@ -9082,7 +9122,7 @@
           "observed_source_values"
         ],
         "caveats": [
-          "The complete procedure locator is optional and is not a durable clinical procedure key."
+          "The patient-scoped procedure identity is optional when any component is absent and is not durable across releases."
         ],
         "join_hazards": [
           "Repeated wide rows multiply co-located object occurrences; do not treat row multiplicity as clinical multiplicity without declared grouping."
@@ -9100,16 +9140,9 @@
         "source": {
           "table": "magview_all_cohorts_PACS_v2_anon",
           "columns": [
-            "acc_anon",
-            "side",
-            "numfind",
+            "empi_anon",
             "procdate_anon",
-            "pdate_anon",
             "type",
-            "technique",
-            "biopsite",
-            "surgery",
-            "lymphsurg",
             "bside"
           ],
           "completeness": "optional"
@@ -9117,16 +9150,9 @@
         "target": {
           "table": "magview_all_cohorts_PACS_v2_anon",
           "columns": [
-            "acc_anon",
-            "side",
-            "numfind",
+            "empi_anon",
             "procdate_anon",
-            "pdate_anon",
             "type",
-            "technique",
-            "biopsite",
-            "surgery",
-            "lymphsurg",
             "bside"
           ]
         },
@@ -9395,11 +9421,11 @@
           "An inner join on the accession discards clinical V2 exams outside V1c coverage.",
           "Physical linkage does not establish image availability for all internal V2 exams.",
           "Physical cardinality is many-to-many because the clinical table repeats exam rows and the metadata table holds many image rows per exam; each image still belongs to one exam clinically.",
-          "The clinical endpoint is taken from the Phase 1 inventory; no cross-table match measurement was performed and the clinical table was not read for this binding."
+          "The clinical endpoint is taken from the MagView inventory; the shared accession namespace and cross-table exam identity are maintainer confirmed."
         ],
         "join_hazards": [
           "Both endpoints repeat the accession, so an accession join multiplies clinical association rows against image rows; declare a grouping and de-duplication policy before joining.",
-          "Use the anonymized patient identifier as a data-quality consistency check rather than an exam-identity component; a cross-patient accession association is a source defect, while acc_anon still identifies one exam.",
+          "Use the anonymized patient identifier for cross-table patient identity and as a consistency check rather than as an exam-identity component; a cross-patient accession association is invalid and must not be retained as a valid linkage.",
           "Image laterality may be used only as a consistency check; it is not the imaging-finding or procedure side and must not be made a join-identity component.",
           "Do not derive an image-availability flag, a no-image cohort, or an exclusion rule from join outcomes."
         ],
@@ -9438,8 +9464,8 @@
           "inference"
         ],
         "caveats": [
-          "This route exists to check patient agreement on an accession join; it is not an independent image-attachment route.",
-          "Cross-artifact alignment of the two anonymized patient identifiers is expected but was not verified in this phase, because the clinical table was not read.",
+          "The shared identifier supports cross-table patient identity and patient-agreement checking on an accession join; it is not an independent image-attachment route.",
+          "The clinical and image-metadata occurrences use the same anonymization namespace.",
           "V1c patient coverage is narrower than internal clinical V2, so an unmatched patient is outside extraction coverage."
         ],
         "join_hazards": [
@@ -9593,7 +9619,7 @@
         "caveats": [
           "The value is meaningful only together with empi_anon.",
           "It is not itself a cancer diagnosis, cancer outcome, or proof that diagnosis occurred at Emory.",
-          "The referenced registry table is not physically bound in Phase 1."
+          "The referenced registry table is not yet physically bound."
         ],
         "missing_states": [],
         "temporal_semantics": [],
@@ -9896,7 +9922,7 @@
           "multifocal recurrent posttreatment TNM"
         ],
         "caveats": [
-          "Preserve the source string; delimiter, ordering, and repetition semantics are not documented."
+          "Parse comma-delimited tokens; ordering and repetition do not change meaning."
         ],
         "evidence": [
           "release_legend",
@@ -10884,7 +10910,7 @@
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.dicom_study_identifier": {
+    "internal-v2.image.dicom_study_identifier": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -10911,7 +10937,9 @@
           "inference"
         ],
         "objects": [],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11173,7 +11201,7 @@
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.view_modifier": {
+    "internal-v2.image.view_modifier": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11203,7 +11231,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11360,7 +11390,7 @@
         "aggregations": [],
         "vocabulary": "internal-v2.vocabulary.image.laterality_derivation_flag"
       },
-      "internal-v2.image.body_part_examined": {
+    "internal-v2.image.body_part_examined": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11387,7 +11417,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11427,7 +11459,7 @@
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.photometric_interpretation": {
+    "internal-v2.image.photometric_interpretation": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11456,12 +11488,14 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.pixel_representation": {
+    "internal-v2.image.pixel_representation": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11489,12 +11523,14 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.pixel_matrix_dimension": {
+    "internal-v2.image.pixel_matrix_dimension": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11524,12 +11560,14 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.pixel_bit_depth": {
+    "internal-v2.image.pixel_bit_depth": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11558,12 +11596,14 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.samples_per_pixel": {
+    "internal-v2.image.samples_per_pixel": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11588,12 +11628,14 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.images_in_acquisition": {
+    "internal-v2.image.images_in_acquisition": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11621,12 +11663,14 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.pixel_spacing": {
+    "internal-v2.image.pixel_spacing": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11655,7 +11699,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+      "claim_refs": [
+        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+      ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11687,7 +11733,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11719,7 +11767,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11750,7 +11800,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11775,7 +11827,7 @@
           "mGy"
         ],
         "caveats": [
-          "Other represented dose and exposure attributes remain unmapped because their units and internal meaning are not established."
+          "Other represented dose and exposure attributes retain their standard DICOM element meanings but remain inventoried without dedicated catalogue concepts."
         ],
         "evidence": [
           "observed_source_values"
@@ -11783,7 +11835,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11816,7 +11870,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11849,7 +11905,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11881,7 +11939,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11914,7 +11974,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11947,7 +12009,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -12030,7 +12094,9 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -12772,6 +12838,41 @@
           "Absence of represented pathology is not proof of disease absence or adequate negative follow-up."
         ]
       },
+      "coverage.internal-v2.specimen-staging-biomarker-surface": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "subject_kind": "topic",
+        "subject": "internal-v2.magview-pathology-context",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "summary": "The inventoried specimen, TNM, stage, concordance, biomarker, margin, and nodal columns are not commonly used and have not been validated as a reliable specimen or staging surface.",
+        "domains": [
+          "pathology",
+          "procedure",
+          "workflow"
+        ],
+        "search_terms": [
+          "internal specimen reliability",
+          "internal TNM staging",
+          "internal biomarker reliability",
+          "internal nodal fields"
+        ],
+        "claim_refs": [
+          "internal-v2.magview-pathology-context#specimen-surface",
+          "internal-v2.magview-pathology-context#tnmpn-dictionary-conflict"
+        ],
+        "caveats": [
+          "Do not rely on these columns for TNM staging or specimen-level operations without new field-specific validation.",
+          "Unknown meanings remain unknown; the profile does not manufacture definitions for infrequently used fields."
+        ]
+      },
       "coverage.internal-v2.v1c-roi-coordinate-geometry": {
         "availability": {
           "scope": "profiles",
@@ -12884,7 +12985,7 @@
         "profiles": [
           "internal-v2"
         ],
-        "summary": "Many inventoried internal V1c DICOM acquisition, dose, detector, collimator, geometry, windowing, icon-image, order-number, patient-age, and time-of-day attributes remain unmapped because their internal meaning and anonymization treatment are not established.",
+        "summary": "Inventoried internal V1c columns parsed directly from DICOM retain their standard element semantics; many acquisition, dose, detector, collimator, geometry, windowing, icon-image, order-number, patient-age, and time-of-day attributes remain physically inventoried without dedicated catalogue concepts, while extraction transformations and anonymization treatment remain field specific.",
         "domains": [
           "imaging",
           "technical"
@@ -12895,9 +12996,12 @@
           "DICOM time of day",
           "uninterpreted image columns"
         ],
-        "claim_refs": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "caveats": [
-          "A recognizable DICOM attribute name is not evidence for an internal interpretation; these columns stay inventoried and unmapped rather than guessed."
+          "An unmapped parsed DICOM column is not semantically unknowable: it can be mapped using the standard element meaning when a dedicated catalogue concept is needed.",
+          "Pipeline-derived fields, extraction-specific transformations, anonymization handling, and empirical coverage still require separate evidence."
         ]
       }
     }

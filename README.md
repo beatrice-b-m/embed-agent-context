@@ -356,12 +356,20 @@ putative specimen, and pathology objects alongside supported workflow meanings.
 Within this profile, `empi_anon` supports longitudinal patient identity,
 linked accessions are co-occurring exams in one imaging episode rather than
 prior or follow-up exams, and `(acc_anon, numfind)` identifies one clinical
-finding. Patient dates share one patient-specific anonymization shift;
+finding. A null finding side is bilateral and equivalent to `B`; either
+representation projects to both unilateral breast-side identities. Finding
+number `-9` is the synthetic contralateral BI-RADS 1/`N` finding added when a
+bilateral exam has only a unilateral non-negative finding row. Every anonymized
+date across EMBED tables and versions uses the same patient-specific shift;
 `studydate_anon` and `procdate_anon` are exam and procedure occurrence times,
-while `pdate_anon` remains provisional. Procedure-level information is
-supported, but specimen-level presence, completeness, reliability, identity,
-and cardinality remain unresolved and should not be relied upon. A represented
-pathology-severity value `6` is invalid or unexpected, not a clinical category.
+while `pdate_anon` remains provisional. Within a patient, each complete
+`(procdate_anon, type, bside)` tuple identifies one procedure. Every exam-level
+field is invariant within an accession; conflicts are data-quality errors.
+Specimen-level presence, completeness, reliability, identity, and cardinality
+remain unresolved and should not be relied upon. `path_severity` is the most
+severe group selected by the extraction's fixed mapping over `path1` through
+`path10`; a null severity with a populated descriptor or a represented value
+`6` is a data-quality error, not a clinical category.
 Unclear columns remain in the physical inventory without manufactured
 mappings, and absent curated Open V2 aggregates are not projected onto the
 internal table. Load `internal-v2` explicitly; it is not part of the public
@@ -379,15 +387,18 @@ currently paired image metadata is internal **V1c**, which covers a shorter
 period and a smaller patient set. A clinical V2 exam with no matching image row
 is therefore outside current extraction coverage and is **not** an exam without
 images; an inner accession join silently discards those exams. `acc_anon`
-remains the identifier of one distinct exam across EMBED; an association with
-more than one patient identifier is a data-quality defect, not a different exam
-identity. The anonymized DICOM locator is intended to be present for every
+and `empi_anon` use the same cross-table exam and patient namespaces. Each
+accession belongs to exactly one patient; a cross-patient association is an
+invalid data-quality error and must not be retained as a valid link. The
+anonymized DICOM locator is intended to be present for every
 extracted image, and a missing value means the image file is unavailable and
 should be treated as a data-quality defect. The image surface is
 mammography-centred, full-period extraction is still in progress, and no future
 ultrasound or MRI columns are modelled. DICOM Burned In Annotation records
 whether the source declares sufficient burned-in annotation to identify the
 patient and acquisition date; it is a declaration, not pixel-data verification.
+Columns parsed directly from DICOM elements retain their standard DICOM
+semantics; pipeline-derived fields require separate extraction evidence.
 Regions of interest are serialized collections on the image row rather than one
 row per region: the count, coordinate, frame-index, and depth-derivation
 collections are aligned by position, no region identifier exists, and the
