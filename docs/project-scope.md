@@ -123,11 +123,17 @@ physical representation is a serialized per-image collection with positionally
 aligned count, coordinate, frame-index, and depth-derivation fields, so the
 table is not one row per ROI and carries no ROI identifier. ROI coordinate axis
 order and reference frame, per-region provenance, and cross-image ROI grouping
-remain unresolved or future work. Because the paired image metadata is internal
-V1c rather than V2, its period and patient coverage are narrower than the
-clinical table: an unmatched clinical exam records missing extraction coverage,
-never an exam without images, and no future ultrasound or MRI extraction is
-modelled.
+remain unresolved or future work. `acc_anon` remains one distinct exam
+identifier across EMBED even when a source data-quality defect associates it
+with more than one patient identifier. The anonymized DICOM locator is intended
+to be defined for every extracted image; a missing value means that image file
+is unavailable and is itself a data-quality defect. DICOM Burned In Annotation
+retains the standard source-declaration meaning for sufficient identifying
+annotation, including distinct `YES`, `NO`, and absent states. Because the
+paired image metadata is internal V1c rather than V2, its period and patient
+coverage are narrower than the clinical table: an unmatched clinical exam
+records missing extraction coverage, never an exam without images, and no
+future ultrasound or MRI extraction is modelled.
 
 ## Breast-cancer outcome focus
 

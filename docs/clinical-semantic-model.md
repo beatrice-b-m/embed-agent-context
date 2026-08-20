@@ -53,7 +53,17 @@ image-type attribute, the pipeline-derived mammographic image-type
 classification, view position, and image laterality as separate features.
 Because that extraction inventories no DICOM instance identifier, the profile
 declares no image instance identity; the anonymized file locator is a technical,
-incomplete, release-local row locator.
+incomplete, release-local row locator. It is nevertheless intended to be
+defined for every extracted image: a missing value means the image file is
+unavailable and is a data-quality defect. `acc_anon` remains the identifier of
+one distinct exam across EMBED; a cross-patient association is a data-quality
+defect rather than a different exam identity.
+
+DICOM Burned In Annotation retains its standard meaning: it declares whether
+the image contains sufficient burned-in annotation to identify the patient and
+the date the image was acquired. `YES` and `NO` are source declarations, an
+absent attribute leaves that condition unknown, and none is a pixel-data
+verification.
 
 Each ROI still originates on exactly one required source image, and an ROI is
 not equated with a clinical finding. Physically, an image row carries a

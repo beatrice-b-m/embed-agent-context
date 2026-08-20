@@ -44,7 +44,10 @@ This setup and the baseline test suite need no EMBED data. Read
   the cross-table exam-to-image route, and serialized regions of interest. The
   clinical surface is internal V2 while the paired image metadata is internal
   V1c and narrower; region coordinate axis order and per-region identity remain
-  unresolved.
+  unresolved. The accession remains the distinct exam identifier when a
+  cross-patient association exposes a source defect; the anonymized DICOM
+  locator is intended for every extracted image, and an observed missing value
+  means the image file is unavailable and is a data-quality defect.
 - `catalog/catalog-set.json` selects bundled defaults; each document type has
   a standalone version-matched JSON Schema shape contract.
 - `embed_context/catalog.py` adds strict semantic, cross-reference, scope, and

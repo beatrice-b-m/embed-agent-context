@@ -378,13 +378,20 @@ deliberate version boundary: the clinical surface is internal V2 while the
 currently paired image metadata is internal **V1c**, which covers a shorter
 period and a smaller patient set. A clinical V2 exam with no matching image row
 is therefore outside current extraction coverage and is **not** an exam without
-images; an inner accession join silently discards those exams. The image
-surface is mammography-centred, full-period extraction is still in progress,
-and no future ultrasound or MRI columns are modelled. Regions of interest are
-serialized collections on the image row rather than one row per region: the
-count, coordinate, frame-index, and depth-derivation collections are aligned by
-position, no region identifier exists, and the coordinate axis order and
-reference frame remain unresolved.
+images; an inner accession join silently discards those exams. `acc_anon`
+remains the identifier of one distinct exam across EMBED; an association with
+more than one patient identifier is a data-quality defect, not a different exam
+identity. The anonymized DICOM locator is intended to be present for every
+extracted image, and a missing value means the image file is unavailable and
+should be treated as a data-quality defect. The image surface is
+mammography-centred, full-period extraction is still in progress, and no future
+ultrasound or MRI columns are modelled. DICOM Burned In Annotation records
+whether the source declares sufficient burned-in annotation to identify the
+patient and acquisition date; it is a declaration, not pixel-data verification.
+Regions of interest are serialized collections on the image row rather than one
+row per region: the count, coordinate, frame-index, and depth-derivation
+collections are aligned by position, no region identifier exists, and the
+coordinate axis order and reference frame remain unresolved.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal

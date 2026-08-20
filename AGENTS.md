@@ -32,7 +32,11 @@ versioned in lockstep with the core distribution.
   DICOM-attribute, modality, enrichment, and serialized region-of-interest
   representations. The clinical surface is internal V2 while the paired image
   metadata is internal V1c and deliberately narrower, so an unmatched clinical
-  exam means missing extraction coverage rather than missing images.
+  exam means missing extraction coverage rather than missing images. The
+  accession remains one distinct exam identifier despite cross-patient source
+  defects, and the anonymized DICOM locator is intended for every extracted
+  image; a missing locator means the image file is unavailable and is a
+  data-quality defect.
 - `catalog/catalog-set.json` selects the bundled semantic and default profile
   modules; version-matched schemas are standalone structural contracts.
 - `embed_context/catalog.py` implements strict parsing, cross-reference,

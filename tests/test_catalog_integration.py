@@ -272,6 +272,10 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertEqual(locator_key.kind, "technical")
         self.assertEqual(locator_key.uniqueness, "unique")
         self.assertEqual(locator_key.completeness, "incomplete")
+        self.assertIn(
+            "intended to be defined for every extracted image row",
+            " ".join(locator_key.caveats),
+        )
 
         # Co-located patient, exam, and image-derived side projections.
         by_object = {
@@ -289,6 +293,10 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         )
         self.assertFalse(
             by_object["imaging_exam"].instance_identity.longitudinal_identity
+        )
+        self.assertIn(
+            "one distinct exam across EMBED",
+            " ".join(by_object["imaging_exam"].caveats),
         )
         self.assertEqual(
             by_object["breast_side"].columns,
@@ -319,6 +327,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertIn("inner join", caveats)
         hazards = " ".join(exam_image.join_hazards)
         self.assertIn("consistency check", hazards)
+        self.assertIn("source defect", hazards)
         qualification = internal.qualifications[
             "internal-v2.qualification.semantic_relationship."
             "clinical.exam-image"
@@ -386,6 +395,24 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             ),
             {"L", "R"},
         )
+        burned_in = internal.concepts[
+            "internal-v2.image.burned_in_annotation_flag"
+        ]
+        self.assertIn("sufficient burned-in annotation", burned_in.definition)
+        self.assertEqual(
+            set(
+                dict(
+                    internal.vocabularies[
+                        "internal-v2.vocabulary.image.burned_in_annotation"
+                    ].codes
+                )
+            ),
+            {"YES", "NO"},
+        )
+        self.assertEqual(
+            {state.id for state in burned_in.missing_states},
+            {"absent-attribute"},
+        )
 
         # ROI collections are bound without inventing a row-per-ROI identity.
         roi = next(
@@ -416,6 +443,10 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertEqual(roi_route.source.table, roi_route.target.table)
         self.assertEqual(roi_route.targets_per_source, "zero_or_more")
         self.assertEqual(roi_route.sources_per_target, "exactly_one")
+        self.assertIn(
+            "intended to be defined for every extracted image row",
+            " ".join(roi_route.caveats),
+        )
         self.assertEqual(
             internal.coverage["coverage.internal-v2.roi-physical-binding"]
             .status,

@@ -64,7 +64,12 @@ classification, view position, and image laterality stay separate mappings.
 Because the clinical surface is internal V2 while the paired image metadata is
 internal V1c, the profile records the version boundary explicitly: coverage is
 narrower, and an unmatched clinical exam means missing extraction coverage
-rather than an exam without images.
+rather than an exam without images. The accession remains the distinct exam
+identifier despite cross-patient source defects. The anonymized DICOM locator
+is the intended image-file reference, with observed absence treated as file
+unavailability and a data-quality defect. Standard DICOM Burned In Annotation
+semantics distinguish `YES`, `NO`, and absence without treating the source
+declaration as pixel-data verification.
 
 ## Physical schemas and mappings
 

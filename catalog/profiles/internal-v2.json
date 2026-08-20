@@ -170,6 +170,19 @@
         "Open V2 physical and aggregate bindings are not imported into internal-v2."
       ]
     },
+    "internal-v2.dicom-image-module-standard": {
+      "title": "DICOM PS3.3 Common Image Information Entity Modules",
+      "kind": "public_documentation",
+      "scope": "general_clinical",
+      "locator_kind": "url",
+      "locator": "https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_C.7.6.html",
+      "version_scope": "Current DICOM PS3.3 definition of Burned In Annotation (0028,0301), including its YES, NO, and absent-attribute semantics.",
+      "profiles": [],
+      "notes": [
+        "Used to interpret the standard DICOM attribute rather than infer its meaning from the internal column name.",
+        "Does not establish that the internal extraction verified the source declaration against pixel data."
+      ]
+    },
     "internal-v2.v1c-metadata-artifact": {
       "title": "Internal V1c image-metadata artifact inventory",
       "kind": "supporting_internal",
@@ -243,6 +256,22 @@
         "V1c covers a shorter period and a smaller patient set than internal clinical V2.",
         "Future metadata is expected to add or expand modalities such as ultrasound and MRI and may replace this image surface.",
         "Does not establish column names, encodings, or representations for any future extraction."
+      ]
+    },
+    "internal-v2.v1c-metadata-maintainer-clarifications": {
+      "title": "Internal V1c image-metadata maintainer clarifications",
+      "kind": "maintainer_confirmed",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "maintainer-confirmed:internal-v1c-image-metadata-identity-and-availability",
+      "version_scope": "Internal EMBED V1c image-metadata accession identity and anonymized DICOM locator expectations within the internal-v2 working profile.",
+      "profiles": [
+        "internal-v2"
+      ],
+      "notes": [
+        "acc_anon is the exam identifier across EMBED; a cross-patient association is a data-quality defect and does not redefine the accession as several exams.",
+        "anon_dicom_path is intended to be defined for every extracted image row; a missing value means the image file is unavailable and is a data-quality defect.",
+        "The anonymized DICOM locator remains a technical, release-local reference and is not durable clinical image identity."
       ]
     }
   },
@@ -1037,14 +1066,16 @@
         },
         {
           "id": "image-identity-unresolved",
-          "statement": "The internal V1c extraction inventories no DICOM instance identifier; the anonymized DICOM file locator distinguishes rows wherever it is represented but is a technical locator that is not represented on every row, and the DICOM series and instance numbers do not distinguish one image row within an accession.",
+          "statement": "The internal V1c extraction inventories no DICOM instance identifier; the anonymized DICOM file locator distinguishes rows wherever it is represented and is intended to be defined for every extracted image row, while the DICOM series and instance numbers do not distinguish one image row within an accession.",
           "status": "reconciled",
           "sources": [
-            "internal-v2.v1c-metadata-structure-observation"
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
             "A file locator is a technical reference and must not be promoted to clinical image identity.",
-            "Any release-local row distinctness is scoped to this extraction and does not survive re-extraction."
+            "Any release-local row distinctness is scoped to this extraction and does not survive re-extraction.",
+            "An observed missing locator is a data-quality defect indicating that the image file is unavailable, not intended optionality."
           ]
         },
         {
@@ -1101,14 +1132,29 @@
         },
         {
           "id": "patient-and-exam-projection",
-          "statement": "The patient identifier and the accession repeat across internal V1c image rows and remain patient-level and exam-level respectively, and an accession value in this extraction does not by itself determine one patient identifier.",
+          "statement": "The patient identifier and the accession repeat across internal V1c image rows and remain patient-level and exam-level respectively; acc_anon identifies one exam across EMBED even when a data-quality defect associates that accession with more than one patient identifier.",
           "status": "reconciled",
           "sources": [
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
+          ],
+          "caveats": [
+            "Treat the patient identifier as a data-quality consistency check on an accession route rather than an exam-identity component.",
+            "A cross-patient accession association is a source defect to flag; it does not split or redefine the accession's exam identity.",
+            "Repetition across image rows is physical multiplicity, not clinical multiplicity."
+          ]
+        },
+        {
+          "id": "burned-in-annotation-semantics",
+          "statement": "DICOM Burned In Annotation (0028,0301) declares whether the image contains sufficient burned-in annotation to identify the patient and the date the image was acquired; YES and NO are the defined values, and an absent attribute leaves that condition unknown.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.dicom-image-module-standard",
             "internal-v2.v1c-metadata-structure-observation"
           ],
           "caveats": [
-            "Treat the patient identifier as a required consistency check on an accession route rather than an assumed agreement.",
-            "Repetition across image rows is physical multiplicity, not clinical multiplicity."
+            "The attribute is a source declaration and is not a verification of the pixel data.",
+            "The affirmative state is represented in internal V1c and requires appropriate handling before redistribution or model input."
           ]
         },
         {
@@ -3979,6 +4025,30 @@
         "R": "Right"
       }
     },
+    "internal-v2.vocabulary.image.burned_in_annotation": {
+      "availability": {
+        "scope": "profiles",
+        "profiles": [
+          "internal-v2"
+        ]
+      },
+      "label": "DICOM Burned In Annotation values",
+      "completeness": "closed",
+      "parsing": "atomic",
+      "evidence": [
+        "observed_v2_values",
+        "inference"
+      ],
+      "caveats": [
+        "These values carry the standard DICOM meaning; they do not declare whether any non-identifying annotation is present.",
+        "The attribute is a source declaration and is not a verification of pixel data.",
+        "An absent value means the presence of sufficient identifying burned-in annotation is unknown."
+      ],
+      "codes": {
+        "YES": "The source declares that the image contains sufficient burned-in annotation to identify the patient and the date the image was acquired",
+        "NO": "The source declares that the image does not contain sufficient burned-in annotation to identify the patient and the date the image was acquired"
+      }
+    },
     "internal-v2.vocabulary.image.extraction_category": {
       "availability": {
         "scope": "profiles",
@@ -5662,7 +5732,7 @@
         "concept": "exam.accession_identifier",
         "status": "direct",
         "notes": [
-          "The accession repeats across the exam's image rows and does not by itself determine one patient identifier in this extraction."
+          "The accession repeats across the exam's image rows and identifies one distinct exam; a cross-patient association is a data-quality defect."
         ]
       },
       {
@@ -6120,7 +6190,8 @@
         "table": "metadata_all_cohorts_v1c",
         "column": "BurnedInAnnotation",
         "concept": "internal-v2.image.burned_in_annotation_flag",
-        "status": "direct"
+        "status": "direct",
+        "vocabulary": "internal-v2.vocabulary.image.burned_in_annotation"
       },
       {
         "id": "internal-v2.binding.feature.internal-v2.image.dicom_conversion_type.metadata-v1c.conversiontype",
@@ -6600,13 +6671,15 @@
           "internal-v2.v1c-metadata-context#image-identity-unresolved",
           "internal-v2.v1c-metadata-context#version-boundary",
           "internal-v2.v1c-metadata-context#modality-surface",
-          "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
+          "internal-v2.v1c-metadata-context#locator-and-enrichment-population",
+          "internal-v2.v1c-metadata-context#burned-in-annotation-semantics"
         ],
         "caveats": [
           "Coverage is internal V1c: the extraction spans a shorter period and a smaller patient set than the internal clinical V2 table, and a future extraction is expected to expand or replace it.",
           "No DICOM instance identifier is inventoried, so no clinical image instance identity is declared; the anonymized DICOM locator is a technical, incomplete, release-local row locator.",
           "DICOM-derived attributes, pipeline-derived classifications, and enrichment flags are separate mappings and must not be conflated.",
-          "The row describes image attributes; a missing file locator or enrichment flag is not evidence that no image exists."
+          "A missing rendered-image locator or enrichment flag is not evidence that no image exists.",
+          "The anonymized DICOM locator is intended to be present; a missing value means the image file is unavailable and is a data-quality defect."
         ]
       },
       {
@@ -6684,7 +6757,8 @@
         ],
         "caveats": [
           "The accession repeats across the exam's image rows and remains exam-level.",
-          "An accession value in this extraction does not by itself determine one patient identifier, so a patient consistency check is required on any accession route.",
+          "acc_anon remains the identifier of one distinct exam across EMBED; association with more than one patient identifier is a data-quality defect rather than a different exam identity.",
+          "Use the patient identifier as a data-quality consistency check on an accession route, not as an exam-identity component.",
           "Only an accession, an exam date, and a cohort number project here; the clinical table remains the preferred exam representation.",
           "Exam coverage is internal V1c and narrower than internal clinical V2."
         ],
@@ -8466,7 +8540,7 @@
             ],
             "caveats": [
               "The accession repeats across the exam's image rows and remains exam-level.",
-              "An accession value in this extraction does not by itself determine one patient identifier, so a patient consistency check is required."
+              "acc_anon remains the identifier of one distinct exam across EMBED; an association with more than one patient identifier is a data-quality defect."
             ]
           },
           {
@@ -8482,7 +8556,8 @@
             ],
             "caveats": [
               "This is a technical file reference, not clinical image identity, and it is release-local to this extraction.",
-              "It is not represented on every row, so it cannot serve as a complete row key."
+              "It is intended to be defined for every extracted image row; an observed missing value means the image file is unavailable and is a data-quality defect.",
+              "Because missing values occur, it cannot serve as a complete physical row key in this extraction."
             ]
           },
           {
@@ -8527,7 +8602,7 @@
           "Region-of-interest information is serialized in per-row collections; this table is not one row per region of interest.",
           "This extraction is internal V1c and covers a shorter period and a smaller patient set than the internal clinical V2 table; absence of an exam here is not absence of images.",
           "The extraction is mammography-centred; represented non-mammographic source modality values do not establish systematic ultrasound or MRI image coverage, and no future modality column is modelled.",
-          "Some rows represent secondary-capture or screen-save images and the burned-in-annotation attribute can be affirmative, so pixel data can contain burned-in text.",
+          "Some rows represent secondary-capture or screen-save images, and the DICOM Burned In Annotation attribute can declare that sufficient identifying annotation is present in the pixel data.",
           "DICOM time-of-day attributes are numerically parsable, so a numeric parse discards zero padding and any fractional-second form; they remain inventoried and unmapped.",
           "A DICOM patient-age attribute and an imaging-service-request order number are inventoried; their anonymization treatment and internal meaning are not established, so they remain unmapped.",
           "Detailed DICOM acquisition, dose, detector, collimator, geometry, windowing, and icon-image attributes remain inventoried without mappings rather than mapped from a recognizable attribute name."
@@ -9324,7 +9399,7 @@
         ],
         "join_hazards": [
           "Both endpoints repeat the accession, so an accession join multiplies clinical association rows against image rows; declare a grouping and de-duplication policy before joining.",
-          "Use the anonymized patient identifier as a consistency check rather than assuming agreement: an accession value in the V1c extraction does not by itself determine one patient identifier.",
+          "Use the anonymized patient identifier as a data-quality consistency check rather than an exam-identity component; a cross-patient accession association is a source defect, while acc_anon still identifies one exam.",
           "Image laterality may be used only as a consistency check; it is not the imaging-finding or procedure side and must not be made a join-identity component.",
           "Do not derive an image-availability flag, a no-image cohort, or an exclusion rule from join outcomes."
         ],
@@ -9402,7 +9477,8 @@
         "caveats": [
           "The relationship is realized by row co-location rather than by a key join: an image row's region-of-interest collections are carried in that same row.",
           "One image row carries zero or more regions and each region belongs to exactly one image row, preserving the semantic rule that a region has exactly one source image.",
-          "The endpoint locator is technical and is not represented on every row, so it is neither image identity nor region identity.",
+          "The endpoint locator is technical and is intended to be defined for every extracted image row; a missing value means the image file is unavailable and is a data-quality defect.",
+          "Observed missing locator values make the physical endpoint incomplete, but the locator remains the intended image-to-region attachment and is neither durable image identity nor region identity.",
           "There is no separate region-of-interest table and none should be inferred."
         ],
         "join_hazards": [
@@ -10747,7 +10823,8 @@
         ],
         "caveats": [
           "A file locator is a technical reference and is not clinical image identity.",
-          "It distinguishes rows wherever represented but is not represented on every row and is release-local."
+          "It is intended to be defined for every extracted image row and is release-local.",
+          "An observed missing value means the image file is unavailable and is a data-quality defect."
         ],
         "evidence": [
           "observed_v2_values"
@@ -10756,7 +10833,19 @@
         "claim_refs": [
           "internal-v2.v1c-metadata-context#image-identity-unresolved"
         ],
-        "missing_states": [],
+        "missing_states": [
+          {
+            "id": "missing-locator",
+            "representation": "null or blank value",
+            "meaning": "The intended image file is unavailable because its anonymized DICOM locator is missing",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#image-identity-unresolved"
+            ],
+            "caveats": [
+              "Treat this as a data-quality defect, not intended optionality."
+            ]
+          }
+        ],
         "temporal_semantics": [],
         "aggregations": []
       },
@@ -11871,7 +11960,7 @@
           ]
         },
         "label": "Burned-in annotation attribute",
-        "definition": "Represented source DICOM indication of whether one internal V1c image row's pixel data contains burned-in annotation.",
+        "definition": "Represented source DICOM declaration of whether one internal V1c image row contains sufficient burned-in annotation to identify the patient and the date the image was acquired.",
         "feature_kind": "coded",
         "domains": [
           "imaging",
@@ -11883,8 +11972,9 @@
           "pixel annotation"
         ],
         "caveats": [
-          "The affirmative state is represented, so pixel data can contain burned-in text and must be handled before redistribution or model input.",
-          "The attribute is a source declaration and is not a verification."
+          "The affirmative state is represented and requires appropriate handling before redistribution or model input.",
+          "The attribute is a source declaration and is not a verification of the pixel data.",
+          "NO does not mean that the image contains no annotation; it means the source does not declare sufficient burned-in annotation to identify the patient and acquisition date."
         ],
         "evidence": [
           "observed_v2_values"
@@ -11892,10 +11982,25 @@
         "objects": [
           "image"
         ],
-        "claim_refs": [],
-        "missing_states": [],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#burned-in-annotation-semantics"
+        ],
+        "missing_states": [
+          {
+            "id": "absent-attribute",
+            "representation": "null or absent value",
+            "meaning": "The source makes no Burned In Annotation declaration; sufficient identifying annotation may or may not be present",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#burned-in-annotation-semantics"
+            ],
+            "caveats": [
+              "Do not interpret absence as NO."
+            ]
+          }
+        ],
         "temporal_semantics": [],
-        "aggregations": []
+        "aggregations": [],
+        "vocabulary": "internal-v2.vocabulary.image.burned_in_annotation"
       },
       "internal-v2.image.dicom_conversion_type": {
         "availability": {

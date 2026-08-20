@@ -115,7 +115,13 @@ declared, ROI coordinate geometry and per-region provenance remain `unresolved`
 coverage, and cross-image ROI grouping is still absent. The paired image
 metadata is internal V1c while the clinical surface is internal V2, so the
 exam-to-image binding records incomplete coverage and states that an unmatched
-clinical exam is not an exam without images.
+clinical exam is not an exam without images. The accession remains one distinct
+exam identifier even where a cross-patient association exposes a source
+data-quality defect. The anonymized DICOM locator is intended for every
+extracted image; observed missing values mean the file is unavailable and keep
+the technical key physically incomplete. DICOM Burned In Annotation uses the
+standard `YES`, `NO`, and absent-attribute meanings and remains a source
+declaration rather than pixel-data verification.
 
 ## Profile modules
 
