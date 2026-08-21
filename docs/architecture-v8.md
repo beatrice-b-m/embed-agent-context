@@ -61,18 +61,23 @@ breast-side projections, a cross-table accession route for the exam-to-image
 relationship, and a same-table route for the image-to-ROI relationship. Each ROI
 still has exactly one required source image, but the physical representation is a
 serialized per-image collection, so no ROI row grain, ROI identifier, or
-cross-image ROI grouping is asserted. Source DICOM modality, the source DICOM
-image-type attribute, the pipeline-derived mammographic image-type
-classification, view position, and image laterality stay separate mappings.
+cross-image ROI grouping is asserted. Coordinates use DICOM pixel-array
+`[y_min, x_min, y_max, x_max]` order and originate from radiologist clinical
+annotations; model-inferred DBT depth is explicitly flagged. Source DICOM
+modality, the source DICOM image-type attribute, the pipeline-derived
+mammographic image-type classification, view position, and image laterality
+stay separate mappings.
 Because the clinical surface is internal V2 while the paired image metadata is
-internal V1c, the profile records the version boundary explicitly: coverage is
-narrower, and an unmatched clinical exam means missing extraction coverage
+internal V1c, the profile records the version boundary explicitly: V1c covers
+every EMBEDv1 exam and patient but is narrower than clinical V2, and an
+unmatched later clinical exam means missing extraction coverage
 rather than an exam without images. The accession remains the distinct exam
 identifier in the shared cross-table namespace and each accession belongs to
 exactly one patient; cross-patient associations are invalid data-quality
-errors. The anonymized DICOM locator
-is the intended image-file reference, with observed absence treated as file
-unavailability and a data-quality defect. Standard DICOM Burned In Annotation
+errors. The anonymized DICOM locator is the intended image-file reference and
+its basename is the dataset-version-scoped anonymized SOP Instance UID;
+observed absence likely reflects anonymization failure. Standard DICOM Burned
+In Annotation
 semantics distinguish `YES`, `NO`, and absence without treating the source
 declaration as pixel-data verification.
 

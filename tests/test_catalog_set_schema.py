@@ -183,8 +183,15 @@ class CatalogSetSchemaTests(unittest.TestCase):
                 for item in image_side.values()
             )
         )
-        for item in image_side.values():
-            self.assertNotIn("instance_identity", item)
+        self.assertEqual(
+            image_side["image"]["instance_identity"]["columns"],
+            ["anon_dicom_path"],
+        )
+        self.assertEqual(
+            image_side["image"]["instance_identity"]["rows_per_instance"],
+            "exactly_one",
+        )
+        self.assertNotIn("instance_identity", image_side["region_of_interest"])
         self.assertTrue(
             any(
                 "clinical.image-region-of-interest"

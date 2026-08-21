@@ -53,9 +53,10 @@ and temporal qualification. Claims cite exact `context-id#claim-id` records.
 The shared catalog includes the `image` object and `clinical.exam-image`
 relationship. Their presence expresses shared meaning; it does not assert that
 every profile supplies an image table, file layout, or verified physical key.
-`internal-v2` supplies an image table but still declares no image instance
-identity, because its current extraction inventories no DICOM instance
-identifier.
+`internal-v2` supplies an image table whose `anon_dicom_path` basename is the
+anonymized SOP Instance UID. That value supplies durable image identity within
+one dataset version even though the UID is not exported as a separate metadata
+column.
 
 ## Contributions and availability
 
@@ -111,16 +112,19 @@ no embedded column schema, its recorded physical types are assessed parse types
 and every column is conservatively nullable; unresolved and technical columns
 stay inventoried without mappings. Region-of-interest information is a
 serialized per-image collection, so no ROI row grain or ROI identifier is
-declared, ROI coordinate geometry and per-region provenance remain `unresolved`
-coverage, and cross-image ROI grouping is still absent. The paired image
-metadata is internal V1c while the clinical surface is internal V2, so the
+declared; ROI coordinates use `[y_min, x_min, y_max, x_max]` DICOM pixel-array
+space and have routine-clinical radiologist provenance, while cross-image ROI
+grouping remains absent. The paired image metadata is internal V1c while the
+clinical surface is internal V2, so the
 exam-to-image binding records incomplete coverage and states that an unmatched
 clinical exam is not an exam without images. The accession remains one distinct
 exam identifier in the shared cross-table namespace, belongs to exactly one
 patient, and treats a cross-patient association as an invalid data-quality
 error. The anonymized DICOM locator is intended for every
-extracted image; observed missing values mean the file is unavailable and keep
-the technical key physically incomplete. DICOM Burned In Annotation uses the
+extracted image; its basename supplies dataset-version-scoped anonymized SOP
+Instance UID identity. Observed missing values likely mean anonymization failed
+before saving and keep the technical key physically incomplete. DICOM Burned
+In Annotation uses the
 standard `YES`, `NO`, and absent-attribute meanings and remains a source
 declaration rather than pixel-data verification.
 

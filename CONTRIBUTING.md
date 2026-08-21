@@ -43,12 +43,14 @@ This setup and the baseline test suite need no EMBED data. Read
   patient, exam, and image-derived side projections, image metadata concepts,
   the cross-table exam-to-image route, and serialized regions of interest. The
   clinical surface is internal V2 while the paired image metadata is internal
-  V1c and narrower; region coordinate axis order and per-region identity remain
-  unresolved. Patient and exam identifiers share their cross-table namespaces;
+  V1c, covers every EMBEDv1 exam and patient, and is narrower than clinical V2.
+  ROI coordinates use DICOM pixel-array `[y_min, x_min, y_max, x_max]` order;
+  stable per-region identity and cross-image correspondence are not represented.
+  Patient and exam identifiers share their cross-table namespaces;
   each accession belongs to exactly one patient, and a cross-patient
-  association is an invalid data-quality error. The anonymized DICOM
-  locator is intended for every extracted image, and an observed missing value
-  means the image file is unavailable and is a data-quality defect.
+  association is an invalid data-quality error. The anonymized DICOM path
+  basename is the dataset-version-scoped anonymized SOP Instance UID; a missing
+  path likely means anonymization failed before the file could be saved.
 - `catalog/catalog-set.json` selects bundled defaults; each document type has
   a standalone version-matched JSON Schema shape contract.
 - `embed_context/catalog.py` adds strict semantic, cross-reference, scope, and

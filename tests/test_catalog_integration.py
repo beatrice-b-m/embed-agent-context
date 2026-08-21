@@ -248,7 +248,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             " ".join(metadata.caveats),
         )
 
-        # Image grain and the absence of an unjustified instance identity.
+        # Image grain and dataset-version-scoped SOP instance identity.
         image = next(
             item
             for item in binding.object_bindings
@@ -258,11 +258,17 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertEqual(image.completeness, "partial")
         self.assertEqual(image.authority, "preferred")
         self.assertEqual(image.derivation, "source")
-        self.assertIsNone(image.instance_identity)
+        self.assertEqual(image.instance_identity.columns, ("anon_dicom_path",))
+        self.assertEqual(image.instance_identity.rows_per_instance, "exactly_one")
+        self.assertFalse(image.instance_identity.longitudinal_identity)
+        self.assertEqual(
+            image.instance_identity.reserved_exceptions[0].representation,
+            "null or blank",
+        )
         self.assertEqual(
             internal.coverage["coverage.internal-v2.v1c-image-instance-identity"]
             .status,
-            "unresolved",
+            "supported",
         )
         locator_key = next(
             key
@@ -283,7 +289,10 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             for item in binding.object_bindings
             if item.table == "metadata_all_cohorts_v1c"
         }
-        self.assertEqual(by_object["patient"].columns, ("empi_anon",))
+        self.assertEqual(
+            by_object["patient"].columns,
+            ("empi_anon", "PatientAge", "PatientSex"),
+        )
         self.assertTrue(
             by_object["patient"].instance_identity.longitudinal_identity
         )
@@ -348,8 +357,23 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertEqual(statuses["ImageLaterality"], "direct")
         self.assertEqual(statuses["LateralityDeriveFlag"], "ambiguous")
         self.assertEqual(statuses["category"], "unresolved")
-        self.assertEqual(statuses["has_pix_array"], "unresolved")
-        self.assertEqual(statuses["anon_dicom_path"], "direct")
+        self.assertEqual(statuses["has_pix_array"], "direct")
+        self.assertEqual(statuses["anon_dicom_path"], "derived")
+        anon_path_mappings = {
+            (item.concept, item.status)
+            for item in binding.feature_bindings
+            if item.table == "metadata_all_cohorts_v1c"
+            and item.column == "anon_dicom_path"
+        }
+        self.assertEqual(
+            anon_path_mappings,
+            {
+                ("internal-v2.image.dicom_file_locator", "direct"),
+                ("internal-v2.image.sop_instance_identifier", "derived"),
+            },
+        )
+        self.assertEqual(statuses["PatientAge"], "direct")
+        self.assertEqual(statuses["PatientSex"], "direct")
         self.assertEqual(statuses["png_path"], "conditional")
         concepts_by_column = {
             item.column: item.concept
@@ -374,6 +398,20 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             internal.concepts["internal-v2.image.dicom_file_locator"].objects,
             (),
         )
+        self.assertEqual(
+            internal.concepts["internal-v2.image.sop_instance_identifier"]
+            .feature_kind,
+            "identifier",
+        )
+        acquisition_group = internal.concepts[
+            "internal-v2.image.acquisition_group_identifier"
+        ]
+        self.assertIn(
+            "ProtocolName with spaces replaced", acquisition_group.definition
+        )
+        self.assertIn(
+            "ContentTime cast as an integer", acquisition_group.definition
+        )
         modality_codes = dict(
             internal.vocabularies[
                 "internal-v2.vocabulary.image.source_modality"
@@ -385,6 +423,16 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             ].codes
         ).keys()
         self.assertTrue({"2D", "3D", "cview"} <= set(image_type_codes))
+        self.assertIn("ROI_SS", image_type_codes)
+        self.assertIn("ROI_SSC", image_type_codes)
+        self.assertIn(
+            "burned-in radiologist pixel annotations",
+            dict(
+                internal.vocabularies[
+                    "internal-v2.vocabulary.image.derived_image_type"
+                ].codes
+            )["ROI_SS"],
+        )
         self.assertTrue(set(modality_codes).isdisjoint(image_type_codes))
         self.assertEqual(
             set(
@@ -432,9 +480,21 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertIn("zero or more regions", roi_caveats)
         self.assertIn("row-per-region representation", roi_caveats)
         self.assertEqual(statuses["num_ROI"], "derived")
-        self.assertEqual(statuses["ROI_coords"], "ambiguous")
+        self.assertEqual(statuses["ROI_coords"], "derived")
         self.assertEqual(statuses["ROI_frames"], "derived")
         self.assertEqual(statuses["ROI_depth_derived"], "derived")
+        roi_context = internal.contexts["internal-v2.roi-context"]
+        finding_attribution = next(
+            claim
+            for claim in roi_context.claims
+            if claim.id == "roi-finding-attribution"
+        )
+        self.assertEqual(finding_attribution.status, "verified")
+        self.assertIn("exactly one finding", finding_attribution.statement)
+        self.assertIn(
+            "internal-v2.guardrail.roi-finding-attribution-is-conditional",
+            internal.guardrails,
+        )
         roi_route = next(
             item
             for item in binding.relationship_bindings
@@ -445,7 +505,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertEqual(roi_route.targets_per_source, "zero_or_more")
         self.assertEqual(roi_route.sources_per_target, "exactly_one")
         self.assertIn(
-            "intended to be defined for every extracted image row",
+            "endpoint locator is intended for every extracted image row",
             " ".join(roi_route.caveats),
         )
         self.assertEqual(
@@ -457,7 +517,7 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             internal.coverage[
                 "coverage.internal-v2.v1c-roi-coordinate-geometry"
             ].status,
-            "unresolved",
+            "supported",
         )
         self.assertNotIn(
             "not_cataloged",
@@ -468,21 +528,18 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             },
         )
 
-        # No future ultrasound or MRI extraction is represented.
+        # Current V1c modality coverage is complete for the EMBEDv1 boundary.
         self.assertEqual(
             internal.coverage[
                 "coverage.internal-v2.v1c-image-modality-coverage"
             ].status,
-            "unresolved",
+            "supported",
         )
-        self.assertNotIn("MRI", modality_codes)
-        metadata_columns = {column.name for column in metadata.columns}
-        self.assertTrue(
-            all(
-                "ultrasound" not in name.lower() and "mri" not in name.lower()
-                for name in metadata_columns
-            )
-        )
+        modality_coverage = internal.coverage[
+            "coverage.internal-v2.v1c-image-modality-coverage"
+        ]
+        self.assertIn("complete EMBEDv1 accession set", modality_coverage.summary)
+        self.assertNotIn("progress", modality_coverage.summary.lower())
 
     def test_exact_getters_resolve_navigation_and_claim_provenance(self) -> None:
         result = self.catalog.get_clinical_object("pathology_diagnosis")

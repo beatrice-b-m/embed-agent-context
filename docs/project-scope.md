@@ -39,7 +39,8 @@ remain unresolved. Its image-metadata binding inventories the internal V1c
 image-metadata table and binds image, co-located patient, exam, and
 image-derived side, DICOM-attribute, modality, enrichment, and serialized
 region-of-interest representations; the clinical surface is internal V2 while
-the paired image metadata is internal V1c and deliberately narrower.
+the paired image metadata is the most recent internal V1c artifact, covers
+every EMBEDv1 exam and patient, and is narrower than clinical V2.
 `catalog/catalog-set.json` selects bundled defaults.
 Together they must
 remain:
@@ -122,19 +123,23 @@ relationship. Each ROI still has exactly one required source image; the ROI
 physical representation is a serialized per-image collection with positionally
 aligned count, coordinate, frame-index, and depth-derivation fields, so the
 table is not one row per ROI and carries no ROI identifier. ROI coordinate axis
-order and reference frame, per-region provenance, and cross-image ROI grouping
-remain unresolved or future work. `acc_anon` remains one distinct exam
+order is `[y_min, x_min, y_max, x_max]` in the attached DICOM pixel-array
+space; annotations originate from radiologists during routine clinical care,
+and `ROI_depth_derived` marks model-inferred DBT frame depth. Stable per-region
+identity and cross-image ROI correspondence are not represented. `acc_anon`
+remains one distinct exam
 identifier across EMBED, uses the same namespace in both tables, and belongs to
 exactly one `empi_anon`; a cross-patient association is an invalid data-quality
-error and must not be retained as a valid link. The anonymized DICOM locator is intended
-to be defined for every extracted image; a missing value means that image file
-is unavailable and is itself a data-quality defect. DICOM Burned In Annotation
+error and must not be retained as a valid link. The anonymized DICOM path is
+intended for every extracted image; its basename is the anonymized SOP Instance UID
+within one dataset version, and a missing value likely means anonymization
+failed before the de-identified file could be saved. DICOM Burned In Annotation
 retains the standard source-declaration meaning for sufficient identifying
 annotation, including distinct `YES`, `NO`, and absent states. Because the
-paired image metadata is internal V1c rather than V2, its period and patient
-coverage are narrower than the clinical table: an unmatched clinical exam
-records missing extraction coverage, never an exam without images, and no
-future ultrasound or MRI extraction is modelled.
+paired image metadata is internal V1c rather than V2, it covers the complete
+EMBEDv1 exam and patient set and remains narrower than the clinical table: an
+unmatched later clinical exam records missing extraction coverage,
+never an exam without images.
 
 ## Breast-cancer outcome focus
 

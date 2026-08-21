@@ -15,13 +15,14 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "maintainer-confirmed:internal-v2-roi-model",
-      "version_scope": "Internal EMBED V2 working profile; semantic existence, required single-source-image attachment, and future simultaneous-acquisition linkage direction.",
+      "version_scope": "Internal EMBED V1c region-of-interest geometry, clinical provenance, frame-depth derivation, collection invariants, and finding-attribution limitations within the internal-v2 working profile.",
       "profiles": [
         "internal-v2"
       ],
       "notes": [
         "Confirms that every ROI originates on exactly one source image and cannot exist without that source-image attachment.",
-        "Does not establish physical table, column, geometry, identifier, or future cross-image grouping details."
+        "Confirms y-minimum, x-minimum, y-maximum, x-maximum pixel-array coordinate order; radiologist-origin clinical provenance; DBT frame-index and inferred-depth semantics; tandem collection generation; and the absence of stable ROI identity or cross-image correspondence.",
+        "Confirms that accession-and-side attribution is generally safe only when exactly one clinical finding is represented on that side; multiple findings on one side cannot be reliably distinguished from the represented ROIs."
       ]
     },
     "internal-v2.magview-maintainer-confirmation": {
@@ -260,15 +261,13 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "maintainer-confirmed:internal-v2-v1c-image-metadata-boundary",
-      "version_scope": "Deliberate and temporary pairing of the internal clinical V2 profile with an internal V1c image-metadata extraction, and the status of the in-progress full-period image extraction.",
+      "version_scope": "Current pairing of the internal clinical V2 profile with the most recent internal V1c image-metadata artifact, which covers the complete EMBEDv1 exam and patient set.",
       "profiles": [
         "internal-v2"
       ],
       "notes": [
-        "Image extraction for the full internal V2 period is still in progress; the V1c artifact is the current companion.",
-        "V1c covers a shorter period and a smaller patient set than internal clinical V2.",
-        "Future metadata is expected to add or expand modalities such as ultrasound and MRI and may replace this image surface.",
-        "Does not establish column names, encodings, or representations for any future extraction."
+        "The V1c artifact is the most current image-metadata file and covers the full set of EMBEDv1 exams and patients.",
+        "V1c remains narrower than internal clinical V2 because the clinical table contains later dataset coverage."
       ]
     },
     "internal-v2.v1c-metadata-maintainer-clarifications": {
@@ -277,7 +276,7 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "maintainer-confirmed:internal-v1c-image-metadata-identity-and-availability",
-      "version_scope": "Internal EMBED V1c image-metadata patient and accession identity, anonymized date shifting, DICOM element interpretation, and anonymized DICOM locator expectations within the internal-v2 working profile.",
+      "version_scope": "Internal EMBED V1c extraction coverage, patient, accession, and image identity, anonymization, legacy image fields, acquisition grouping, reliable final laterality, DICOM interpretation, and locator expectations within the internal-v2 working profile.",
       "profiles": [
         "internal-v2"
       ],
@@ -286,8 +285,14 @@
         "acc_anon is the exam identifier across EMBED; a cross-patient association is a data-quality defect that must not be retained as a valid identity or linkage association and does not redefine the accession as several exams.",
         "The same patient-specific date shift is applied consistently to every anonymized date value across EMBED tables and dataset versions.",
         "Parsed-out DICOM elements retain the applicable standard DICOM element semantics; pipeline-derived fields require separate extraction evidence.",
-        "anon_dicom_path is intended to be defined for every extracted image row; a missing value means the image file is unavailable and is a data-quality defect.",
-        "The anonymized DICOM locator remains a technical, release-local reference and is not durable clinical image identity."
+        "All DICOM objects associated with EMBEDv1 accessions were extracted, after which secondary captures and screen saves were excluded except ROI_SS and ROI_SSC annotation images retained solely to enable ROI extraction.",
+        "anon_dicom_path is intended to be defined for every extracted image row; a missing value likely means anonymization failed before the de-identified file could be saved and is a data-quality defect.",
+        "The anonymized SOP Instance UID is durable within one dataset version and is present in the source DICOM and as the anon_dicom_path filename without the .dcm suffix.",
+        "PNG locators are legacy EMBEDv1 FFDM conversion outputs and should not be used for current or future work; the DICOM files are the maintained image representation.",
+        "acquisition_group_id is constructed as acc_anon, normalized ProtocolName, and integer ContentTime; it is stable across reruns and globally unique for simultaneous acquisition groups.",
+        "ImageLateralityFinal is the reliable image breast-laterality attribute even though its derivation rule and LateralityDeriveFlag meanings remain unresolved.",
+        "PatientAge is top-coded to 89, PatientSex is unchanged, and sensitive non-identifier/non-date attributes were dropped during anonymization.",
+        "No DICOM processing other than anonymization and sensitive-information redaction was applied."
       ]
     }
   },
@@ -299,7 +304,7 @@
       "profiles": [
         "internal-v2"
       ],
-      "summary": "Internal V1c represents regions of interest as serialized per-image collections on the image-metadata table; each region originates on exactly one source image, while coordinate axis order, per-region identity, provenance, and cross-image correspondence remain unresolved.",
+      "summary": "Internal V1c represents radiologist-origin clinical regions of interest as tandem-generated serialized per-image collections in DICOM pixel-array coordinates; no stable per-region identity or cross-image correspondence is represented, and finding attribution is reliable only in the documented single-finding-per-side case.",
       "domains": [
         "imaging"
       ],
@@ -330,82 +335,97 @@
             "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
-            "No physical representation or geometry semantics are asserted.",
-            "Linking corresponding or normalized ROIs across simultaneously acquired FFDM, DBT, and synthetic 2D images is a separate future semantic and physical surface."
+            "Linking corresponding or normalized ROIs across simultaneously acquired FFDM, DBT, and synthetic 2D images is not represented."
           ]
         },
         {
           "id": "roi-serialized-collections",
           "statement": "An internal V1c image row carries a represented region-of-interest count together with serialized coordinate, frame-index, and depth-derivation collections whose lengths agree with that count, and represents no regions of interest as empty collections.",
-          "status": "reconciled",
+          "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
-            "internal-v2.public-embed-roi"
+            "internal-v2.public-embed-roi",
+            "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
             "The three collections are aligned by position only; no per-region identifier is represented.",
-            "The public count, coordinate, and frame column description was confirmed against internal V1c, and the internal extraction adds a depth-derivation collection."
+            "The collections are generated in tandem, so mismatched counts or collection lengths are not a valid representation."
           ]
         },
         {
-          "id": "roi-geometry-unresolved",
-          "statement": "Each represented region of interest is a four-element integer rectangle whose first two components are the lower bounds and whose last two are the matching upper bounds, but whether the first axis is the row axis or the column axis is not established for internal V1c and components can fall outside the pixel matrix.",
-          "status": "unresolved",
+          "id": "roi-coordinate-geometry",
+          "statement": "ROI_coords is a nested list of rectangles in [y_min, x_min, y_max, x_max] order, expressed directly in the coordinate space of the attached DICOM image's pixel array without a spacing, orientation, or other coordinate transformation.",
+          "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
-            "internal-v2.public-embed-roi"
+            "internal-v2.public-embed-roi",
+            "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
-            "The public row-first coordinate order is a hypothesis that a pixel-matrix bounds comparison did not confirm for internal V1c, because rectangles consistent with each order occur and some rectangles are consistent with neither.",
-            "Negative components occur, so a rectangle is not clipped to the pixel matrix and must be clamped explicitly before cropping.",
-            "No coordinate unit, origin, or reference-frame statement is supported beyond integer pixel-matrix indices.",
-            "Whether the rectangle approximates an original non-rectangular annotation is not established for internal V1c."
+            "The inclusive or exclusive interpretation of the maximum bounds is not established.",
+            "Observed negative or out-of-range components remain data-quality conditions; the catalogue does not prescribe a clipping rule."
           ]
         },
         {
-          "id": "roi-frames-not-tomosynthesis-only",
-          "statement": "Internal V1c frame-index collections are positionally aligned with the coordinate collection, use zero-based indices, and are represented for rows classified as two-dimensional and synthetic two-dimensional as well as tomosynthesis, so they are not a tomosynthesis-only field.",
-          "status": "reconciled",
+          "id": "roi-frame-depth-semantics",
+          "statement": "ROI_frames is a nested list aligned by ROI position whose sublists contain one or more matched frame indices; those indices are informative only for DBT images, while ROI_depth_derived is an aligned boolean list whose true state marks DBT depth coordinates inferred by an in-house model after transferring radiologist 2D coordinates.",
+          "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
-            "internal-v2.public-embed-roi"
+            "internal-v2.public-embed-roi",
+            "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
-            "The public statement that frame indices are populated only for tomosynthesis rows does not hold for internal V1c.",
-            "No inventoried column states a frame count, so no frame-index upper bound is established.",
-            "An empty frame collection alongside represented regions means no frame indices are represented, not frame zero."
+            "Frame-index values represented on 2D or synthetic 2D rows are not informative.",
+            "A DBT ROI may match one or several frames, and no inventoried column states the frame-count upper bound.",
+            "ROI_depth_derived describes inferred depth only; the radiologist-origin x/y annotation remains a clinical artifact."
           ]
         },
         {
-          "id": "roi-identity-and-provenance-unresolved",
-          "statement": "Internal V1c represents no region-of-interest identifier, annotator, or derivation history, and a region is addressable only by its position within one image row's collections.",
-          "status": "unresolved",
+          "id": "roi-identity-and-provenance",
+          "statement": "Every represented ROI originates from a radiologist annotation created during routine clinical operations, but internal V1c exports no stable ROI identifier or individual annotator field and addresses each ROI only by its position within one image row's aligned collections.",
+          "status": "verified",
           "sources": [
-            "internal-v2.v1c-metadata-structure-observation"
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
             "Collection position is a serialization artefact and must not be treated as a durable region identifier.",
-            "The depth-derivation flag records that a region's depth information was derived rather than who or what produced the region."
+            "The annotations are in-time clinical artifacts communicating some aspect of decision making, but they need not mark the most severe lesion or the lesion that later became cancer.",
+            "For some DBT rows an in-house model inferred the matched frames after radiologist 2D coordinates were transferred; ROI_depth_derived records that distinction."
           ]
         },
         {
           "id": "roi-cross-image-correspondence-absent",
           "statement": "Internal V1c attaches region-of-interest collections to individual image rows and represents no correspondence among regions on separate images of one acquisition group.",
-          "status": "reconciled",
+          "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
             "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
             "The derived acquisition-group identifier groups image rows and must not be read as a region-of-interest grouping.",
-            "Linking corresponding regions across simultaneously acquired full-field, tomosynthesis, and synthetic two-dimensional images remains future work."
+            "No stable cross-image ROI correspondence should be inferred."
+          ]
+        },
+        {
+          "id": "roi-finding-attribution",
+          "statement": "Internal V1c provides no explicit ROI-to-MagView-finding link; matching all same-accession, same-side ROIs to the clinical finding is generally reliable only when exactly one finding is represented on that side, while individual attribution is unreliable when more than one finding is present.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.roi-maintainer-confirmation"
+          ],
+          "caveats": [
+            "When exactly one finding exists on the side, multiple ROIs may all be associated with that one finding.",
+            "When more than one finding exists on the side, EMBED currently supplies no reliable method to distinguish which ROI belongs to which finding.",
+            "This limitation does not establish that any ROI marks the most severe lesion or a future cancer."
           ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
         "This context records the region-of-interest semantic boundary and its internal V1c physical representation, not a complete ROI data dictionary.",
-        "The physical representation belongs to the internal V1c image-metadata extraction and is expected to change when image extraction is rerun."
+        "The physical representation belongs to the current internal V1c image-metadata artifact."
       ]
     },
     "internal-v2.magview-representation-context": {
@@ -1023,7 +1043,7 @@
       "profiles": [
         "internal-v2"
       ],
-      "summary": "The internal clinical V2 profile is currently paired with an internal V1c image-metadata extraction whose rows describe one extracted DICOM image instance each, carry repeated patient and exam projections and serialized region-of-interest collections, and cover a narrower period and patient set than clinical V2.",
+      "summary": "The internal clinical V2 profile is paired with the most current internal V1c image-metadata artifact, whose rows describe one extracted DICOM image instance each, carry repeated patient and exam projections and serialized region-of-interest collections, and cover every EMBEDv1 exam and patient while remaining narrower than clinical V2.",
       "domains": [
         "imaging",
         "exam",
@@ -1054,7 +1074,8 @@
           "status": "reconciled",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
-            "internal-v2.public-embed-structure"
+            "internal-v2.public-embed-structure",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
             "The public description of an image-oriented metadata table was confirmed against the internal V1c artifact rather than assumed.",
@@ -1063,13 +1084,13 @@
         },
         {
           "id": "version-boundary",
-          "statement": "The internal clinical V2 profile is currently paired with an internal V1c image-metadata extraction that covers a shorter period and a smaller patient set than internal clinical V2.",
+          "statement": "The internal clinical V2 profile is paired with the most current internal V1c image-metadata artifact, which covers the complete EMBEDv1 exam and patient set and is therefore narrower than internal clinical V2.",
           "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-version-boundary"
           ],
           "caveats": [
-            "The pairing is deliberate and temporary; the profile remains internal V2 and is not renamed to V1c."
+            "The profile remains internal V2 and is not renamed to V1c; the version boundary describes the current metadata artifact and its EMBEDv1 scope."
           ]
         },
         {
@@ -1084,52 +1105,55 @@
           ]
         },
         {
-          "id": "future-extraction",
-          "statement": "Image extraction for the full internal V2 period is in progress and future metadata is expected to expand or replace this image surface, including adding or expanding modalities such as ultrasound and MRI.",
+          "id": "current-v1c-coverage",
+          "statement": "The current V1c metadata covers every exam and patient in EMBEDv1 and includes DICOM objects associated with those accessions after the documented secondary-capture and screen-save exclusions.",
           "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-version-boundary"
           ],
           "caveats": [
-            "No column, encoding, table, or coverage record is asserted for a future extraction."
+            "Secondary captures and screen saves are excluded except ROI_SS and ROI_SSC images retained solely to enable extraction of radiologist annotations."
           ]
         },
         {
-          "id": "image-identity-unresolved",
-          "statement": "The internal V1c extraction inventories no DICOM instance identifier; the anonymized DICOM file locator distinguishes rows wherever it is represented and is intended to be defined for every extracted image row, while the DICOM series and instance numbers do not distinguish one image row within an accession.",
-          "status": "reconciled",
+          "id": "image-instance-identity",
+          "statement": "The anonymized SOP Instance UID identifies one DICOM image durably within a dataset version and is encoded as the anon_dicom_path filename without the .dcm suffix, even though it is not exported as a separate metadata column.",
+          "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
             "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
-            "A file locator is a technical reference and must not be promoted to clinical image identity.",
-            "Any release-local row distinctness is scoped to this extraction and does not survive re-extraction.",
-            "An observed missing locator is a data-quality defect indicating that the image file is unavailable, not intended optionality."
+            "Identity is durable only within the applicable dataset version; no cross-version image identity is asserted.",
+            "A missing locator likely means anonymization failed before the de-identified DICOM could be saved, so both the file and its exported identity representation are unavailable for that row.",
+            "SeriesNumber and InstanceNumber do not replace the SOP Instance UID and do not distinguish every image row within an accession."
           ]
         },
         {
           "id": "locator-and-enrichment-population",
-          "statement": "The rendered-image locator columns and the extraction category and pixel-array enrichment flags are represented only on part of the extraction, and the pixel-array flag represents only its negative state.",
-          "status": "reconciled",
+          "statement": "The PNG locator columns are legacy EMBEDv1 FFDM conversion outputs, the extraction-category meaning remains unresolved, and has_pix_array is an obsolete, unreliable field that is no longer populated.",
+          "status": "verified",
           "sources": [
-            "internal-v2.v1c-metadata-structure-observation"
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
-            "A missing rendered-image locator or enrichment flag is not evidence that image pixel data is absent for that row.",
-            "The intended meaning of the extraction category and pixel-array flags is not established."
+            "Use the anonymized DICOM files rather than the legacy PNG conversion for current or future work because the conversion can affect downstream behavior and model generalizability.",
+            "Do not interpret has_pix_array values or missingness as reliable evidence about pixel-data availability.",
+            "The intended meaning of the extraction category remains unknown."
           ]
         },
         {
           "id": "modality-surface",
-          "statement": "The represented source DICOM modality values in internal V1c are mammography, ultrasound, and other; the extraction is mammography-centred and every non-mammographic row falls into the residual derived image-type class.",
-          "status": "reconciled",
+          "statement": "Internal V1c extracted DICOM objects associated with every EMBEDv1 accession, then excluded secondary captures and screen saves except ROI_SS and ROI_SSC annotation images retained solely for ROI extraction; represented source modalities include mammography, ultrasound, and other.",
+          "status": "verified",
           "sources": [
-            "internal-v2.v1c-metadata-structure-observation"
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
-            "Represented non-mammographic modality values do not establish systematic ultrasound or MRI image coverage.",
-            "A modality value absent from this extraction is not thereby absent from internal clinical V2 or from the imaging archive."
+            "The extraction boundary is the EMBEDv1 accession set, not internal clinical V2.",
+            "ROI_SS and ROI_SSC are annotation-transfer artifacts and are not intended for other image analyses."
           ]
         },
         {
@@ -1138,7 +1162,8 @@
           "status": "reconciled",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
-            "internal-v2.public-embed-structure"
+            "internal-v2.public-embed-structure",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
             "The derived classification only separates mammographic acquisition forms and is not a modality field.",
@@ -1147,17 +1172,30 @@
           ]
         },
         {
+          "id": "roi-screen-capture-purpose",
+          "statement": "ROI_SS and ROI_SSC are retained secondary screen-capture images containing burned-in radiologist pixel annotations; an annotation-extraction model converted those annotations to coordinates that were transferred to the corresponding original images, and the screen captures are not intended for any other use.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.v1c-metadata-maintainer-clarifications",
+            "internal-v2.roi-maintainer-confirmation"
+          ],
+          "caveats": [
+            "These pipeline classes describe annotation-transfer artifacts, not primary diagnostic images or a general secondary-capture inventory."
+          ]
+        },
+        {
           "id": "laterality-roles",
-          "statement": "Internal V1c image laterality is an image attribute: the derived final image laterality represents only left or right, is not represented for a bilateral source laterality, and is not always represented even where a source laterality attribute is.",
-          "status": "reconciled",
+          "statement": "ImageLateralityFinal is the reliable internal V1c attribute for determining which breast an image represents; it contains left or right when represented, while the derivation rule and LateralityDeriveFlag meanings remain unknown.",
+          "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
-            "internal-v2.public-embed-structure"
+            "internal-v2.public-embed-structure",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
             "Image laterality is not automatically the imaging-finding side or the procedure side.",
             "A missing derived image laterality is not bilateral.",
-            "The public description of a laterality correspondence with the clinical side column is a linkage hint, not an equality."
+            "The source ImageLaterality and Laterality attributes remain standard DICOM occurrences; no precedence rule is asserted for reconstructing ImageLateralityFinal."
           ]
         },
         {
@@ -1188,7 +1226,7 @@
         },
         {
           "id": "parsed-dicom-element-semantics",
-          "statement": "Columns parsed directly from standard DICOM data elements retain the applicable DICOM element semantics; only pipeline-derived or transformed fields require separate extraction-specific interpretation.",
+          "statement": "Columns parsed directly from standard DICOM data elements retain the applicable DICOM element semantics; the DICOM files received no image or acquisition-attribute processing beyond anonymization and sensitive-information redaction.",
           "status": "verified",
           "sources": [
             "internal-v2.dicom-data-dictionary-standard",
@@ -1196,7 +1234,20 @@
             "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
-            "Standard element semantics do not establish extraction completeness, internal value validity, anonymization treatment beyond confirmed shifted dates, or pixel-data verification."
+            "Standard element semantics do not establish internal value validity or pixel-data verification.",
+            "PatientAge is top-coded to 89, PatientSex is unchanged, anonymized dates use the confirmed patient-specific shift, and sensitive non-identifier/non-date attributes were dropped."
+          ]
+        },
+        {
+          "id": "dicom-demographic-anonymization",
+          "statement": "During DICOM anonymization PatientAge was top-coded to 89, PatientSex was not modified, and sensitive non-identifier/non-date attributes were dropped.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.v1c-metadata-maintainer-clarifications",
+            "internal-v2.dicom-data-dictionary-standard"
+          ],
+          "caveats": [
+            "This claim does not enumerate dropped physical attributes or change the confirmed date-shifting and identifier-anonymization rules."
           ]
         },
         {
@@ -1209,26 +1260,38 @@
           ],
           "caveats": [
             "The attribute is a source declaration and is not a verification of the pixel data.",
-            "The affirmative state is represented in internal V1c and requires appropriate handling before redistribution or model input."
+            "The catalogue does not prescribe exclusion, redaction, or another action based on this attribute."
           ]
         },
         {
           "id": "acquisition-grouping",
-          "statement": "Internal V1c represents a derived acquisition-group identifier that is nested within one accession, can contain several derived image types and view positions, and does not mix a represented left and right laterality.",
-          "status": "reconciled",
+          "statement": "acquisition_group_id is constructed as {acc_anon}_{ProtocolName with spaces replaced by hyphens}_{ContentTime cast as an integer}; it is stable across reruns and globally unique for simultaneous image-acquisition groups.",
+          "status": "verified",
           "sources": [
-            "internal-v2.v1c-metadata-structure-observation"
+            "internal-v2.v1c-metadata-structure-observation",
+            "internal-v2.v1c-metadata-maintainer-clarifications"
           ],
           "caveats": [
-            "The construction rule for the grouping is not established.",
-            "The grouping is not a region-of-interest correspondence representation."
+            "Spaces are replaced only in ProtocolName as part of the documented construction.",
+            "The grouping is not a region-of-interest identity or correspondence representation."
+          ]
+        },
+        {
+          "id": "dicom-study-and-accession-identifiers",
+          "statement": "During anonymization acc_anon is written to the DICOM AccessionNumber element; the relationship between StudyID and acc_anon is unknown and StudyID is not relied upon internally.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.v1c-metadata-maintainer-clarifications",
+            "internal-v2.dicom-data-dictionary-standard"
+          ],
+          "caveats": [
+            "Do not use StudyID as an exam identity or assume it equals acc_anon."
           ]
         }
       ],
       "workflow_steps": [],
       "caveats": [
-        "The profile remains internal V2; the paired image metadata is internal V1c and is deliberately and temporarily narrower.",
-        "This context describes the current extraction only and asserts nothing about a future image-metadata surface."
+        "The profile remains internal V2; the paired image metadata is the most current internal V1c artifact and covers the complete EMBEDv1 exam and patient set."
       ]
     }
   },
@@ -1507,15 +1570,15 @@
         "id": "image"
       },
       "applicability": "supported",
-      "summary": "The image object is bound to the internal V1c image-metadata extraction at one row per extracted DICOM image instance, with DICOM-derived attributes, pipeline-derived classifications, and enrichment flags kept distinct; no clinical image instance identity is established.",
+      "summary": "The image object is bound to internal V1c at one row per extracted DICOM image instance; the anonymized SOP Instance UID in the anon_dicom_path basename provides dataset-version-scoped identity, and DICOM-derived attributes remain distinct from pipeline-derived and legacy fields.",
       "claim_refs": [
         "internal-v2.v1c-metadata-context#image-row-grain",
-        "internal-v2.v1c-metadata-context#image-identity-unresolved",
+        "internal-v2.v1c-metadata-context#image-instance-identity",
         "internal-v2.v1c-metadata-context#version-boundary"
       ],
       "caveats": [
-        "Coverage is internal V1c and narrower than internal clinical V2.",
-        "Row distinctness through the anonymized DICOM locator is technical and release-local and will be replaced by a future extraction."
+        "Coverage is the complete EMBEDv1 exam and patient set and is narrower than internal clinical V2.",
+        "A missing anon_dicom_path likely reflects anonymization failure and makes the de-identified file and exported SOP Instance UID representation unavailable."
       ]
     },
     "internal-v2.qualification.clinical_object.region_of_interest": {
@@ -1529,12 +1592,15 @@
       "claim_refs": [
         "internal-v2.roi-context#roi-attached-to-image",
         "internal-v2.roi-context#roi-serialized-collections",
-        "internal-v2.roi-context#roi-geometry-unresolved",
-        "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
+        "internal-v2.roi-context#roi-coordinate-geometry",
+        "internal-v2.roi-context#roi-frame-depth-semantics",
+        "internal-v2.roi-context#roi-identity-and-provenance",
+        "internal-v2.roi-context#roi-finding-attribution"
       ],
       "caveats": [
         "One physical row can carry several regions, so the table is not one row per region and positional order is not region identity.",
-        "Coordinate axis order, coordinate reference frame, region provenance, and cross-image correspondence remain unresolved."
+        "Coordinates are [y_min, x_min, y_max, x_max] in the attached DICOM pixel-array space and originate from routine-clinical radiologist annotations.",
+        "Stable per-region identity, cross-image correspondence, and multi-finding attribution remain unsupported."
       ]
     },
     "internal-v2.qualification.semantic_relationship.clinical.exam-image": {
@@ -4000,11 +4066,12 @@
       "parsing": "atomic",
       "evidence": [
         "observed_source_values",
-        "inference"
+        "inference",
+        "maintainer_confirmed"
       ],
       "caveats": [
-        "The represented set is scoped to the current internal V1c extraction; a future extraction may represent more modalities.",
-        "A code absent here is not absent from internal clinical V2 or from the imaging archive."
+        "The represented set is scoped to the complete EMBEDv1 accession extraction after the documented secondary-capture exclusions.",
+        "A code absent here is not thereby absent from internal clinical V2 or from the imaging archive."
       ],
       "codes": {
         "MG": "mammography",
@@ -4029,14 +4096,15 @@
       "caveats": [
         "These are pipeline-derived classes, not source DICOM values, and the class set is scoped to the current internal V1c extraction.",
         "The classification is not exhaustive: source image-type tokens equivalent to a named class also occur under the residual class.",
-        "Every non-mammographic source modality falls into the residual class."
+        "Every non-mammographic source modality falls into the residual class.",
+        "ROI_SS and ROI_SSC are secondary screen-capture annotation-transfer artifacts retained solely for ROI extraction and are not intended for other use."
       ],
       "codes": {
         "2D": "two-dimensional mammographic acquisition; also covers contrast-enhanced, stereotactic, and post-biopsy acquisitions separable only through the source image-type attribute",
         "3D": "tomosynthesis acquisition",
         "cview": "synthetic two-dimensional image reconstructed from a tomosynthesis acquisition",
-        "ROI_SS": "secondary-capture screen-save image; the abbreviation and its distinction from the related class are not established",
-        "ROI_SSC": "secondary-capture screen-save image variant; the abbreviation and its distinction from the related class are not established",
+        "ROI_SS": "secondary screen-capture image containing burned-in radiologist pixel annotations, retained solely to enable ROI coordinate extraction and transfer to the original image",
+        "ROI_SSC": "secondary screen-capture image containing burned-in radiologist pixel annotations, retained solely to enable ROI coordinate extraction and transfer to the original image",
         "other": "residual class for rows the classification does not assign to a named mammographic acquisition form"
       }
     },
@@ -5817,6 +5885,44 @@
         ]
       },
       {
+        "id": "internal-v2.binding.feature.demographics.age-at-exam.metadata-v1c.patient-age",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "PatientAge",
+        "concept": "demographics.age_at_exam",
+        "status": "direct",
+        "occurrence_interpretations": [
+          {
+            "representation": "DICOM PatientAge value",
+            "meaning": "Patient age at imaging, with ages 90 years or older top-coded to 89 during anonymization",
+            "status": "verified",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#dicom-demographic-anonymization"
+            ],
+            "caveats": [
+              "The physical value retains DICOM age-string serialization rather than the clinical table's numeric representation."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "internal-v2.binding.feature.demographics.gender-description.metadata-v1c.patient-sex",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "PatientSex",
+        "concept": "demographics.gender_description",
+        "status": "direct",
+        "occurrence_interpretations": [
+          {
+            "representation": "DICOM PatientSex value",
+            "meaning": "The source DICOM patient-sex value, retained without modification during anonymization",
+            "status": "verified",
+            "claim_refs": [
+              "internal-v2.v1c-metadata-context#dicom-demographic-anonymization"
+            ],
+            "caveats": []
+          }
+        ]
+      },
+      {
         "id": "internal-v2.binding.feature.breast.side.metadata-v1c.imagelateralityfinal",
         "table": "metadata_all_cohorts_v1c",
         "column": "ImageLateralityFinal",
@@ -5825,13 +5931,13 @@
         "occurrence_interpretations": [
           {
             "representation": "derived left or right image laterality",
-            "meaning": "Breast side projected from the pipeline-derived image laterality of the image row",
-            "status": "unverified",
+            "meaning": "Reliable breast side represented by the image row's pipeline-derived final image laterality",
+            "status": "verified",
             "claim_refs": [
               "internal-v2.v1c-metadata-context#laterality-roles"
             ],
             "caveats": [
-              "Image laterality is not automatically the imaging-finding or procedure side; treat this projection as a consistency check rather than an equality."
+              "Use this attribute to determine image breast laterality; it is not automatically equal to an individual finding or procedure side."
             ]
           },
           {
@@ -5854,6 +5960,16 @@
         "column": "anon_dicom_path",
         "concept": "internal-v2.image.dicom_file_locator",
         "status": "direct"
+      },
+      {
+        "id": "internal-v2.binding.feature.internal-v2.image.sop-instance-identifier.metadata-v1c.anon-dicom-path",
+        "table": "metadata_all_cohorts_v1c",
+        "column": "anon_dicom_path",
+        "concept": "internal-v2.image.sop_instance_identifier",
+        "status": "derived",
+        "notes": [
+          "Take the filename without the .dcm suffix; the anonymized SOP Instance UID is durable within one dataset version."
+        ]
       },
       {
         "id": "internal-v2.binding.feature.internal-v2.image.png_render_locator.metadata-v1c.png-path",
@@ -5887,13 +6003,13 @@
         "occurrence_interpretations": [
           {
             "representation": "null",
-            "meaning": "No rendered-image locator component is represented for the row",
-            "status": "unresolved",
+            "meaning": "No legacy PNG conversion locator component is represented for the row",
+            "status": "verified",
             "claim_refs": [
               "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
             ],
             "caveats": [
-              "The locator columns are represented on only part of the extraction; absence is not evidence that no rendering exists."
+              "PNG fields are legacy and must not be used to infer source DICOM availability."
             ]
           }
         ]
@@ -6277,17 +6393,17 @@
         "table": "metadata_all_cohorts_v1c",
         "column": "has_pix_array",
         "concept": "internal-v2.image.pixel_array_present_flag",
-        "status": "unresolved",
+        "status": "direct",
         "occurrence_interpretations": [
           {
             "representation": "negative state only",
-            "meaning": "The extraction recorded a negative pixel-array determination for the image row",
-            "status": "unresolved",
+            "meaning": "A legacy, unreliable negative pixel-array determination from an obsolete field that is no longer populated",
+            "status": "verified",
             "claim_refs": [
               "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
             ],
             "caveats": [
-              "The affirmative state is not represented, so a missing value must not be read as pixel data being present."
+              "Do not use the value or its absence to infer whether pixel data is available."
             ]
           }
         ]
@@ -6304,18 +6420,18 @@
         "table": "metadata_all_cohorts_v1c",
         "column": "ROI_coords",
         "concept": "internal-v2.roi.coordinate_collection",
-        "status": "ambiguous",
+        "status": "derived",
         "occurrence_interpretations": [
           {
             "representation": "serialized collection of four-element integer rectangles",
-            "meaning": "One lower-bound pair followed by the matching upper-bound pair for each region of interest on the image row",
-            "status": "unresolved",
+            "meaning": "One [y_min, x_min, y_max, x_max] rectangle in the attached DICOM pixel-array coordinate space for each region of interest",
+            "status": "verified",
             "claim_refs": [
-              "internal-v2.roi-context#roi-geometry-unresolved"
+              "internal-v2.roi-context#roi-coordinate-geometry"
             ],
             "caveats": [
-              "Whether the first axis is the row axis or the column axis is not established for internal V1c, so the public row-first order must not be assumed.",
-              "Components can be negative or exceed the pixel matrix."
+              "No spacing or orientation transformation is required.",
+              "The maximum-bound inclusion convention and handling of out-of-range components remain unspecified."
             ]
           },
           {
@@ -6338,22 +6454,22 @@
         "occurrence_interpretations": [
           {
             "representation": "serialized collection of zero-based frame-index lists",
-            "meaning": "Frame indices at which each positionally corresponding region of interest is represented",
-            "status": "reconciled",
+            "meaning": "For DBT images, one nested list of one or more matched frame indices for each positionally corresponding region of interest",
+            "status": "verified",
             "claim_refs": [
-              "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+              "internal-v2.roi-context#roi-frame-depth-semantics"
             ],
             "caveats": [
-              "Represented for two-dimensional and synthetic two-dimensional rows as well as tomosynthesis rows.",
+              "Values represented for 2D and synthetic 2D images are not informative.",
               "No inventoried column states a frame count, so no upper bound is established."
             ]
           },
           {
             "representation": "empty serialized collection alongside represented regions of interest",
             "meaning": "No frame indices are represented for the row's regions",
-            "status": "reconciled",
+            "status": "verified",
             "claim_refs": [
-              "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+              "internal-v2.roi-context#roi-frame-depth-semantics"
             ],
             "caveats": [
               "An empty collection is not frame zero."
@@ -6366,7 +6482,20 @@
         "table": "metadata_all_cohorts_v1c",
         "column": "ROI_depth_derived",
         "concept": "internal-v2.roi.depth_derivation_flag_collection",
-        "status": "derived"
+        "status": "derived",
+        "occurrence_interpretations": [
+          {
+            "representation": "true at one ROI-list position",
+            "meaning": "An in-house model inferred the corresponding DBT ROI frame-depth coordinates after radiologist x/y coordinates were transferred from a grouped 2D image",
+            "status": "verified",
+            "claim_refs": [
+              "internal-v2.roi-context#roi-frame-depth-semantics"
+            ],
+            "caveats": [
+              "The boolean refers to inferred z/depth information, not to retrospective creation of the underlying radiologist clinical annotation."
+            ]
+          }
+        ]
       }
     ],
     "object_bindings": [
@@ -6457,28 +6586,28 @@
         "claim_refs": [
           "internal-v2.magview-coded-values-context#laterality-roles"
         ],
-      "caveats": [
-        "Finding-side B and null are bilateral projections to both unilateral breast-side identities; neither creates a third bilateral identity."
+        "caveats": [
+          "Finding-side B and null are bilateral projections to both unilateral breast-side identities; neither creates a third bilateral identity."
         ],
         "instance_identity": {
           "columns": [
             "acc_anon",
             "side"
           ],
-        "scope": "Unilateral left or right breast-side identity within one imaging accession; bilateral B and null occurrences project to both unilateral identities.",
-        "reserved_exceptions": [
-          {
-            "column": "side",
-            "representation": "B",
-            "meaning": "Bilateral finding-side occurrence that maps to both left and right breast-side identities.",
-            "claim_refs": [
-              "internal-v2.magview-coded-values-context#laterality-roles"
-            ],
-            "caveats": [
-              "Do not create a third bilateral breast-side identity."
-            ]
-          }
-        ],
+          "scope": "Unilateral left or right breast-side identity within one imaging accession; bilateral B and null occurrences project to both unilateral identities.",
+          "reserved_exceptions": [
+            {
+              "column": "side",
+              "representation": "B",
+              "meaning": "Bilateral finding-side occurrence that maps to both left and right breast-side identities.",
+              "claim_refs": [
+                "internal-v2.magview-coded-values-context#laterality-roles"
+              ],
+              "caveats": [
+                "Do not create a third bilateral breast-side identity."
+              ]
+            }
+          ],
           "rows_per_instance": "one_or_more",
           "longitudinal_identity": false
         }
@@ -6513,12 +6642,12 @@
             {
               "column": "numfind",
               "representation": "-9",
-        "meaning": "Synthetic contralateral BI-RADS 1 negative finding added by the EMBED extraction.",
-        "claim_refs": [
-          "internal-v2.magview-representation-context#synthetic-contralateral-negative-finding"
-        ],
-        "caveats": [
-          "It is not an originally documented source finding."
+              "meaning": "Synthetic contralateral BI-RADS 1 negative finding added by the EMBED extraction.",
+              "claim_refs": [
+                "internal-v2.magview-representation-context#synthetic-contralateral-negative-finding"
+              ],
+              "caveats": [
+                "It is not an originally documented source finding."
               ]
             }
           ],
@@ -6548,9 +6677,9 @@
         "id": "internal-v2.procedure.magview",
         "object": "procedure",
         "table": "magview_all_cohorts_PACS_v2_anon",
-      "columns": [
-        "empi_anon",
-        "acc_anon",
+        "columns": [
+          "empi_anon",
+          "acc_anon",
           "numfind",
           "procdate_anon",
           "type",
@@ -6566,20 +6695,20 @@
         "claim_refs": [
           "internal-v2.magview-pathology-context#procedure-pathology-attachment"
         ],
-      "caveats": [
-        "Within a patient, procedure date, procedure type, and biopsy side identify one unique procedure.",
-        "The identity is incomplete when any component is absent and is not durable across releases; one finding with multiple procedures occupies repeated rows."
-      ],
-      "instance_identity": {
-        "columns": [
-          "empi_anon",
-          "procdate_anon",
-          "type",
-          "bside"
+        "caveats": [
+          "Within a patient, procedure date, procedure type, and biopsy side identify one unique procedure.",
+          "The identity is incomplete when any component is absent and is not durable across releases; one finding with multiple procedures occupies repeated rows."
         ],
-        "scope": "Release-scoped procedure identity; within one patient the identifying tuple is procedure date, procedure type, and biopsy side.",
-        "reserved_exceptions": [],
-        "rows_per_instance": "one_or_more",
+        "instance_identity": {
+          "columns": [
+            "empi_anon",
+            "procdate_anon",
+            "type",
+            "bside"
+          ],
+          "scope": "Release-scoped procedure identity; within one patient the identifying tuple is procedure date, procedure type, and biopsy side.",
+          "reserved_exceptions": [],
+          "rows_per_instance": "one_or_more",
           "longitudinal_identity": false
         }
       },
@@ -6726,19 +6855,40 @@
         "derivation": "source",
         "claim_refs": [
           "internal-v2.v1c-metadata-context#image-row-grain",
-          "internal-v2.v1c-metadata-context#image-identity-unresolved",
+          "internal-v2.v1c-metadata-context#image-instance-identity",
           "internal-v2.v1c-metadata-context#version-boundary",
           "internal-v2.v1c-metadata-context#modality-surface",
           "internal-v2.v1c-metadata-context#locator-and-enrichment-population",
           "internal-v2.v1c-metadata-context#burned-in-annotation-semantics"
         ],
         "caveats": [
-          "Coverage is internal V1c: the extraction spans a shorter period and a smaller patient set than the internal clinical V2 table, and a future extraction is expected to expand or replace it.",
-          "No DICOM instance identifier is inventoried, so no clinical image instance identity is declared; the anonymized DICOM locator is a technical, incomplete, release-local row locator.",
+          "Coverage is internal V1c: it covers the complete EMBEDv1 exam and patient set and is narrower than the internal clinical V2 table.",
+          "The anon_dicom_path basename is the anonymized SOP Instance UID and supplies dataset-version-scoped image identity; a missing path makes that identity unavailable for the affected row.",
           "DICOM-derived attributes, pipeline-derived classifications, and enrichment flags are separate mappings and must not be conflated.",
-          "A missing rendered-image locator or enrichment flag is not evidence that no image exists.",
-          "The anonymized DICOM locator is intended to be present; a missing value means the image file is unavailable and is a data-quality defect."
-        ]
+          "Legacy PNG locators and has_pix_array must not be used as current image-availability evidence.",
+          "The anonymized DICOM locator is intended to be present; a missing value likely means anonymization failed before the de-identified file was saved and is a data-quality defect."
+        ],
+        "instance_identity": {
+          "columns": [
+            "anon_dicom_path"
+          ],
+          "scope": "Dataset-version-scoped anonymized SOP Instance UID encoded in the anon_dicom_path filename without the .dcm suffix.",
+          "reserved_exceptions": [
+            {
+              "column": "anon_dicom_path",
+              "representation": "null or blank",
+              "meaning": "Invalid row-level exception in which anonymization likely failed before the de-identified DICOM file and its exported SOP Instance UID representation could be saved.",
+              "claim_refs": [
+                "internal-v2.v1c-metadata-context#image-instance-identity"
+              ],
+              "caveats": [
+                "This is a data-quality defect and does not define a second image-identity scheme."
+              ]
+            }
+          ],
+          "rows_per_instance": "exactly_one",
+          "longitudinal_identity": false
+        }
       },
       {
         "id": "internal-v2.region_of_interest.metadata-v1c",
@@ -6756,15 +6906,18 @@
         "claim_refs": [
           "internal-v2.roi-context#roi-attached-to-image",
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-geometry-unresolved",
-          "internal-v2.roi-context#roi-identity-and-provenance-unresolved",
-          "internal-v2.roi-context#roi-cross-image-correspondence-absent"
+          "internal-v2.roi-context#roi-coordinate-geometry",
+          "internal-v2.roi-context#roi-identity-and-provenance",
+          "internal-v2.roi-context#roi-cross-image-correspondence-absent",
+          "internal-v2.roi-context#roi-finding-attribution"
         ],
         "caveats": [
           "One image row carries a collection of zero or more regions, so this binding is a collection-valued occurrence and not a row-per-region representation.",
           "No region identifier is declared: within a row a region is addressable only by its position in the aligned collections, and position is not durable identity.",
-          "Coordinate axis order, coordinate reference frame, and region provenance remain unresolved, and rectangles are not clipped to the pixel matrix.",
-          "Correspondence among regions on separate images of one acquisition group is not represented."
+          "Coordinates use [y_min, x_min, y_max, x_max] directly in the attached DICOM pixel-array coordinate space; the maximum-bound convention and handling of out-of-range values remain unspecified.",
+          "ROIs originate from radiologist annotations created during routine clinical operations; model-inferred DBT depth is marked by ROI_depth_derived.",
+          "Correspondence among regions on separate images of one acquisition group is not represented.",
+          "ROI-to-finding attribution is reliable only when exactly one finding is represented on the same accession side; multiple findings on one side cannot be individually linked."
         ]
       },
       {
@@ -6772,7 +6925,9 @@
         "object": "patient",
         "table": "metadata_all_cohorts_v1c",
         "columns": [
-          "empi_anon"
+          "empi_anon",
+          "PatientAge",
+          "PatientSex"
         ],
         "completeness": "partial",
         "authority": "reference",
@@ -6781,10 +6936,10 @@
           "internal-v2.v1c-metadata-context#patient-and-exam-projection",
           "internal-v2.v1c-metadata-context#version-boundary"
         ],
-      "caveats": [
-        "The patient identifier repeats across the patient's image rows and remains patient-level; row multiplicity is not clinical multiplicity.",
-        "The clinical table remains the preferred patient representation; this projection carries no patient attributes.",
-        "The identifier uses the same anonymization namespace as the clinical table and supports cross-table patient identity."
+        "caveats": [
+          "The patient identifier repeats across the patient's image rows and remains patient-level; row multiplicity is not clinical multiplicity.",
+          "The clinical table remains the preferred patient representation; this projection carries only top-coded age-at-imaging and unchanged DICOM patient sex.",
+          "The identifier uses the same anonymization namespace as the clinical table and supports cross-table patient identity."
         ],
         "instance_identity": {
           "columns": [
@@ -6803,7 +6958,8 @@
         "columns": [
           "acc_anon",
           "study_date_anon",
-          "cohort_num"
+          "cohort_num",
+          "PatientAge"
         ],
         "completeness": "partial",
         "authority": "reference",
@@ -6813,19 +6969,19 @@
           "internal-v2.v1c-metadata-context#version-boundary",
           "internal-v2.v1c-metadata-context#coverage-is-not-image-absence"
         ],
-      "caveats": [
-        "The accession repeats across the exam's image rows and remains exam-level.",
-        "acc_anon uses the same anonymization namespace as the clinical table and identifies one distinct exam across EMBED.",
-        "Association with more than one patient identifier is an invalid data-quality error and must not be retained as a valid identity or linkage association.",
-        "The patient identifier supports cross-table patient identity and consistency checking but is not an exam-identity component.",
-          "Only an accession, an exam date, and a cohort number project here; the clinical table remains the preferred exam representation.",
+        "caveats": [
+          "The accession repeats across the exam's image rows and remains exam-level.",
+          "acc_anon uses the same anonymization namespace as the clinical table and identifies one distinct exam across EMBED.",
+          "Association with more than one patient identifier is an invalid data-quality error and must not be retained as a valid identity or linkage association.",
+          "The patient identifier supports cross-table patient identity and consistency checking but is not an exam-identity component.",
+          "Only an accession, an exam date, a cohort number, and top-coded DICOM patient age project here; the clinical table remains the preferred exam representation.",
           "Exam coverage is internal V1c and narrower than internal clinical V2."
         ],
         "instance_identity": {
           "columns": [
             "acc_anon"
           ],
-      "scope": "Cross-table accession-scoped exam identity shared by the internal V1c image metadata and clinical table; not longitudinal.",
+          "scope": "Cross-table accession-scoped exam identity shared by the internal V1c image metadata and clinical table; not longitudinal.",
           "reserved_exceptions": [],
           "rows_per_instance": "one_or_more",
           "longitudinal_identity": false
@@ -6846,7 +7002,7 @@
           "internal-v2.v1c-metadata-context#laterality-roles"
         ],
         "caveats": [
-          "This side projection is the pipeline-derived image laterality; it is not the imaging-finding side or the procedure side and was not verified equal to the clinical table's side projection.",
+          "ImageLateralityFinal is the reliable attribute for the breast represented by the image; it is not automatically the imaging-finding or procedure side.",
           "Only left and right are represented; a missing derived laterality is not bilateral and prevents a side projection for that row.",
           "No side identity is declared because the derived laterality is not always resolved."
         ]
@@ -8609,8 +8765,8 @@
               "observed_source_values"
             ],
             "caveats": [
-              "This is a technical file reference, not clinical image identity, and it is release-local to this extraction.",
-              "It is intended to be defined for every extracted image row; an observed missing value means the image file is unavailable and is a data-quality defect.",
+              "The path is a technical file reference whose filename without .dcm is the anonymized SOP Instance UID and supplies identity within one dataset version.",
+              "It is intended to be defined for every extracted image row; a missing value likely means anonymization failed before the de-identified file could be saved.",
               "Because missing values occur, it cannot serve as a complete physical row key in this extraction."
             ]
           },
@@ -8643,8 +8799,9 @@
               "observed_source_values"
             ],
             "caveats": [
-              "The group deliberately spans several image rows and is nested within one accession.",
-              "It is not a region-of-interest grouping."
+              "The value is globally unique for one simultaneous acquisition group and is stable across reruns.",
+              "It is constructed from acc_anon, ProtocolName with spaces replaced by hyphens, and integer-cast ContentTime.",
+              "It is not a region-of-interest identity or correspondence grouping."
             ]
           }
         ],
@@ -8654,11 +8811,11 @@
           "The artifact declares no numeric width, so every integer-parsable column is recorded at the widest deterministic integer type rather than a narrower assessed magnitude.",
           "A few inventoried columns yield no parsable value in this extraction, so their parse type defaults to text and their meaning is unresolved.",
           "Region-of-interest information is serialized in per-row collections; this table is not one row per region of interest.",
-          "This extraction is internal V1c and covers a shorter period and a smaller patient set than the internal clinical V2 table; absence of an exam here is not absence of images.",
-          "The extraction is mammography-centred; represented non-mammographic source modality values do not establish systematic ultrasound or MRI image coverage, and no future modality column is modelled.",
-          "Some rows represent secondary-capture or screen-save images, and the DICOM Burned In Annotation attribute can declare that sufficient identifying annotation is present in the pixel data.",
+          "This extraction is internal V1c and covers every EMBEDv1 exam and patient; it remains narrower than internal clinical V2, so absence of a later clinical V2 exam here is not absence of images.",
+          "DICOM objects associated with EMBEDv1 accessions were extracted, then secondary captures and screen saves were excluded except ROI_SS and ROI_SSC images retained solely for ROI extraction.",
+          "ROI_SS and ROI_SSC rows contain burned-in radiologist annotations used to extract coordinates and transfer them to the original images; they are not intended for other use.",
           "DICOM time-of-day attributes are numerically parsable, so a numeric parse discards zero padding and any fractional-second form; they remain inventoried and unmapped.",
-          "A DICOM patient-age attribute and an imaging-service-request order number are inventoried with their standard element meanings; their extraction-specific anonymization treatment remains unresolved.",
+          "DICOM PatientAge is top-coded to 89, PatientSex is unchanged, and sensitive non-identifier/non-date attributes were dropped during anonymization.",
           "Detailed DICOM acquisition, dose, detector, collimator, geometry, windowing, and icon-image attributes retain standard DICOM element semantics but remain inventoried without dedicated catalogue concepts or mappings."
         ]
       }
@@ -9415,7 +9572,7 @@
           "inference"
         ],
         "caveats": [
-          "The internal V1c image-metadata extraction is incomplete relative to internal clinical V2: it covers a shorter period and a smaller patient set.",
+          "Internal V1c covers every EMBEDv1 exam and patient but is incomplete relative to internal clinical V2, which contains later coverage.",
           "A clinical V2 exam can therefore have no matching V1c image row.",
           "An unmatched clinical exam is not evidence that the exam had no images.",
           "An inner join on the accession discards clinical V2 exams outside V1c coverage.",
@@ -9503,8 +9660,8 @@
         "caveats": [
           "The relationship is realized by row co-location rather than by a key join: an image row's region-of-interest collections are carried in that same row.",
           "One image row carries zero or more regions and each region belongs to exactly one image row, preserving the semantic rule that a region has exactly one source image.",
-          "The endpoint locator is technical and is intended to be defined for every extracted image row; a missing value means the image file is unavailable and is a data-quality defect.",
-          "Observed missing locator values make the physical endpoint incomplete, but the locator remains the intended image-to-region attachment and is neither durable image identity nor region identity.",
+          "The endpoint locator is intended for every extracted image row, and its basename supplies dataset-version-scoped SOP Instance UID identity; a missing value likely reflects anonymization failure.",
+          "Observed missing locator values make the physical endpoint incomplete, while row co-location still expresses the image-to-region attachment; no region identity is represented.",
           "There is no separate region-of-interest table and none should be inferred."
         ],
         "join_hazards": [
@@ -9517,7 +9674,7 @@
         "claim_refs": [
           "internal-v2.roi-context#roi-attached-to-image",
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-identity-and-provenance-unresolved",
+          "internal-v2.roi-context#roi-identity-and-provenance",
           "internal-v2.roi-context#roi-cross-image-correspondence-absent"
         ]
       }
@@ -9548,14 +9705,15 @@
         "claim_refs": [
           "internal-v2.roi-context#roi-attached-to-image",
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-geometry-unresolved",
-          "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
+          "internal-v2.roi-context#roi-coordinate-geometry",
+          "internal-v2.roi-context#roi-identity-and-provenance"
         ],
         "caveats": [
-          "The internal V1c physical representation is a serialized per-image collection; coordinate axis order, coordinate reference frame, and region provenance remain unresolved.",
+          "The internal V1c physical representation is a serialized per-image collection using [y_min, x_min, y_max, x_max] coordinates in attached DICOM pixel-array space.",
+          "ROIs originate from radiologists during routine clinical operations; some DBT frame depths are inferred by an in-house model and marked by ROI_depth_derived.",
           "No region identifier is represented: a region is addressable only by its position within one image row's aligned collections.",
-          "Future linkage of corresponding regions across simultaneous FFDM, DBT, and synthetic 2D acquisitions is separate from source-image attachment and is not represented in internal V1c.",
-          "A represented region of interest is not automatically equivalent to a clinical imaging finding."
+          "Correspondence among ROIs across simultaneous FFDM, DBT, and synthetic 2D images is not represented.",
+          "A represented ROI is not automatically equivalent to a clinical finding; same-side attribution is reliable only in the single-finding case."
         ]
       },
       "pathology_specimen": {
@@ -10848,30 +11006,69 @@
           "image file reference"
         ],
         "caveats": [
-          "A file locator is a technical reference and is not clinical image identity.",
-          "It is intended to be defined for every extracted image row and is release-local.",
-          "An observed missing value means the image file is unavailable and is a data-quality defect."
+          "The full path is a technical locator; its filename without the .dcm suffix is the anonymized SOP Instance UID and supplies dataset-version-scoped image identity.",
+          "It is intended to be defined for every extracted image row.",
+          "A missing value likely means anonymization failed before the de-identified DICOM could be saved and is a data-quality defect."
         ],
         "evidence": [
           "observed_source_values"
         ],
         "objects": [],
         "claim_refs": [
-          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+          "internal-v2.v1c-metadata-context#image-instance-identity"
         ],
         "missing_states": [
           {
             "id": "missing-locator",
             "representation": "null or blank value",
-            "meaning": "The intended image file is unavailable because its anonymized DICOM locator is missing",
+            "meaning": "The de-identified image file and its exported SOP Instance UID representation are unavailable, likely because anonymization failed before the file could be saved",
             "claim_refs": [
-              "internal-v2.v1c-metadata-context#image-identity-unresolved"
+              "internal-v2.v1c-metadata-context#image-instance-identity"
             ],
             "caveats": [
               "Treat this as a data-quality defect, not intended optionality."
             ]
           }
         ],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.image.sop_instance_identifier": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Anonymized SOP Instance UID",
+        "definition": "Anonymized DICOM SOP Instance UID identifying one image durably within an EMBED dataset version and encoded as the anon_dicom_path filename without its .dcm suffix.",
+        "feature_kind": "identifier",
+        "domains": [
+          "imaging",
+          "identity",
+          "technical"
+        ],
+        "search_terms": [
+          "SOP Instance UID",
+          "DICOM image identifier",
+          "image identity",
+          "DICOM filename"
+        ],
+        "caveats": [
+          "The UID is not exported as a separate metadata column and must be parsed from the file basename.",
+          "No durability or equality across dataset versions is asserted.",
+          "A missing anon_dicom_path makes this identity unavailable for that row and is a data-quality defect."
+        ],
+        "evidence": [
+          "maintainer_confirmed"
+        ],
+        "objects": [
+          "image"
+        ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#image-instance-identity"
+        ],
+        "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
@@ -10883,7 +11080,7 @@
           ]
         },
         "label": "Rendered image locator component",
-        "definition": "Technical reference component for a rendered raster version of an internal V1c image row.",
+        "definition": "Legacy technical reference component for a PNG conversion originally generated for EMBEDv1 FFDM images.",
         "feature_kind": "technical",
         "domains": [
           "imaging",
@@ -10895,9 +11092,9 @@
           "image render locator"
         ],
         "caveats": [
-          "Represented on only part of the extraction and not a general rendered-image inventory.",
-          "A missing component is not evidence that no rendering exists.",
-          "Its relationship to the anonymized DICOM locator is not established."
+          "This legacy conversion should not be used for current or future work; use the anonymized DICOM file instead.",
+          "The historical PNG conversion can affect downstream applications, including model generalizability.",
+          "A missing component is not evidence that no source DICOM image exists."
         ],
         "evidence": [
           "observed_source_values"
@@ -10910,7 +11107,7 @@
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.dicom_study_identifier": {
+      "internal-v2.image.dicom_study_identifier": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -10929,7 +11126,8 @@
           "DICOM study identifier"
         ],
         "caveats": [
-          "This is a short study identifier attribute, not a study instance identifier, and its relationship to the accession is not established.",
+          "This is a short study identifier attribute, not a study instance identifier; its relationship to acc_anon is unknown and it is rarely, if ever, used internally.",
+          "During anonymization acc_anon is written to the distinct DICOM AccessionNumber element.",
           "It does not distinguish one image row."
         ],
         "evidence": [
@@ -10937,9 +11135,10 @@
           "inference"
         ],
         "objects": [],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics",
+          "internal-v2.v1c-metadata-context#dicom-study-and-accession-identifiers"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -10970,7 +11169,7 @@
         ],
         "objects": [],
         "claim_refs": [
-          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+          "internal-v2.v1c-metadata-context#image-instance-identity"
         ],
         "missing_states": [],
         "temporal_semantics": [],
@@ -11002,7 +11201,7 @@
         ],
         "objects": [],
         "claim_refs": [
-          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+          "internal-v2.v1c-metadata-context#image-instance-identity"
         ],
         "missing_states": [],
         "temporal_semantics": [],
@@ -11016,7 +11215,7 @@
           ]
         },
         "label": "Derived acquisition-group identifier",
-        "definition": "Pipeline-derived identifier grouping internal V1c image rows that the extraction treats as one acquisition group within an accession.",
+        "definition": "Stable, globally unique identifier for one simultaneous acquisition group, constructed as acc_anon, ProtocolName with spaces replaced by hyphens, and ContentTime cast as an integer.",
         "feature_kind": "technical",
         "domains": [
           "imaging",
@@ -11028,13 +11227,13 @@
           "simultaneous acquisition"
         ],
         "caveats": [
-          "The construction rule is not established.",
-          "A group is nested within one accession, can contain several derived image types and view positions, and does not mix a represented left and right laterality.",
+          "The serialized form is {acc_anon}_{normalized ProtocolName}_{integer ContentTime}.",
+          "It is stable across extraction reruns and can group several image rows from one simultaneous acquisition.",
           "It is not a region-of-interest correspondence representation."
         ],
         "evidence": [
           "observed_source_values",
-          "inference"
+          "maintainer_confirmed"
         ],
         "objects": [],
         "claim_refs": [
@@ -11144,18 +11343,21 @@
         ],
         "caveats": [
           "The classification separates mammographic acquisition forms only; every non-mammographic source modality falls into the residual class.",
-          "It is not exhaustive: source image-type tokens equivalent to a named class also occur under the residual class."
+          "It is not exhaustive: source image-type tokens equivalent to a named class also occur under the residual class.",
+          "ROI_SS and ROI_SSC are secondary screen-capture annotation-transfer artifacts retained solely for ROI extraction and are not intended for other use."
         ],
         "evidence": [
           "observed_source_values",
-          "inference"
+          "inference",
+          "maintainer_confirmed"
         ],
         "objects": [
           "image"
         ],
         "claim_refs": [
           "internal-v2.v1c-metadata-context#image-type-distinctions",
-          "internal-v2.v1c-metadata-context#modality-surface"
+          "internal-v2.v1c-metadata-context#modality-surface",
+          "internal-v2.v1c-metadata-context#roi-screen-capture-purpose"
         ],
         "missing_states": [],
         "temporal_semantics": [],
@@ -11201,7 +11403,7 @@
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.view_modifier": {
+      "internal-v2.image.view_modifier": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11231,9 +11433,9 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11320,7 +11522,7 @@
           ]
         },
         "label": "Derived final image laterality",
-        "definition": "Pipeline-resolved laterality assigned to one internal V1c image row.",
+        "definition": "Reliable pipeline-resolved breast laterality assigned to one internal V1c image row and preferred for determining which breast the image represents.",
         "feature_kind": "coded",
         "domains": [
           "imaging",
@@ -11333,12 +11535,13 @@
         ],
         "caveats": [
           "Only left and right are represented; a bilateral source laterality yields no derived value.",
-          "It is not always represented even where a source laterality attribute is, and a missing value is not bilateral.",
-          "Public documentation describes a correspondence with the clinical side column; that correspondence is a linkage hint, not an equality with finding or procedure side."
+          "A missing value is not bilateral.",
+          "Its exact derivation and the LateralityDeriveFlag meanings remain unknown, but ImageLateralityFinal itself is the maintained reliable image-side attribute.",
+          "Image side is not automatically finding or procedure side."
         ],
         "evidence": [
-          "observed_source_values",
-          "inference"
+          "maintainer_confirmed",
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -11390,7 +11593,7 @@
         "aggregations": [],
         "vocabulary": "internal-v2.vocabulary.image.laterality_derivation_flag"
       },
-    "internal-v2.image.body_part_examined": {
+      "internal-v2.image.body_part_examined": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11417,9 +11620,9 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -11459,7 +11662,7 @@
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.photometric_interpretation": {
+      "internal-v2.image.photometric_interpretation": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11488,14 +11691,14 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.pixel_representation": {
+      "internal-v2.image.pixel_representation": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11523,14 +11726,14 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.pixel_matrix_dimension": {
+      "internal-v2.image.pixel_matrix_dimension": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11560,14 +11763,14 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.pixel_bit_depth": {
+      "internal-v2.image.pixel_bit_depth": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11596,14 +11799,14 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.samples_per_pixel": {
+      "internal-v2.image.samples_per_pixel": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11628,14 +11831,14 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.images_in_acquisition": {
+      "internal-v2.image.images_in_acquisition": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11663,14 +11866,14 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
       },
-    "internal-v2.image.pixel_spacing": {
+      "internal-v2.image.pixel_spacing": {
         "availability": {
           "scope": "profiles",
           "profiles": [
@@ -11699,9 +11902,9 @@
         "objects": [
           "image"
         ],
-      "claim_refs": [
-        "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
-      ],
+        "claim_refs": [
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+        ],
         "missing_states": [],
         "temporal_semantics": [],
         "aggregations": []
@@ -12036,9 +12239,9 @@
           "pixel annotation"
         ],
         "caveats": [
-          "The affirmative state is represented and requires appropriate handling before redistribution or model input.",
           "The attribute is a source declaration and is not a verification of the pixel data.",
-          "NO does not mean that the image contains no annotation; it means the source does not declare sufficient burned-in annotation to identify the patient and acquisition date."
+          "NO does not mean that the image contains no annotation; it means the source does not declare sufficient burned-in annotation to identify the patient and acquisition date.",
+          "The catalogue does not prescribe an action for YES, NO, or absence."
         ],
         "evidence": [
           "observed_source_values"
@@ -12086,7 +12289,7 @@
           "synthetic image"
         ],
         "caveats": [
-          "Per-value meanings are not established here; the attribute is used only to show that secondary-capture and screen-save rows occur."
+          "Secondary captures and screen saves were excluded except ROI_SS and ROI_SSC annotation images retained solely for ROI extraction."
         ],
         "evidence": [
           "observed_source_values"
@@ -12146,8 +12349,8 @@
             "internal-v2"
           ]
         },
-        "label": "Pixel-array determination flag",
-        "definition": "Pipeline flag recording a pixel-array determination for one internal V1c image row.",
+        "label": "Legacy pixel-array determination flag",
+        "definition": "Obsolete pipeline field that formerly attempted to record a pixel-array determination for one internal V1c image row.",
         "feature_kind": "flag",
         "domains": [
           "imaging",
@@ -12159,12 +12362,12 @@
           "pixel array flag"
         ],
         "caveats": [
-          "Only the negative state is represented, so a missing value must not be read as pixel data being present.",
-          "Its intended meaning and the pass that produced it are not established."
+          "The field is no longer populated because checking it substantially slowed anonymization.",
+          "Existing values and missingness are not reliable and must not be used to infer pixel-data availability."
         ],
         "evidence": [
-          "observed_source_values",
-          "unresolved"
+          "maintainer_confirmed",
+          "observed_source_values"
         ],
         "objects": [
           "image"
@@ -12220,7 +12423,7 @@
           ]
         },
         "label": "Region-of-interest coordinate collection",
-        "definition": "Serialized collection of four-element integer rectangles, one per region of interest carried by an internal V1c image row.",
+        "definition": "Nested serialized list of [y_min, x_min, y_max, x_max] rectangles in the attached DICOM image's pixel-array coordinate space, one per region of interest.",
         "feature_kind": "text",
         "domains": [
           "imaging"
@@ -12232,20 +12435,20 @@
           "ROI rectangle"
         ],
         "caveats": [
-          "Each rectangle is a lower-bound pair followed by the matching upper-bound pair, but whether the first axis is the row axis or the column axis is not established for internal V1c.",
-          "Components can be negative or exceed the pixel matrix, so a rectangle must be clamped explicitly before cropping.",
+          "Coordinates correspond directly to the attached pixel array and require no spacing, orientation, or other coordinate transformation.",
+          "The maximum-bound inclusion convention is not established, and the catalogue prescribes no repair for negative or out-of-range values.",
           "The collection is aligned by position with the frame-index and depth-derivation collections; position is not region identity."
         ],
         "evidence": [
-          "observed_source_values",
-          "unresolved"
+          "maintainer_confirmed",
+          "observed_source_values"
         ],
         "objects": [
           "region_of_interest"
         ],
         "claim_refs": [
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-geometry-unresolved"
+          "internal-v2.roi-context#roi-coordinate-geometry"
         ],
         "missing_states": [
           {
@@ -12271,7 +12474,7 @@
           ]
         },
         "label": "Region-of-interest frame-index collection",
-        "definition": "Serialized collection of zero-based frame-index lists, one per region of interest carried by an internal V1c image row.",
+        "definition": "Nested serialized collection of zero-based frame-index lists aligned one-for-one with the ROI coordinate collection; a DBT ROI can match one or several frames.",
         "feature_kind": "text",
         "domains": [
           "imaging"
@@ -12283,11 +12486,12 @@
           "ROI depth"
         ],
         "caveats": [
-          "Aligned by position with the coordinate collection when represented; a region's frame list may hold several non-contiguous indices.",
-          "Represented for two-dimensional and synthetic two-dimensional rows as well as tomosynthesis rows, so it is not a tomosynthesis-only field.",
+          "Frame indices are informative only for DBT images; represented values on 2D or synthetic 2D images are not informative.",
+          "Aligned by position with the coordinate collection; a region's frame list may hold one or several indices.",
           "No inventoried column states a frame count, so no upper bound is established."
         ],
         "evidence": [
+          "maintainer_confirmed",
           "observed_source_values"
         ],
         "objects": [
@@ -12295,7 +12499,7 @@
         ],
         "claim_refs": [
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+          "internal-v2.roi-context#roi-frame-depth-semantics"
         ],
         "missing_states": [
           {
@@ -12303,7 +12507,7 @@
             "representation": "empty serialized collection alongside represented regions of interest",
             "meaning": "No frame indices are represented for the row's regions",
             "claim_refs": [
-              "internal-v2.roi-context#roi-frames-not-tomosynthesis-only"
+              "internal-v2.roi-context#roi-frame-depth-semantics"
             ],
             "caveats": [
               "An empty frame collection means absent frame information, not frame zero."
@@ -12321,7 +12525,7 @@
           ]
         },
         "label": "Region-of-interest depth-derivation flag collection",
-        "definition": "Serialized collection of one boolean per region of interest recording whether that region's depth information was derived.",
+        "definition": "Serialized collection of one boolean per ROI; true means an in-house model inferred the DBT frame-depth coordinates after radiologist 2D coordinates were transferred to the DBT image.",
         "feature_kind": "flag",
         "domains": [
           "imaging"
@@ -12332,20 +12536,21 @@
           "derived ROI depth"
         ],
         "caveats": [
-          "Its length agrees with the represented region count and with the frame-index collection when frames are represented.",
-          "The affirmative state occurs only alongside represented frame indices.",
-          "It records that depth information was derived, not who or what produced the region."
+          "Its length agrees with the represented region count because the ROI collections are generated in tandem.",
+          "True refers to inferred z/depth information; the x/y coordinates originate from a radiologist clinical annotation.",
+          "It does not provide stable ROI identity or an individual annotator identifier."
         ],
         "evidence": [
-          "observed_source_values",
-          "inference"
+          "maintainer_confirmed",
+          "observed_source_values"
         ],
         "objects": [
           "region_of_interest"
         ],
         "claim_refs": [
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
+          "internal-v2.roi-context#roi-frame-depth-semantics",
+          "internal-v2.roi-context#roi-identity-and-provenance"
         ],
         "missing_states": [],
         "temporal_semantics": [],
@@ -12374,7 +12579,7 @@
         },
         "attribution": "A represented region of interest is attached to one represented image.",
         "attribution_limitations": [
-          "The relationship does not establish equivalence between an ROI and a clinical finding.",
+          "The relationship does not establish unconditional equivalence between an ROI and a clinical finding; same-side attribution is reliable only when exactly one finding is represented on that accession side.",
           "Internal V1c represents no region identifier, so a region is identified only by its position within one image row's collections."
         ],
         "temporal_qualification": "No independent ROI event or availability time is currently asserted.",
@@ -12390,11 +12595,12 @@
         "claim_refs": [
           "internal-v2.roi-context#roi-attached-to-image",
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-cross-image-correspondence-absent"
+          "internal-v2.roi-context#roi-cross-image-correspondence-absent",
+          "internal-v2.roi-context#roi-finding-attribution"
         ],
         "caveats": [
           "The internal V1c physical route is row co-location on the image-metadata table, not a join to a separate region-of-interest table.",
-          "Correspondence among regions on separate images of one acquisition group remains future work."
+          "Correspondence among regions on separate images of one acquisition group is not represented."
         ]
       },
       "internal-v2.clinical.procedure-pathology-specimen": {
@@ -12552,8 +12758,8 @@
           ]
         },
         "title": "Missing image metadata is not missing imaging",
-        "statement": "Do not treat a clinical exam without a matching internal V1c image-metadata row, or an image row without a rendered-image locator or enrichment flag, as evidence that no image exists.",
-        "rationale": "The paired image-metadata extraction is internal V1c and covers a narrower period and patient set than internal clinical V2, and its locator and enrichment columns are represented on only part of the extraction.",
+        "statement": "Do not treat a clinical V2 exam without a matching internal V1c row, a missing legacy PNG locator, or has_pix_array as evidence that no DICOM image exists.",
+        "rationale": "V1c completely covers EMBEDv1 but is narrower than clinical V2; PNG conversion fields are legacy, has_pix_array is obsolete and unreliable, and a missing anon_dicom_path instead indicates a data-quality failure to save the anonymized DICOM.",
         "category": "interpretation_limit",
         "priority": "high",
         "scope": "profile_specific",
@@ -12588,7 +12794,50 @@
           "internal-v2.v1c-metadata-context#locator-and-enrichment-population"
         ],
         "caveats": [
-          "An image-availability indicator would need evidence this profile does not supply."
+          "Use anon_dicom_path for current DICOM availability, treating its absence as an anonymization data-quality error rather than intended optionality."
+        ]
+      },
+      "internal-v2.guardrail.roi-finding-attribution-is-conditional": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "title": "ROI-to-finding attribution depends on side-level finding multiplicity",
+        "statement": "Same-accession, same-side ROI attribution is generally reliable only when exactly one clinical finding is represented on that side; when multiple findings are present, EMBED supplies no reliable individual ROI-to-finding link.",
+        "rationale": "The ROI collections contain no finding identifier. Multiple ROIs can all belong to the single represented finding, but accession and side cannot distinguish several findings from one another.",
+        "category": "interpretation_limit",
+        "priority": "high",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "objects": [
+          "imaging_finding",
+          "region_of_interest"
+        ],
+        "concepts": [
+          "internal-v2.roi.coordinate_collection"
+        ],
+        "semantic_relationships": [],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "coverage": [],
+        "domains": [
+          "imaging",
+          "breast_side"
+        ],
+        "search_terms": [
+          "link ROI to finding",
+          "ROI finding attribution",
+          "multiple findings one side"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-finding-attribution"
+        ],
+        "caveats": [
+          "An ROI need not mark the most severe lesion or a lesion that later became cancer."
         ]
       }
     },
@@ -12666,7 +12915,7 @@
         "profiles": [
           "internal-v2"
         ],
-        "summary": "Internal V1c region-of-interest information is now physically cataloged: the count, coordinate, frame-index, and depth-derivation columns live on the image-metadata table, their collections are aligned by position, and the empty-collection representation is recorded; coordinate axis order, per-region identity, and region provenance remain unresolved.",
+        "summary": "Internal V1c region-of-interest information is physically cataloged as tandem-generated aligned collections: coordinates use [y_min, x_min, y_max, x_max] DICOM pixel-array space, frames are informative for DBT, the depth flag marks model-inferred DBT z coordinates, and the underlying annotations originate from radiologists during routine clinical operations.",
         "domains": [
           "imaging"
         ],
@@ -12679,12 +12928,13 @@
         "claim_refs": [
           "internal-v2.roi-context#roi-attached-to-image",
           "internal-v2.roi-context#roi-serialized-collections",
-          "internal-v2.roi-context#roi-geometry-unresolved",
-          "internal-v2.roi-context#roi-identity-and-provenance-unresolved"
+          "internal-v2.roi-context#roi-coordinate-geometry",
+          "internal-v2.roi-context#roi-identity-and-provenance"
         ],
         "caveats": [
           "The image-metadata table is not one row per region of interest.",
-          "Cross-image region correspondence is still not represented."
+          "Stable per-region identity and cross-image correspondence are not represented.",
+          "Finding attribution remains conditional on exactly one finding being represented on the same accession side."
         ]
       },
       "coverage.internal-v2.pathology-severity-to-side": {
@@ -12882,12 +13132,12 @@
         },
         "subject_kind": "concept",
         "subject": "internal-v2.roi.coordinate_collection",
-        "status": "unresolved",
+        "status": "supported",
         "scope": "profile_specific",
         "profiles": [
           "internal-v2"
         ],
-        "summary": "Internal V1c region-of-interest rectangles are four-element integer lower-bound and upper-bound pairs, but which axis comes first is not established and components can fall outside the pixel matrix.",
+        "summary": "Internal V1c ROI rectangles are [y_min, x_min, y_max, x_max] coordinates expressed directly in the attached DICOM pixel-array coordinate space without transformation.",
         "domains": [
           "imaging"
         ],
@@ -12898,10 +13148,10 @@
           "ROI coordinate system"
         ],
         "claim_refs": [
-          "internal-v2.roi-context#roi-geometry-unresolved"
+          "internal-v2.roi-context#roi-coordinate-geometry"
         ],
         "caveats": [
-          "Resolve the axis order and clamp to the pixel matrix before cropping or rendering a region."
+          "The maximum-bound inclusion convention and preferred handling of negative or out-of-range components are not established."
         ]
       },
       "coverage.internal-v2.v1c-image-instance-identity": {
@@ -12913,12 +13163,12 @@
         },
         "subject_kind": "clinical_object",
         "subject": "image",
-        "status": "unresolved",
+        "status": "supported",
         "scope": "profile_specific",
         "profiles": [
           "internal-v2"
         ],
-        "summary": "Internal V1c inventories no DICOM instance identifier, so the profile records no clinical image instance identity; the anonymized DICOM file locator is a technical, incomplete, release-local row locator.",
+        "summary": "The anon_dicom_path filename without .dcm is the anonymized SOP Instance UID and provides durable image identity within one dataset version, although the UID is not exported as a separate metadata column.",
         "domains": [
           "imaging",
           "identity",
@@ -12931,10 +13181,11 @@
           "image locator"
         ],
         "claim_refs": [
-          "internal-v2.v1c-metadata-context#image-identity-unresolved"
+          "internal-v2.v1c-metadata-context#image-instance-identity"
         ],
         "caveats": [
-          "Do not promote a file locator or a DICOM series and instance number pair to clinical image identity."
+          "A missing anon_dicom_path makes the file and exported identity unavailable for that row and likely reflects an anonymization failure.",
+          "No identity stability across dataset versions is asserted."
         ]
       },
       "coverage.internal-v2.v1c-image-modality-coverage": {
@@ -12946,12 +13197,12 @@
         },
         "subject_kind": "topic",
         "subject": "internal-v2.v1c-metadata-context",
-        "status": "unresolved",
+        "status": "supported",
         "scope": "profile_specific",
         "profiles": [
           "internal-v2"
         ],
-        "summary": "The internal V1c image surface is mammography-centred; represented non-mammographic modality values do not establish systematic ultrasound or MRI image coverage, and full-period extraction is still in progress.",
+        "summary": "Internal V1c covers DICOM objects associated with the complete EMBEDv1 accession set after excluding secondary captures and screen saves, except ROI_SS and ROI_SSC images retained solely for ROI extraction.",
         "domains": [
           "imaging",
           "exam"
@@ -12960,15 +13211,15 @@
           "ultrasound images",
           "MRI images",
           "image modality coverage",
-          "image extraction progress"
+          "V1c extraction coverage"
         ],
         "claim_refs": [
           "internal-v2.v1c-metadata-context#modality-surface",
-          "internal-v2.v1c-metadata-context#future-extraction"
+          "internal-v2.v1c-metadata-context#current-v1c-coverage"
         ],
         "caveats": [
-          "Absence of a modality from this extraction is not absence from internal clinical V2 or from the imaging archive.",
-          "No future modality column, encoding, or table is modelled."
+          "This supported coverage statement is scoped to EMBEDv1, not the later exams and patients represented by internal clinical V2.",
+          "ROI_SS and ROI_SSC images are annotation-extraction artifacts and are not intended for other uses."
         ]
       },
       "coverage.internal-v2.v1c-dicom-attribute-interpretation": {
@@ -12985,7 +13236,7 @@
         "profiles": [
           "internal-v2"
         ],
-        "summary": "Inventoried internal V1c columns parsed directly from DICOM retain their standard element semantics; many acquisition, dose, detector, collimator, geometry, windowing, icon-image, order-number, patient-age, and time-of-day attributes remain physically inventoried without dedicated catalogue concepts, while extraction transformations and anonymization treatment remain field specific.",
+        "summary": "Inventoried internal V1c columns parsed directly from DICOM retain standard element semantics and received no processing beyond anonymization; many acquisition, dose, detector, collimator, geometry, windowing, icon-image, order-number, and time-of-day attributes remain physically inventoried without dedicated catalogue concepts.",
         "domains": [
           "imaging",
           "technical"
@@ -12997,11 +13248,12 @@
           "uninterpreted image columns"
         ],
         "claim_refs": [
-          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics",
+          "internal-v2.v1c-metadata-context#dicom-demographic-anonymization"
         ],
         "caveats": [
           "An unmapped parsed DICOM column is not semantically unknowable: it can be mapped using the standard element meaning when a dedicated catalogue concept is needed.",
-          "Pipeline-derived fields, extraction-specific transformations, anonymization handling, and empirical coverage still require separate evidence."
+          "Pipeline-derived fields require separate evidence, and anonymization of DICOM time-of-day attributes remains unknown."
         ]
       }
     }

@@ -50,12 +50,12 @@ extraction, at one row per extracted DICOM image instance. It carries the image
 object together with co-located patient, exam, and image-derived breast-side
 projections, and it distinguishes source DICOM modality, the source DICOM
 image-type attribute, the pipeline-derived mammographic image-type
-classification, view position, and image laterality as separate features.
-Because that extraction inventories no DICOM instance identifier, the profile
-declares no image instance identity; the anonymized file locator is a technical,
-incomplete, release-local row locator. It is nevertheless intended to be
-defined for every extracted image: a missing value means the image file is
-unavailable and is a data-quality defect. `acc_anon` remains the identifier of
+classification, view position, and image laterality as separate features. The
+profile derives image identity from the anonymized SOP Instance UID encoded in the
+`anon_dicom_path` filename. That identity is durable within one dataset version,
+while the full path remains a technical locator. It is intended for every
+extracted image; a missing value likely means anonymization failed before the
+de-identified file could be saved. `acc_anon` remains the identifier of
 one distinct exam across EMBED and shares its namespace across the clinical and
 metadata tables; each accession belongs to exactly one patient, and a
 cross-patient association is an invalid data-quality error rather than a
@@ -67,22 +67,27 @@ the date the image was acquired. `YES` and `NO` are source declarations, an
 absent attribute leaves that condition unknown, and none is a pixel-data
 verification.
 
+The catalogue does not prescribe an exclusion, redaction, or review action from
+that declaration.
+
 Each ROI still originates on exactly one required source image, and an ROI is
 not equated with a clinical finding. Physically, an image row carries a
 region-of-interest count with positionally aligned coordinate, frame-index, and
 depth-derivation collections, so the table is not one row per ROI, no ROI
 identifier exists, and a region is addressable only by collection position.
-Coordinate axis order and reference frame, per-region provenance, and grouping of
-corresponding ROIs across simultaneous FFDM, DBT, and synthetic 2D acquisitions
-remain unresolved or future work.
+Coordinates are `[y_min, x_min, y_max, x_max]` in the attached DICOM pixel-array
+space. ROIs originate from radiologists during routine clinical operations;
+`ROI_depth_derived` distinguishes DBT depth inferred by an in-house model.
+Cross-image correspondence is absent. Linking same-accession, same-side ROIs to
+a finding is reliable only when exactly one finding exists on that side.
 
-The clinical surface here is internal V2 while the paired image metadata is
-internal V1c. That boundary is deliberate and temporary: V1c covers a shorter
-period and a smaller patient set, so a clinical exam without a matching image
-row is outside current extraction coverage and is never an exam without images.
-An inner accession join discards those exams silently. The image surface is
-mammography-centred, full-period extraction is in progress, and no future
-ultrasound or MRI columns are modelled.
+The clinical surface here is internal V2 while the paired image metadata is the
+most recent internal V1c artifact. V1c covers every EMBEDv1 exam and patient but
+is narrower than clinical V2, so a later clinical exam without a matching image
+row is outside V1c coverage and is never an exam without images. An inner
+accession join discards those exams silently. Secondary captures and screen
+saves were excluded except ROI_SS and ROI_SSC annotation images retained solely
+for ROI extraction.
 
 An object does not imply a dedicated table. In open-v2, procedure, pathology
 observation, diagnosis, and report-date fields can be co-located on a

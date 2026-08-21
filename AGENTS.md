@@ -31,13 +31,15 @@ versioned in lockstep with the core distribution.
   image, co-located patient/exam/side,
   DICOM-attribute, modality, enrichment, and serialized region-of-interest
   representations. The clinical surface is internal V2 while the paired image
-  metadata is internal V1c and deliberately narrower, so an unmatched clinical
+  metadata is the most recent internal V1c artifact, covers every EMBEDv1 exam
+  and patient, and is narrower than clinical V2, so an unmatched later clinical
   exam means missing extraction coverage rather than missing images. The
   patient and exam identifiers share their cross-table namespaces, every
   accession belongs to exactly one patient, and any cross-patient association
   is a data-quality error. The anonymized DICOM locator is intended for every
-  extracted image; a missing locator means the image file is unavailable and
-  is a data-quality defect.
+  extracted image; its basename is the anonymized SOP Instance UID within one
+  dataset version, and a missing locator likely means anonymization failed
+  before the de-identified file could be saved.
 - `catalog/catalog-set.json` selects the bundled semantic and default profile
   modules; version-matched schemas are standalone structural contracts.
 - `embed_context/catalog.py` implements strict parsing, cross-reference,

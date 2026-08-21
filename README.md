@@ -383,26 +383,36 @@ classifications, enrichment flags, and serialized per-image regions of
 interest. Its physical types are assessed parse types rather than an embedded
 schema, and every column is conservatively nullable. There is an important and
 deliberate version boundary: the clinical surface is internal V2 while the
-currently paired image metadata is internal **V1c**, which covers a shorter
-period and a smaller patient set. A clinical V2 exam with no matching image row
+currently paired image metadata is the most recent internal **V1c** artifact,
+which covers every EMBEDv1 exam and patient. It remains narrower than clinical
+V2, so a clinical V2 exam with no matching image row
 is therefore outside current extraction coverage and is **not** an exam without
 images; an inner accession join silently discards those exams. `acc_anon`
 and `empi_anon` use the same cross-table exam and patient namespaces. Each
 accession belongs to exactly one patient; a cross-patient association is an
 invalid data-quality error and must not be retained as a valid link. The
 anonymized DICOM locator is intended to be present for every
-extracted image, and a missing value means the image file is unavailable and
-should be treated as a data-quality defect. The image surface is
-mammography-centred, full-period extraction is still in progress, and no future
-ultrasound or MRI columns are modelled. DICOM Burned In Annotation records
+extracted image. Its filename is the anonymized SOP Instance UID, providing
+durable image identity within one dataset version; a missing path likely means
+anonymization failed before the de-identified file could be saved. V1c covers
+the DICOM objects associated with EMBEDv1 accessions after excluding secondary
+captures and screen saves, except ROI_SS and ROI_SSC annotation images retained
+solely for ROI extraction. Legacy PNG conversions and `has_pix_array` should
+not be used for current work; use the anonymized DICOM files. DICOM Burned In Annotation records
 whether the source declares sufficient burned-in annotation to identify the
-patient and acquisition date; it is a declaration, not pixel-data verification.
+patient and acquisition date; it is a declaration, not pixel-data verification,
+and the catalogue prescribes no action from it.
 Columns parsed directly from DICOM elements retain their standard DICOM
 semantics; pipeline-derived fields require separate extraction evidence.
 Regions of interest are serialized collections on the image row rather than one
 row per region: the count, coordinate, frame-index, and depth-derivation
-collections are aligned by position, no region identifier exists, and the
-coordinate axis order and reference frame remain unresolved.
+collections are generated in tandem and aligned by position. Coordinates are
+`[y_min, x_min, y_max, x_max]` in the attached DICOM pixel-array space. The
+annotations originate from radiologists during routine clinical care; for some
+DBT ROIs an in-house model inferred frame depth, marked by
+`ROI_depth_derived`. No stable ROI identifier or cross-image correspondence is
+represented, and ROI-to-finding attribution is reliable only when one finding
+exists on that accession side.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal
