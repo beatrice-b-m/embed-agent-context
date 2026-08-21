@@ -21,7 +21,9 @@
       ],
       "notes": [
         "Confirms that every ROI originates on exactly one source image and cannot exist without that source-image attachment.",
-        "Confirms y-minimum, x-minimum, y-maximum, x-maximum pixel-array coordinate order; radiologist-origin clinical provenance; DBT frame-index and inferred-depth semantics; tandem collection generation; and the absence of stable ROI identity or cross-image correspondence.",
+        "Confirms y-minimum, x-minimum, y-maximum, x-maximum pixel-array coordinate order with inclusive minimum and maximum bounds; direct target-image pixel-array coordinates; expected in-bounds curation; and safe clipping of residual out-of-bounds coordinates.",
+        "Confirms radiologist-origin clinical provenance through multiple annotation sources and workflows, including annotation DICOM objects without pixel arrays whose coordinates were extracted directly and ROI_SS/ROI_SSC screen captures whose burned-in annotations were extracted and transferred to original images.",
+        "Confirms DBT frame-index and inferred-depth semantics, tandem collection generation, and the absence of stable ROI identity or cross-image correspondence.",
         "Confirms that accession-and-side attribution is generally safe only when exactly one clinical finding is represented on that side; multiple findings on one side cannot be reliably distinguished from the represented ROIs."
       ]
     },
@@ -354,7 +356,7 @@
         },
         {
           "id": "roi-coordinate-geometry",
-          "statement": "ROI_coords is a nested list of rectangles in [y_min, x_min, y_max, x_max] order, expressed directly in the coordinate space of the attached DICOM image's pixel array without a spacing, orientation, or other coordinate transformation.",
+          "statement": "ROI_coords is a nested list of rectangles in [y_min, x_min, y_max, x_max] order with both minimum and maximum bounds inclusive, expressed directly in the coordinate space of the attached DICOM image's pixel array without a spacing, orientation, or other coordinate transformation.",
           "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
@@ -362,8 +364,9 @@
             "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
-            "The inclusive or exclusive interpretation of the maximum bounds is not established.",
-            "Observed negative or out-of-range components remain data-quality conditions; the catalogue does not prescribe a clipping rule."
+            "For example, [100, 200, 150, 250] is a 51 by 51 pixel region and corresponds to NumPy indexing image[100:151, 200:251].",
+            "The expected curated invariant is 0 <= y_min <= y_max < Rows and 0 <= x_min <= x_max < Columns for the attached image.",
+            "Negative coordinates or maxima beyond the attached image bounds are residual data-quality conditions, not intended representation semantics, and should normally be resolved during dataset curation; downstream consumers may safely clip any residual coordinates to the valid pixel-array bounds."
           ]
         },
         {
@@ -383,7 +386,7 @@
         },
         {
           "id": "roi-identity-and-provenance",
-          "statement": "Every represented ROI originates from a radiologist annotation created during routine clinical operations, but internal V1c exports no stable ROI identifier or individual annotator field and addresses each ROI only by its position within one image row's aligned collections.",
+          "statement": "Every represented ROI originates from a radiologist annotation created during routine clinical operations through one of multiple annotation sources or workflows, but internal V1c exports no stable ROI identifier or individual annotator field and addresses each ROI only by its position within one image row's aligned collections.",
           "status": "verified",
           "sources": [
             "internal-v2.v1c-metadata-structure-observation",
@@ -391,6 +394,8 @@
           ],
           "caveats": [
             "Collection position is a serialization artefact and must not be treated as a durable region identifier.",
+            "Annotation DICOM objects without pixel arrays supplied coordinates directly in one workflow; ROI_SS and ROI_SSC screen captures supplied burned-in annotations that were extracted and transferred to the corresponding original images in another workflow.",
+            "ROI_SS and ROI_SSC are not the exclusive source of represented ROIs.",
             "The annotations are in-time clinical artifacts communicating some aspect of decision making, but they need not mark the most severe lesion or the lesion that later became cancer.",
             "For some DBT rows an in-house model inferred the matched frames after radiologist 2D coordinates were transferred; ROI_depth_derived records that distinction."
           ]
@@ -1180,7 +1185,8 @@
             "internal-v2.roi-maintainer-confirmation"
           ],
           "caveats": [
-            "These pipeline classes describe annotation-transfer artifacts, not primary diagnostic images or a general secondary-capture inventory."
+            "These pipeline classes describe annotation-transfer artifacts, not primary diagnostic images or a general secondary-capture inventory.",
+            "They are one ROI annotation source; other represented ROIs came through other clinical annotation workflows, including direct extraction from annotation DICOM objects without pixel arrays."
           ]
         },
         {
@@ -1599,7 +1605,8 @@
       ],
       "caveats": [
         "One physical row can carry several regions, so the table is not one row per region and positional order is not region identity.",
-        "Coordinates are [y_min, x_min, y_max, x_max] in the attached DICOM pixel-array space and originate from routine-clinical radiologist annotations.",
+        "Coordinates use inclusive [y_min, x_min, y_max, x_max] bounds in the attached DICOM pixel-array space; curated coordinates are expected in bounds, and residual out-of-bounds coordinates may be safely clipped.",
+        "Routine-clinical radiologist annotations were obtained through multiple workflows, including annotation DICOM objects without pixel arrays and ROI_SS/ROI_SSC screen captures.",
         "Stable per-region identity, cross-image correspondence, and multi-finding attribution remain unsupported."
       ]
     },
@@ -6424,14 +6431,15 @@
         "occurrence_interpretations": [
           {
             "representation": "serialized collection of four-element integer rectangles",
-            "meaning": "One [y_min, x_min, y_max, x_max] rectangle in the attached DICOM pixel-array coordinate space for each region of interest",
+            "meaning": "One [y_min, x_min, y_max, x_max] rectangle with inclusive minimum and maximum bounds in the attached DICOM pixel-array coordinate space for each region of interest",
             "status": "verified",
             "claim_refs": [
               "internal-v2.roi-context#roi-coordinate-geometry"
             ],
             "caveats": [
               "No spacing or orientation transformation is required.",
-              "The maximum-bound inclusion convention and handling of out-of-range components remain unspecified."
+              "For NumPy slicing, add one to each inclusive maximum: [100, 200, 150, 250] maps to image[100:151, 200:251] and yields 51 by 51 pixels.",
+              "Curated coordinates are expected to lie within the attached pixel array; residual out-of-bounds components may be safely clipped to the valid bounds."
             ]
           },
           {
@@ -6914,8 +6922,8 @@
         "caveats": [
           "One image row carries a collection of zero or more regions, so this binding is a collection-valued occurrence and not a row-per-region representation.",
           "No region identifier is declared: within a row a region is addressable only by its position in the aligned collections, and position is not durable identity.",
-          "Coordinates use [y_min, x_min, y_max, x_max] directly in the attached DICOM pixel-array coordinate space; the maximum-bound convention and handling of out-of-range values remain unspecified.",
-          "ROIs originate from radiologist annotations created during routine clinical operations; model-inferred DBT depth is marked by ROI_depth_derived.",
+          "Coordinates use inclusive [y_min, x_min, y_max, x_max] bounds directly in the attached DICOM pixel-array coordinate space; curated coordinates are expected in bounds, and residual out-of-bounds values may be safely clipped.",
+          "ROIs originate from radiologist annotations created during routine clinical operations through multiple source workflows, including direct coordinate extraction from annotation DICOM objects without pixel arrays and annotation extraction from ROI_SS/ROI_SSC screen captures; model-inferred DBT depth is marked by ROI_depth_derived.",
           "Correspondence among regions on separate images of one acquisition group is not represented.",
           "ROI-to-finding attribution is reliable only when exactly one finding is represented on the same accession side; multiple findings on one side cannot be individually linked."
         ]
@@ -8813,7 +8821,8 @@
           "Region-of-interest information is serialized in per-row collections; this table is not one row per region of interest.",
           "This extraction is internal V1c and covers every EMBEDv1 exam and patient; it remains narrower than internal clinical V2, so absence of a later clinical V2 exam here is not absence of images.",
           "DICOM objects associated with EMBEDv1 accessions were extracted, then secondary captures and screen saves were excluded except ROI_SS and ROI_SSC images retained solely for ROI extraction.",
-          "ROI_SS and ROI_SSC rows contain burned-in radiologist annotations used to extract coordinates and transfer them to the original images; they are not intended for other use.",
+          "ROI_SS and ROI_SSC rows contain burned-in radiologist annotations used to extract coordinates and transfer them to the original images; they are one annotation source and are not intended for other use.",
+          "Other ROI workflows include annotation DICOM objects without pixel arrays, from which coordinates were extracted directly before attachment to the corresponding target images.",
           "DICOM time-of-day attributes are numerically parsable, so a numeric parse discards zero padding and any fractional-second form; they remain inventoried and unmapped.",
           "DICOM PatientAge is top-coded to 89, PatientSex is unchanged, and sensitive non-identifier/non-date attributes were dropped during anonymization.",
           "Detailed DICOM acquisition, dose, detector, collimator, geometry, windowing, and icon-image attributes retain standard DICOM element semantics but remain inventoried without dedicated catalogue concepts or mappings."
@@ -12423,7 +12432,7 @@
           ]
         },
         "label": "Region-of-interest coordinate collection",
-        "definition": "Nested serialized list of [y_min, x_min, y_max, x_max] rectangles in the attached DICOM image's pixel-array coordinate space, one per region of interest.",
+        "definition": "Nested serialized list of [y_min, x_min, y_max, x_max] rectangles with inclusive minimum and maximum bounds in the attached DICOM image's pixel-array coordinate space, one per region of interest.",
         "feature_kind": "text",
         "domains": [
           "imaging"
@@ -12436,7 +12445,8 @@
         ],
         "caveats": [
           "Coordinates correspond directly to the attached pixel array and require no spacing, orientation, or other coordinate transformation.",
-          "The maximum-bound inclusion convention is not established, and the catalogue prescribes no repair for negative or out-of-range values.",
+          "An inclusive rectangle has height y_max - y_min + 1 and width x_max - x_min + 1; NumPy slices therefore use y_max + 1 and x_max + 1 as their exclusive stops.",
+          "The expected curated invariant is 0 <= y_min <= y_max < Rows and 0 <= x_min <= x_max < Columns; residual out-of-bounds coordinates may be safely clipped to the attached image's valid pixel-array bounds.",
           "The collection is aligned by position with the frame-index and depth-derivation collections; position is not region identity."
         ],
         "evidence": [
@@ -12839,6 +12849,56 @@
         "caveats": [
           "An ROI need not mark the most severe lesion or a lesion that later became cancer."
         ]
+      },
+      "internal-v2.guardrail.roi-coordinate-bounds": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "title": "ROI coordinates use inclusive, normally in-bounds pixel bounds",
+        "statement": "Interpret ROI rectangles as inclusive [y_min, x_min, y_max, x_max] pixel-array bounds. Curated coordinates are expected to lie within the attached image; if residual out-of-bounds coordinates are encountered downstream, they may be safely clipped to the valid pixel-array bounds.",
+        "rationale": "Coordinates outside y indices 0 through Rows - 1 or x indices 0 through Columns - 1 are residual data-quality conditions rather than intended representation semantics. Inclusive bounds also require adding one to y_max and x_max when using exclusive-stop slicing APIs such as NumPy.",
+        "category": "interpretation_limit",
+        "priority": "high",
+        "scope": "profile_specific",
+        "profiles": [
+          "internal-v2"
+        ],
+        "objects": [
+          "image",
+          "region_of_interest"
+        ],
+        "concepts": [
+          "internal-v2.image.pixel_matrix_dimension",
+          "internal-v2.roi.coordinate_collection"
+        ],
+        "semantic_relationships": [
+          "clinical.image-region-of-interest"
+        ],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "coverage": [
+          "coverage.internal-v2.v1c-roi-coordinate-geometry"
+        ],
+        "domains": [
+          "imaging",
+          "technical"
+        ],
+        "search_terms": [
+          "ROI bounds",
+          "ROI crop",
+          "inclusive coordinates",
+          "clip ROI coordinates",
+          "out of bounds ROI"
+        ],
+        "claim_refs": [
+          "internal-v2.roi-context#roi-coordinate-geometry"
+        ],
+        "caveats": [
+          "The supported clipping behavior is recovery for residual defects; it does not redefine out-of-bounds values as an intended source representation."
+        ]
       }
     },
     "coverage": {
@@ -12915,7 +12975,7 @@
         "profiles": [
           "internal-v2"
         ],
-        "summary": "Internal V1c region-of-interest information is physically cataloged as tandem-generated aligned collections: coordinates use [y_min, x_min, y_max, x_max] DICOM pixel-array space, frames are informative for DBT, the depth flag marks model-inferred DBT z coordinates, and the underlying annotations originate from radiologists during routine clinical operations.",
+        "summary": "Internal V1c region-of-interest information is physically cataloged as tandem-generated aligned collections: coordinates use inclusive [y_min, x_min, y_max, x_max] DICOM pixel-array bounds, frames are informative for DBT, the depth flag marks model-inferred DBT z coordinates, and the underlying radiologist annotations come through multiple clinical annotation workflows.",
         "domains": [
           "imaging"
         ],
@@ -12933,6 +12993,8 @@
         ],
         "caveats": [
           "The image-metadata table is not one row per region of interest.",
+          "Curated ROI coordinates are expected within the attached image bounds; residual out-of-bounds values may be safely clipped.",
+          "ROI_SS and ROI_SSC are not the exclusive ROI annotation source; annotation DICOM objects without pixel arrays also supplied coordinates directly.",
           "Stable per-region identity and cross-image correspondence are not represented.",
           "Finding attribution remains conditional on exactly one finding being represented on the same accession side."
         ]
@@ -13137,7 +13199,7 @@
         "profiles": [
           "internal-v2"
         ],
-        "summary": "Internal V1c ROI rectangles are [y_min, x_min, y_max, x_max] coordinates expressed directly in the attached DICOM pixel-array coordinate space without transformation.",
+        "summary": "Internal V1c ROI rectangles use inclusive [y_min, x_min, y_max, x_max] coordinates expressed directly in the attached DICOM pixel-array coordinate space without transformation.",
         "domains": [
           "imaging"
         ],
@@ -13151,7 +13213,7 @@
           "internal-v2.roi-context#roi-coordinate-geometry"
         ],
         "caveats": [
-          "The maximum-bound inclusion convention and preferred handling of negative or out-of-range components are not established."
+          "Coordinates are expected to be within the attached image bounds after curation; residual out-of-bounds coordinates may be safely clipped to those valid bounds."
         ]
       },
       "coverage.internal-v2.v1c-image-instance-identity": {

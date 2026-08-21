@@ -407,12 +407,17 @@ semantics; pipeline-derived fields require separate extraction evidence.
 Regions of interest are serialized collections on the image row rather than one
 row per region: the count, coordinate, frame-index, and depth-derivation
 collections are generated in tandem and aligned by position. Coordinates are
-`[y_min, x_min, y_max, x_max]` in the attached DICOM pixel-array space. The
-annotations originate from radiologists during routine clinical care; for some
-DBT ROIs an in-house model inferred frame depth, marked by
-`ROI_depth_derived`. No stable ROI identifier or cross-image correspondence is
-represented, and ROI-to-finding attribution is reliable only when one finding
-exists on that accession side.
+inclusive `[y_min, x_min, y_max, x_max]` bounds in the attached DICOM
+pixel-array space: `[100, 200, 150, 250]` is 51×51 pixels and maps to
+`image[100:151, 200:251]` in NumPy. Curated coordinates are expected within
+the image bounds; residual out-of-bounds coordinates may be safely clipped.
+The annotations originate from radiologists during routine clinical care
+through multiple workflows, including direct coordinate extraction from
+annotation DICOM objects without pixel arrays and annotation extraction from
+ROI_SS/ROI_SSC screen captures. For some DBT ROIs an in-house model inferred
+frame depth, marked by `ROI_depth_derived`. No stable ROI identifier or
+cross-image correspondence is represented, and ROI-to-finding attribution is
+reliable only when one finding exists on that accession side.
 
 A uv tool installation is intentionally isolated and does not add
 `embed_context` to unrelated Python environments. Add the package as a normal

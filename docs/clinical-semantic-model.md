@@ -75,9 +75,14 @@ not equated with a clinical finding. Physically, an image row carries a
 region-of-interest count with positionally aligned coordinate, frame-index, and
 depth-derivation collections, so the table is not one row per ROI, no ROI
 identifier exists, and a region is addressable only by collection position.
-Coordinates are `[y_min, x_min, y_max, x_max]` in the attached DICOM pixel-array
-space. ROIs originate from radiologists during routine clinical operations;
-`ROI_depth_derived` distinguishes DBT depth inferred by an in-house model.
+Coordinates use inclusive `[y_min, x_min, y_max, x_max]` bounds in the attached
+DICOM pixel-array space; `[100, 200, 150, 250]` is a 51×51-pixel rectangle.
+Curated coordinates are expected within the image bounds, while residual
+out-of-bounds values may be safely clipped. ROIs originate from radiologists
+during routine clinical operations through multiple workflows, including
+annotation DICOM objects without pixel arrays and ROI_SS/ROI_SSC screen
+captures; `ROI_depth_derived` distinguishes DBT depth inferred by an in-house
+model.
 Cross-image correspondence is absent. Linking same-accession, same-side ROIs to
 a finding is reliable only when exactly one finding exists on that side.
 

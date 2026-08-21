@@ -61,9 +61,12 @@ breast-side projections, a cross-table accession route for the exam-to-image
 relationship, and a same-table route for the image-to-ROI relationship. Each ROI
 still has exactly one required source image, but the physical representation is a
 serialized per-image collection, so no ROI row grain, ROI identifier, or
-cross-image ROI grouping is asserted. Coordinates use DICOM pixel-array
-`[y_min, x_min, y_max, x_max]` order and originate from radiologist clinical
-annotations; model-inferred DBT depth is explicitly flagged. Source DICOM
+cross-image ROI grouping is asserted. Coordinates use inclusive DICOM
+pixel-array `[y_min, x_min, y_max, x_max]` bounds. Curated coordinates are
+expected within the image, while residual out-of-bounds values may be safely
+clipped. Radiologist annotations come through multiple workflows, including
+annotation DICOM objects without pixel arrays and ROI_SS/ROI_SSC screen
+captures; model-inferred DBT depth is explicitly flagged. Source DICOM
 modality, the source DICOM image-type attribute, the pipeline-derived
 mammographic image-type classification, view position, and image laterality
 stay separate mappings.

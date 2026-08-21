@@ -44,7 +44,11 @@ This setup and the baseline test suite need no EMBED data. Read
   the cross-table exam-to-image route, and serialized regions of interest. The
   clinical surface is internal V2 while the paired image metadata is internal
   V1c, covers every EMBEDv1 exam and patient, and is narrower than clinical V2.
-  ROI coordinates use DICOM pixel-array `[y_min, x_min, y_max, x_max]` order;
+  ROI coordinates use inclusive DICOM pixel-array
+  `[y_min, x_min, y_max, x_max]` bounds. Curated coordinates are expected in
+  bounds, while residual out-of-bounds values may be safely clipped. ROI
+  provenance spans multiple annotation workflows rather than only
+  ROI_SS/ROI_SSC screen captures;
   stable per-region identity and cross-image correspondence are not represented.
   Patient and exam identifiers share their cross-table namespaces;
   each accession belongs to exactly one patient, and a cross-patient

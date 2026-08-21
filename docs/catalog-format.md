@@ -112,10 +112,12 @@ no embedded column schema, its recorded physical types are assessed parse types
 and every column is conservatively nullable; unresolved and technical columns
 stay inventoried without mappings. Region-of-interest information is a
 serialized per-image collection, so no ROI row grain or ROI identifier is
-declared; ROI coordinates use `[y_min, x_min, y_max, x_max]` DICOM pixel-array
-space and have routine-clinical radiologist provenance, while cross-image ROI
-grouping remains absent. The paired image metadata is internal V1c while the
-clinical surface is internal V2, so the
+declared; ROI coordinates use inclusive `[y_min, x_min, y_max, x_max]` DICOM
+pixel-array bounds. Curated coordinates are expected in bounds, residual
+out-of-bounds values may be safely clipped, and radiologist provenance spans
+multiple annotation workflows rather than only ROI_SS/ROI_SSC screen captures.
+Cross-image ROI grouping remains absent. The paired image metadata is internal
+V1c while the clinical surface is internal V2, so the
 exam-to-image binding records incomplete coverage and states that an unmatched
 clinical exam is not an exam without images. The accession remains one distinct
 exam identifier in the shared cross-table namespace, belongs to exactly one

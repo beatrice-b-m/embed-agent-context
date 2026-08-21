@@ -34,6 +34,10 @@ versioned in lockstep with the core distribution.
   metadata is the most recent internal V1c artifact, covers every EMBEDv1 exam
   and patient, and is narrower than clinical V2, so an unmatched later clinical
   exam means missing extraction coverage rather than missing images. The
+  ROI collections use inclusive `[y_min, x_min, y_max, x_max]` target-image
+  pixel bounds, normally curated in bounds with safe downstream clipping for
+  residual out-of-bounds values, and originate through multiple clinical
+  annotation workflows rather than only ROI_SS/ROI_SSC screen captures. The
   patient and exam identifiers share their cross-table namespaces, every
   accession belongs to exactly one patient, and any cross-patient association
   is a data-quality error. The anonymized DICOM locator is intended for every

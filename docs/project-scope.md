@@ -122,12 +122,15 @@ projections, and a cross-table accession route for the exam-to-image
 relationship. Each ROI still has exactly one required source image; the ROI
 physical representation is a serialized per-image collection with positionally
 aligned count, coordinate, frame-index, and depth-derivation fields, so the
-table is not one row per ROI and carries no ROI identifier. ROI coordinate axis
-order is `[y_min, x_min, y_max, x_max]` in the attached DICOM pixel-array
-space; annotations originate from radiologists during routine clinical care,
-and `ROI_depth_derived` marks model-inferred DBT frame depth. Stable per-region
-identity and cross-image ROI correspondence are not represented. `acc_anon`
-remains one distinct exam
+table is not one row per ROI and carries no ROI identifier. ROI coordinates use
+inclusive `[y_min, x_min, y_max, x_max]` bounds in the attached DICOM
+pixel-array space. Curated coordinates are expected within the image bounds;
+residual out-of-bounds coordinates may be safely clipped. Annotations originate
+from radiologists during routine clinical care through multiple workflows,
+including annotation DICOM objects without pixel arrays and ROI_SS/ROI_SSC
+screen captures, and `ROI_depth_derived` marks model-inferred DBT frame depth.
+Stable per-region identity and cross-image ROI correspondence are not
+represented. `acc_anon` remains one distinct exam
 identifier across EMBED, uses the same namespace in both tables, and belongs to
 exactly one `empi_anon`; a cross-patient association is an invalid data-quality
 error and must not be retained as a valid link. The anonymized DICOM path is

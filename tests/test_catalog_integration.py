@@ -484,6 +484,36 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertEqual(statuses["ROI_frames"], "derived")
         self.assertEqual(statuses["ROI_depth_derived"], "derived")
         roi_context = internal.contexts["internal-v2.roi-context"]
+        coordinate_geometry = next(
+            claim
+            for claim in roi_context.claims
+            if claim.id == "roi-coordinate-geometry"
+        )
+        self.assertIn(
+            "both minimum and maximum bounds inclusive",
+            coordinate_geometry.statement,
+        )
+        self.assertIn(
+            "image[100:151, 200:251]", " ".join(coordinate_geometry.caveats)
+        )
+        roi_coordinates = internal.concepts[
+            "internal-v2.roi.coordinate_collection"
+        ]
+        self.assertIn(
+            "inclusive minimum and maximum", roi_coordinates.definition
+        )
+        provenance = next(
+            claim
+            for claim in roi_context.claims
+            if claim.id == "roi-identity-and-provenance"
+        )
+        self.assertIn(
+            "annotation dicom objects without pixel arrays",
+            " ".join(provenance.caveats).lower(),
+        )
+        self.assertIn(
+            "not the exclusive source", " ".join(provenance.caveats)
+        )
         finding_attribution = next(
             claim
             for claim in roi_context.claims
@@ -495,6 +525,11 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
             "internal-v2.guardrail.roi-finding-attribution-is-conditional",
             internal.guardrails,
         )
+        coordinate_guardrail = internal.guardrails[
+            "internal-v2.guardrail.roi-coordinate-bounds"
+        ]
+        self.assertIn("expected to lie within", coordinate_guardrail.statement)
+        self.assertIn("safely clipped", coordinate_guardrail.statement)
         roi_route = next(
             item
             for item in binding.relationship_bindings
