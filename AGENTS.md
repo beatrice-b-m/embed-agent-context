@@ -38,6 +38,9 @@ versioned in lockstep with the core distribution.
   pixel bounds, normally curated in bounds with safe downstream clipping for
   residual out-of-bounds values, and originate through multiple clinical
   annotation workflows rather than only ROI_SS/ROI_SSC screen captures. The
+  `ImagesInAcquisition` column is informative for DBT images and represents
+  the number of frames or z-slices in the image, not the number of distinct
+  image instances in an acquisition group. The
   patient and exam identifiers share their cross-table namespaces, every
   accession belongs to exactly one patient, and any cross-patient association
   is a data-quality error. The anonymized DICOM locator is intended for every

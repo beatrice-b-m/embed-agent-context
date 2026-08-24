@@ -412,6 +412,31 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
         self.assertIn(
             "ContentTime cast as an integer", acquisition_group.definition
         )
+        dbt_frame_count = internal.concepts[
+            "internal-v2.image.dbt_frame_count"
+        ]
+        self.assertIn("frames or z-slices", dbt_frame_count.definition)
+        self.assertIn(
+            "does not count distinct image instances",
+            " ".join(dbt_frame_count.caveats),
+        )
+        self.assertNotIn(
+            "internal-v2.image.images_in_acquisition", internal.concepts
+        )
+        self.assertEqual(
+            concepts_by_column["ImagesInAcquisition"],
+            "internal-v2.image.dbt_frame_count",
+        )
+        metadata_context = internal.contexts[
+            "internal-v2.v1c-metadata-context"
+        ]
+        dbt_frame_claim = next(
+            claim
+            for claim in metadata_context.claims
+            if claim.id == "dbt-frame-count-semantics"
+        )
+        self.assertIn("rather than", dbt_frame_claim.statement)
+        self.assertIn("acquisition group", dbt_frame_claim.statement)
         modality_codes = dict(
             internal.vocabularies[
                 "internal-v2.vocabulary.image.source_modality"

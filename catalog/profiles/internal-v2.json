@@ -278,7 +278,7 @@
       "scope": "profile_specific",
       "locator_kind": "logical_artifact",
       "locator": "maintainer-confirmed:internal-v1c-image-metadata-identity-and-availability",
-      "version_scope": "Internal EMBED V1c extraction coverage, patient, accession, and image identity, anonymization, legacy image fields, acquisition grouping, reliable final laterality, DICOM interpretation, and locator expectations within the internal-v2 working profile.",
+      "version_scope": "Internal EMBED V1c extraction coverage, patient, accession, and image identity, anonymization, legacy image fields, acquisition grouping, DBT frame-count interpretation, reliable final laterality, DICOM interpretation, and locator expectations within the internal-v2 working profile.",
       "profiles": [
         "internal-v2"
       ],
@@ -292,6 +292,7 @@
         "The anonymized SOP Instance UID is durable within one dataset version and is present in the source DICOM and as the anon_dicom_path filename without the .dcm suffix.",
         "PNG locators are legacy EMBEDv1 FFDM conversion outputs and should not be used for current or future work; the DICOM files are the maintained image representation.",
         "acquisition_group_id is constructed as acc_anon, normalized ProtocolName, and integer ContentTime; it is stable across reruns and globally unique for simultaneous acquisition groups.",
+        "ImagesInAcquisition is informative for DBT images and represents the number of frames or z-slices in the image, not the number of image instances in an acquisition group.",
         "ImageLateralityFinal is the reliable image breast-laterality attribute even though its derivation rule and LateralityDeriveFlag meanings remain unresolved.",
         "PatientAge is top-coded to 89, PatientSex is unchanged, and sensitive non-identifier/non-date attributes were dropped during anonymization.",
         "No DICOM processing other than anonymization and sensitive-information redaction was applied."
@@ -380,7 +381,7 @@
           ],
           "caveats": [
             "Frame-index values represented on 2D or synthetic 2D rows are not informative.",
-            "A DBT ROI may match one or several frames, and no inventoried column states the frame-count upper bound.",
+            "A DBT ROI may match one or several frames; when ImagesInAcquisition is represented, each zero-based frame index should be less than that DBT frame count.",
             "ROI_depth_derived describes inferred depth only; the radiologist-origin x/y annotation remains a clinical artifact."
           ]
         },
@@ -1242,6 +1243,18 @@
           "caveats": [
             "Standard element semantics do not establish internal value validity or pixel-data verification.",
             "PatientAge is top-coded to 89, PatientSex is unchanged, anonymized dates use the confirmed patient-specific shift, and sensitive non-identifier/non-date attributes were dropped."
+          ]
+        },
+        {
+          "id": "dbt-frame-count-semantics",
+          "statement": "For DBT image rows, ImagesInAcquisition represents the number of frames or z-slices in the image rather than the number of distinct image instances in an acquisition group.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.v1c-metadata-maintainer-clarifications"
+          ],
+          "caveats": [
+            "The value is informative only for DBT images and is not represented on every row.",
+            "For a represented DBT frame count, valid zero-based ROI frame indices are less than the count."
           ]
         },
         {
@@ -6269,10 +6282,10 @@
         "status": "direct"
       },
       {
-        "id": "internal-v2.binding.feature.internal-v2.image.images_in_acquisition.metadata-v1c.imagesinacquisition",
+        "id": "internal-v2.binding.feature.internal-v2.image.dbt_frame_count.metadata-v1c.imagesinacquisition",
         "table": "metadata_all_cohorts_v1c",
         "column": "ImagesInAcquisition",
-        "concept": "internal-v2.image.images_in_acquisition",
+        "concept": "internal-v2.image.dbt_frame_count",
         "status": "direct"
       },
       {
@@ -6469,7 +6482,7 @@
             ],
             "caveats": [
               "Values represented for 2D and synthetic 2D images are not informative.",
-              "No inventoried column states a frame count, so no upper bound is established."
+              "When ImagesInAcquisition is represented for the DBT row, each zero-based frame index should be less than that frame count."
             ]
           },
           {
@@ -11847,36 +11860,43 @@
         "temporal_semantics": [],
         "aggregations": []
       },
-      "internal-v2.image.images_in_acquisition": {
+      "internal-v2.image.dbt_frame_count": {
         "availability": {
           "scope": "profiles",
           "profiles": [
             "internal-v2"
           ]
         },
-        "label": "Images in acquisition",
-        "definition": "Represented source DICOM count of images belonging to the acquisition that produced an internal V1c image row.",
+        "label": "DBT frame count",
+        "definition": "Number of frames or z-slices in an internal V1c DBT image, represented by the source DICOM ImagesInAcquisition element.",
         "feature_kind": "numeric",
         "domains": [
           "imaging",
           "technical"
         ],
         "search_terms": [
+          "DBT frame count",
+          "tomosynthesis frame count",
+          "z-slice count",
+          "number of frames",
+          "ImagesInAcquisition",
           "images in acquisition",
           "acquisition size"
         ],
         "caveats": [
-          "This is not a multiframe frame count; no inventoried column states a frame count, so it bounds no region-of-interest frame index.",
+          "This does not count distinct image instances in an acquisition group.",
+          "It is informative only for DBT images; values on other image types should not be interpreted as frame counts.",
+          "For a represented DBT frame count, valid zero-based ROI frame indices are less than the count.",
           "It is not represented on every row."
         ],
         "evidence": [
-          "observed_source_values"
+          "maintainer_confirmed"
         ],
         "objects": [
           "image"
         ],
         "claim_refs": [
-          "internal-v2.v1c-metadata-context#parsed-dicom-element-semantics"
+          "internal-v2.v1c-metadata-context#dbt-frame-count-semantics"
         ],
         "missing_states": [],
         "temporal_semantics": [],
@@ -12498,7 +12518,7 @@
         "caveats": [
           "Frame indices are informative only for DBT images; represented values on 2D or synthetic 2D images are not informative.",
           "Aligned by position with the coordinate collection; a region's frame list may hold one or several indices.",
-          "No inventoried column states a frame count, so no upper bound is established."
+          "When ImagesInAcquisition is represented for the DBT row, each zero-based frame index should be less than that frame count."
         ],
         "evidence": [
           "maintainer_confirmed",

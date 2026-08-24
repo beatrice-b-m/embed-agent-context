@@ -116,6 +116,9 @@ declared; ROI coordinates use inclusive `[y_min, x_min, y_max, x_max]` DICOM
 pixel-array bounds. Curated coordinates are expected in bounds, residual
 out-of-bounds values may be safely clipped, and radiologist provenance spans
 multiple annotation workflows rather than only ROI_SS/ROI_SSC screen captures.
+For DBT rows, the physical `ImagesInAcquisition` column maps to the
+`internal-v2.image.dbt_frame_count` concept: it describes frames or z-slices
+within the image, not distinct image instances in an acquisition group.
 Cross-image ROI grouping remains absent. The paired image metadata is internal
 V1c while the clinical surface is internal V2, so the
 exam-to-image binding records incomplete coverage and states that an unmatched

@@ -129,6 +129,9 @@ residual out-of-bounds coordinates may be safely clipped. Annotations originate
 from radiologists during routine clinical care through multiple workflows,
 including annotation DICOM objects without pixel arrays and ROI_SS/ROI_SSC
 screen captures, and `ROI_depth_derived` marks model-inferred DBT frame depth.
+For DBT images, `ImagesInAcquisition` represents the number of frames or
+z-slices in the image, not the number of distinct image instances in an
+acquisition group; when represented, it bounds zero-based ROI frame indices.
 Stable per-region identity and cross-image ROI correspondence are not
 represented. `acc_anon` remains one distinct exam
 identifier across EMBED, uses the same namespace in both tables, and belongs to

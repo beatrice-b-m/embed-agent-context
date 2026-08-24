@@ -67,6 +67,10 @@ expected within the image, while residual out-of-bounds values may be safely
 clipped. Radiologist annotations come through multiple workflows, including
 annotation DICOM objects without pixel arrays and ROI_SS/ROI_SSC screen
 captures; model-inferred DBT depth is explicitly flagged. Source DICOM
+`ImagesInAcquisition` is interpreted for DBT images as the number of frames or
+z-slices within the image, rather than the number of distinct image instances
+in an acquisition group, and can bound the zero-based ROI frame indices. The
+source DICOM
 modality, the source DICOM image-type attribute, the pipeline-derived
 mammographic image-type classification, view position, and image laterality
 stay separate mappings.
