@@ -566,7 +566,7 @@ class CatalogCLITests(unittest.TestCase):
         )
         self.assertIn("embed-context --format json feature", help_text)
         self.assertIn(
-            "https://github.com/beatrice-b-m/embedv2-agent-context",
+            "https://github.com/beatrice-b-m/embed-agent-context",
             help_text,
         )
         self.assertIn("schema-v8 catalog-set manifest", help_text)

@@ -43,7 +43,7 @@ the lightweight catalog, Python API, and CLI directly from GitHub:
 
 ```bash
 uv tool install \
-  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embed-agent-context.git'
 ```
 
 Add only the optional interfaces you need:
@@ -51,19 +51,19 @@ Add only the optional interfaces you need:
 ```bash
 # Read-only stdio MCP server.
 uv tool install \
-  'embedv2-agent-context[mcp] @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
+  'embedv2-agent-context[mcp] @ git+https://github.com/beatrice-b-m/embed-agent-context.git'
 
 # Local catalog curation web viewer.
 uv tool install \
   --with \
-  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git#subdirectory=packages/curator' \
-  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
+  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embed-agent-context.git#subdirectory=packages/curator' \
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embed-agent-context.git'
 
 # Both optional interfaces.
 uv tool install \
   --with \
-  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git#subdirectory=packages/curator' \
-  'embedv2-agent-context[mcp] @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git'
+  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embed-agent-context.git#subdirectory=packages/curator' \
+  'embedv2-agent-context[mcp] @ git+https://github.com/beatrice-b-m/embed-agent-context.git'
 ```
 
 These commands create an isolated environment and install commands into uv's
@@ -97,7 +97,7 @@ commit:
 
 ```bash
 uv tool install \
-  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git@REV'
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embed-agent-context.git@REV'
 ```
 
 Add `[mcp]` after `embedv2-agent-context` when needed. A curator installation
@@ -106,8 +106,8 @@ must install both projects from the same revision:
 ```bash
 uv tool install \
   --with \
-  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git@REV#subdirectory=packages/curator' \
-  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embedv2-agent-context.git@REV'
+  'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/embed-agent-context.git@REV#subdirectory=packages/curator' \
+  'embedv2-agent-context @ git+https://github.com/beatrice-b-m/embed-agent-context.git@REV'
 ```
 
 Add the root package's `mcp` extra to the final argument when both optional
@@ -241,6 +241,19 @@ The optional `embed-context-mcp` command exposes the catalog as thirteen
 read-only MCP tools. The client starts the command itself and communicates over
 standard input/output; you do not run the server in a separate terminal.
 
+Installing the MCP extra does not select a dataset profile. Profile selection
+happens when the server starts:
+
+- with no composition arguments, the bundled default catalog set loads only
+  `open-v2`;
+- `internal-v2` must be loaded explicitly; and
+- adding `--profile-file` without `--no-default-profiles` loads that profile
+  alongside the default `open-v2` profile rather than replacing it.
+
+The `profile` argument on individual MCP query tools filters contributions from
+an already loaded profile. It does not load a profile that was omitted at
+server startup.
+
 Confirm that the command is visible in the environment where your client
 starts:
 
@@ -251,17 +264,65 @@ embed-context-mcp --version
 
 ### Codex
 
+Register the default `open-v2` server:
+
 ```bash
-codex mcp add embed_context -- embed-context-mcp
+codex mcp add embed_context_open -- embed-context-mcp
 codex mcp list
 ```
 
 Equivalent configuration:
 
 ```toml
-[mcp_servers.embed_context]
+[mcp_servers.embed_context_open]
 command = "embed-context-mcp"
 ```
+
+The uv tool environment also contains the non-default `internal-v2` catalog
+set. Resolve its installed absolute path once, validate it, and pass it to a
+separately named Codex MCP server:
+
+```bash
+INTERNAL_CATALOG=$(find "$(uv tool dir)/embedv2-agent-context/lib" \
+  -path '*/site-packages/embed_context/_data/internal-v2-catalog-set.json' \
+  -print -quit)
+
+embed-context --catalog "$INTERNAL_CATALOG" validate
+
+codex mcp add embed_context_internal -- \
+  embed-context-mcp --catalog "$INTERNAL_CATALOG"
+codex mcp list
+```
+
+The validation output should report `profiles: internal-v2`. The environment
+directory retains the distribution name `embedv2-agent-context`; that package
+name is independent of the repository name. Re-resolve the path if the uv tool
+is removed and reinstalled into a different tool directory.
+
+Equivalent configuration, after replacing the placeholder with the absolute
+path printed by `printf '%s\n' "$INTERNAL_CATALOG"`:
+
+```toml
+[mcp_servers.embed_context_internal]
+command = "embed-context-mcp"
+args = [
+  "--catalog",
+  "/absolute/path/to/internal-v2-catalog-set.json",
+]
+```
+
+From a retained repository checkout, the source-tree manifest is an equivalent
+and simpler stable path:
+
+```bash
+codex mcp add embed_context_internal -- \
+  embed-context-mcp \
+  --catalog /absolute/path/to/embed-agent-context/catalog/internal-v2-catalog-set.json
+```
+
+You may register `embed_context_open` and `embed_context_internal` at the same
+time. To replace an existing registration instead, remove or edit that MCP
+server and add it again with the desired startup arguments.
 
 ### Claude Code
 

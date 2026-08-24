@@ -39,7 +39,7 @@ MCP_INSTALL_HINT = (
     "Install the complete tool from GitHub with "
     "`uv tool install --reinstall "
     "'embedv2-agent-context[mcp] @ "
-    "git+https://github.com/beatrice-b-m/embedv2-agent-context.git'`; "
+    "git+https://github.com/beatrice-b-m/embed-agent-context.git'`; "
     "from a project checkout, run "
     "`uv tool install --reinstall '.[mcp]'`; or install `mcp==2.0.0` "
     "in the current environment."

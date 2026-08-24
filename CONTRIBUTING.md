@@ -10,8 +10,8 @@ schemas and mappings.
 You need uv and Python 3.11, 3.12, or 3.13:
 
 ```bash
-git clone https://github.com/beatrice-b-m/embedv2-agent-context.git
-cd embedv2-agent-context
+git clone https://github.com/beatrice-b-m/embed-agent-context.git
+cd embed-agent-context
 uv sync --locked --all-extras
 uv run --locked embed-context validate
 ```

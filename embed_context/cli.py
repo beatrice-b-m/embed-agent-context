@@ -26,9 +26,9 @@ CURATOR_INSTALL_HINT = (
     "`uv tool install --reinstall '.[curator]'`; or install matching Git "
     "revisions with `uv tool install --reinstall --with "
     "'embedv2-agent-context-curator @ git+https://github.com/beatrice-b-m/"
-    "embedv2-agent-context.git@REV#subdirectory=packages/curator' "
+    "embed-agent-context.git@REV#subdirectory=packages/curator' "
     "'embedv2-agent-context @ git+https://github.com/beatrice-b-m/"
-    "embedv2-agent-context.git@REV'`."
+    "embed-agent-context.git@REV'`."
 )
 
 
@@ -65,7 +65,7 @@ def build_parser(
             "  embed-context --format json feature pathology.severity\n"
             "\n"
             "documentation: "
-            "https://github.com/beatrice-b-m/embedv2-agent-context"
+            "https://github.com/beatrice-b-m/embed-agent-context"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

@@ -2,7 +2,7 @@
 
 This companion distribution supplies the optional loopback-only catalog
 curation viewer for
-[EMBED Agent Context](https://github.com/beatrice-b-m/embedv2-agent-context).
+[EMBED Agent Context](https://github.com/beatrice-b-m/embed-agent-context).
 It is versioned in lockstep with the core distribution and is normally
 installed through the core package's `curator` extra:
 

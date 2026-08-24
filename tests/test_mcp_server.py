@@ -273,7 +273,7 @@ class MissingMCPDependencyTests(unittest.TestCase):
         self.assertIn("mcp==2.0.0", MCP_INSTALL_HINT)
         self.assertIn(
             "git+https://github.com/beatrice-b-m/"
-            "embedv2-agent-context.git",
+            "embed-agent-context.git",
             MCP_INSTALL_HINT,
         )
 
