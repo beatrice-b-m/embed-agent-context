@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SEMANTIC_PATH = ROOT / "catalog" / "semantic" / "catalog.json"
 SEMANTIC_SCHEMA_PATH = ROOT / "catalog" / "semantic" / "catalog.schema.json"
 PROFILE_PATH = ROOT / "catalog" / "profiles" / "open-v2.json"
+INTERNAL_PROFILE_PATH = ROOT / "catalog" / "profiles" / "internal-v2.json"
 PROFILE_SCHEMA_PATH = ROOT / "catalog" / "profiles" / "profile.schema.json"
 
 
@@ -30,6 +31,7 @@ class CatalogSchemaContractTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.semantic = read_json(SEMANTIC_PATH)
         cls.profile = read_json(PROFILE_PATH)
+        cls.internal_profile = read_json(INTERNAL_PROFILE_PATH)
         cls.semantic_schema = read_json(SEMANTIC_SCHEMA_PATH)
         cls.profile_schema = read_json(PROFILE_SCHEMA_PATH)
         Draft202012Validator.check_schema(cls.semantic_schema)
@@ -40,6 +42,7 @@ class CatalogSchemaContractTests(unittest.TestCase):
     def test_canonical_modules_validate(self) -> None:
         self.semantic_validator.validate(self.semantic)
         self.profile_validator.validate(self.profile)
+        self.profile_validator.validate(self.internal_profile)
 
     def test_nonblank_semantic_strings_reject_surrounding_whitespace(self) -> None:
         for value in (" Leading", "Trailing ", "Trailing\n"):

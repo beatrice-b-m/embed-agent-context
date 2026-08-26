@@ -27,7 +27,12 @@ versioned in lockstep with the core distribution.
 - `catalog/profiles/internal-v2.json` is the non-default working internal
   profile. It covers the wide MagView clinical table; its procedure-level
   representation is supported and its specimen-level reliability and identity
-  remain unresolved. It also covers the internal V1c image-metadata table with
+  remain unresolved. It contributes semantic-only `HormoneHist` and `ProcHist`
+  patient-history meaning, including category-dependent codes and partial
+  exposure timing; history accessions are recording context, historical results
+  are not verified current pathology, and the tables remain physically unbound
+  until complete schemas are available. It also covers the internal V1c
+  image-metadata table with
   image, co-located patient/exam/side,
   DICOM-attribute, modality, enrichment, and serialized region-of-interest
   representations. The clinical surface is internal V2 while the paired image

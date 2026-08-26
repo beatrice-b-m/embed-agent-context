@@ -92,7 +92,7 @@ When omitted, semantic-catalog records default to portable availability and a
 profile or extension contribution defaults to its target profile. Runtime
 validation checks availability against loaded profiles and provenance scope.
 
-The `internal-v2` profile demonstrates this mechanism in two independent ways.
+The `internal-v2` profile demonstrates this mechanism in three independent ways.
 Its MagView binding maps the wide `magview_all_cohorts_PACS_v2_anon` clinical
 table to shared and profile-owned clinical semantics, including an internal
 putative pathology-specimen object whose reliability and identity remain
@@ -101,6 +101,17 @@ accessions, accession-plus-finding-number identity, date-shift and event-time
 meaning, supported procedure representation, categorical normalization,
 invalid pathology-severity value `6`, and a technical cancer-registry
 reference.
+
+Its semantic-only patient-history contribution models `HormoneHist` and
+`ProcHist` as reported history owned by the longitudinal patient and optionally
+associated with an imaging-accession recording context. Category-specific
+vocabularies keep reused tokens such as `C` unambiguous, partial age/month/year
+fields retain reported exposure-start and exposure-end meaning, and guardrails
+prevent historical entries or results from being treated as current procedures,
+finding attribution, or verified pathology. Coverage explicitly records that
+physical bindings, row identity, deduplication, exact recording time, and
+historical procedure event time are unavailable; neither table is invented from
+the semantic scaffold.
 
 Its image-metadata binding adds the `metadata_all_cohorts_v1c` table at
 one row per extracted DICOM image instance. That table carries the `image`

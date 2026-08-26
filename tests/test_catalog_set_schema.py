@@ -221,14 +221,13 @@ class CatalogSetSchemaTests(unittest.TestCase):
             "coverage.internal-v2.roi-physical-binding"
         ]
         self.assertEqual(roi_coverage["status"], "supported")
-        self.assertNotIn(
-            "not_cataloged",
-            {
-                record["status"]
-                for record in internal_profile["contributions"][
-                    "coverage"
-                ].values()
-            },
+        history_binding_coverage = internal_profile["contributions"][
+            "coverage"
+        ]["coverage.internal-v2.patient-history-physical-binding"]
+        self.assertEqual(history_binding_coverage["status"], "not_cataloged")
+        self.assertIn(
+            "complete column inventories, physical types, and schema nullability",
+            history_binding_coverage["summary"],
         )
         self.assertIn(
             "6",

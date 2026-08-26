@@ -224,6 +224,227 @@ class ClinicalSemanticCatalogAcceptanceTests(unittest.TestCase):
                     endpoints,
                 )
 
+    def test_internal_v2_models_reported_patient_history_without_binding_it(
+        self,
+    ) -> None:
+        internal = load_catalog(INTERNAL_MANIFEST_PATH)
+        history_objects = {
+            "internal-v2.hormone_history_entry",
+            "internal-v2.procedure_history_entry",
+        }
+        self.assertTrue(history_objects.isdisjoint(self.catalog.clinical_objects))
+        self.assertLessEqual(history_objects, set(internal.clinical_objects))
+
+        binding = internal.profile_bindings["internal-v2"]
+        self.assertEqual(
+            {table.table for table in binding.tables},
+            {"magview_all_cohorts_PACS_v2_anon", "metadata_all_cohorts_v1c"},
+        )
+        self.assertTrue(
+            history_objects.isdisjoint(
+                item.object for item in binding.object_bindings
+            )
+        )
+
+        hormone_codes = dict(
+            internal.vocabularies[
+                "internal-v2.vocabulary.hormone_history.hormone"
+            ].codes
+        )
+        contraceptive_codes = dict(
+            internal.vocabularies[
+                "internal-v2.vocabulary.hormone_history.contraceptive"
+            ].codes
+        )
+        self.assertEqual(
+            hormone_codes["C"],
+            "Estrogen and progesterone; combined hormone-replacement therapy",
+        )
+        self.assertEqual(
+            contraceptive_codes["C"], "Combined oral contraceptive"
+        )
+        expected_codes = {
+            "internal-v2.vocabulary.hormone_history.exposure_category": {
+                "H": "Hormone",
+                "T": "Therapy",
+                "O": "Contraceptive",
+            },
+            "internal-v2.vocabulary.hormone_history.hormone": {
+                "C": "Estrogen and progesterone; combined hormone-replacement therapy",
+                "ESTRO": "Estrogen",
+                "PH": "Premphase",
+                "PP": "Prempro",
+                "PROGES": "Progesterone",
+                "R": "Premarin",
+                "RA": "Raloxifene",
+                "TAMOX": "Tamoxifen",
+                "V": "Provera",
+                "O": "Other hormone",
+            },
+            "internal-v2.vocabulary.hormone_history.therapy": {
+                "CH": "Chemotherapy",
+                "ET": "Endocrine therapy",
+                "H": "Hormonal therapy",
+                "RT": "Radiation therapy",
+                "RTC": "Radiation therapy and chemotherapy",
+                "RTH": "Radiation therapy and hormone therapy",
+                "TAXOL": "Taxol",
+                "XRT": "XRT/radiation therapy",
+                "O": "Other therapy",
+            },
+            "internal-v2.vocabulary.hormone_history.contraceptive": {
+                "C": "Combined oral contraceptive",
+                "ORAL": "Oral contraceptive",
+                "O": "Other contraceptive",
+            },
+            "internal-v2.vocabulary.procedure_history.procedure_category": {
+                "G": "Gynecological procedure",
+                "B": "Breast procedure",
+            },
+            "internal-v2.vocabulary.procedure_history.gynecological_procedure": {
+                "HYST": "Hysterectomy",
+                "H": "Partial hysterectomy",
+                "O": "One ovary removed",
+                "OS": "Ovaries removed",
+            },
+            "internal-v2.vocabulary.procedure_history.breast_procedure": {
+                "1": "Core biopsy",
+                "SB": "Stereotactic core biopsy",
+                "UCB": "Ultrasound-guided core biopsy",
+                "B": "MRI-guided core biopsy",
+                "E": "Excisional biopsy",
+                "NB": "Needle biopsy",
+                "CA": "Cyst aspiration",
+                "FNA": "Fine-needle aspiration",
+                "L": "Lumpectomy",
+                "M": "Mastectomy",
+                "D": "Breast reduction",
+                "MP": "Mammoplasty",
+                "R": "Reconstruction",
+                "EXI": "Implants removed",
+                "NO": "Non-oncologic procedure",
+            },
+            "internal-v2.vocabulary.procedure_history.result": {
+                "ADH": "Atypical ductal hyperplasia",
+                "ALH": "Atypical lobular hyperplasia",
+                "BEN": "Benign",
+                "BOT": "Invasive ductal carcinoma and ductal carcinoma in situ",
+                "DE": "Duct ectasia",
+                "DS": "Ductal carcinoma in situ",
+                "FA": "Fibroadenoma",
+                "FN": "Fat necrosis",
+                "ID": "Invasive ductal carcinoma",
+                "IF": "Chronic inflammatory changes",
+                "IL": "Invasive lobular carcinoma",
+                "LS": "Lobular carcinoma in situ",
+                "LY": "Lymphoma",
+                "MAL": "Malignant",
+                "PA": "Papilloma",
+                "SA": "Sclerosing adenosis",
+                "SF": "Stromal fibrosis",
+                "NONE": "No reported result",
+            },
+            "internal-v2.vocabulary.procedure_history.breast_side": {
+                "L": "Left",
+                "R": "Right",
+                "B": "Bilateral",
+            },
+        }
+        for identifier, expected in expected_codes.items():
+            with self.subTest(authoritative_vocabulary=identifier):
+                self.assertEqual(
+                    dict(internal.vocabularies[identifier].codes), expected
+                )
+        for identifier in (
+            "internal-v2.vocabulary.hormone_history.hormone",
+            "internal-v2.vocabulary.hormone_history.therapy",
+            "internal-v2.vocabulary.hormone_history.contraceptive",
+            "internal-v2.vocabulary.procedure_history.gynecological_procedure",
+            "internal-v2.vocabulary.procedure_history.breast_procedure",
+            "internal-v2.vocabulary.procedure_history.result",
+        ):
+            with self.subTest(vocabulary=identifier):
+                self.assertEqual(
+                    internal.vocabularies[identifier].completeness, "unknown"
+                )
+
+        self.assertIn(
+            "internal-v2.time.reported-exposure-start",
+            internal.temporal_semantics,
+        )
+        self.assertIn(
+            "internal-v2.time.reported-exposure-end",
+            internal.temporal_semantics,
+        )
+        self.assertEqual(
+            internal.coverage[
+                "coverage.internal-v2.patient-history-physical-binding"
+            ].status,
+            "not_cataloged",
+        )
+        self.assertEqual(
+            internal.coverage[
+                "coverage.internal-v2.patient-history-row-identity"
+            ].status,
+            "unresolved",
+        )
+        self.assertEqual(
+            internal.coverage[
+                "coverage.internal-v2.historical-procedure-event-time"
+            ].status,
+            "unsupported",
+        )
+        self.assertIn(
+            "internal-v2.guardrail.patient-history-is-not-verified-current-care",
+            internal.guardrails,
+        )
+        self.assertEqual(
+            {
+                relationship.source_object
+                for relationship in internal.semantic_relationships.values()
+                if relationship.target_object
+                in {
+                    "internal-v2.hormone_history_entry",
+                    "internal-v2.procedure_history_entry",
+                }
+            },
+            {"patient", "imaging_exam"},
+        )
+
+        discovery_cases = (
+            (
+                "tamoxifen and raloxifene hormone therapy history",
+                "internal-v2.hormone_history.hormone_code",
+            ),
+            (
+                "oral contraceptive exposure history",
+                "internal-v2.hormone_history.contraceptive_code",
+            ),
+            (
+                "prior hysterectomy or oophorectomy",
+                "internal-v2.procedure_history.gynecological_procedure_code",
+            ),
+            (
+                "prior breast core biopsy lumpectomy mastectomy",
+                "internal-v2.procedure_history.breast_procedure_code",
+            ),
+            (
+                "historical procedure result not verified pathology",
+                "internal-v2.guardrail.patient-history-is-not-verified-current-care",
+            ),
+        )
+        for query, expected in discovery_cases:
+            with self.subTest(query=query):
+                result = internal.discover(
+                    query,
+                    profile="internal-v2",
+                    limit=30,
+                )
+                self.assertIn(
+                    expected,
+                    {item["identifier"] for item in result["matches"]},
+                )
+
     def test_internal_v2_binds_v1c_image_metadata_and_roi_collections(
         self,
     ) -> None:

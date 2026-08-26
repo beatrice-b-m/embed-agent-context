@@ -41,6 +41,13 @@ image-derived side, DICOM-attribute, modality, enrichment, and serialized
 region-of-interest representations; the clinical surface is internal V2 while
 the paired image metadata is the most recent internal V1c artifact, covers
 every EMBEDv1 exam and patient, and is narrower than clinical V2.
+The profile additionally contributes semantic-only `HormoneHist` and
+`ProcHist` patient-history objects, category-dependent vocabularies, partial
+exposure-time meanings, relationships, guardrails, and coverage. A valid
+history accession is recording context rather than historical event time, and
+reported procedure results are not verified current pathology. Those tables
+remain outside the physical binding because complete schemas, types, and
+nullability are unavailable.
 `catalog/catalog-set.json` selects bundled defaults.
 Together they must
 remain:

@@ -297,6 +297,23 @@
         "PatientAge is top-coded to 89, PatientSex is unchanged, and sensitive non-identifier/non-date attributes were dropped during anonymization.",
         "No DICOM processing other than anonymization and sensitive-information redaction was applied."
       ]
+    },
+    "internal-v2.patient-history-maintainer-confirmation": {
+      "title": "Internal V2 patient-history maintainer confirmation",
+      "kind": "maintainer_confirmed",
+      "scope": "profile_specific",
+      "locator_kind": "logical_artifact",
+      "locator": "maintainer-confirmed:internal-v2-patient-history",
+      "version_scope": "Internal V2 HormoneHist and ProcHist clinical meaning, controlled code meanings, patient and recording-accession context, and interpretation boundaries.",
+      "profiles": [
+        "internal-v2"
+      ],
+      "notes": [
+        "Confirms the listed HormoneHist exposure-category, hormone, therapy, and contraceptive code meanings and the listed ProcHist procedure-category, procedure, result, and laterality code meanings.",
+        "Confirms that empi_anon uses the established longitudinal patient namespace and that a valid acc_anon uses the established imaging-accession namespace as the history record's context, not as the accession or time when the historical exposure or procedure occurred.",
+        "Confirms that these are reported or previously documented history records rather than current-exam procedures, verified procedure-associated pathology, or finding-level attribution.",
+        "Does not establish exhaustive represented vocabularies, physical schemas, row identity, a deduplication rule, the duration unit, timing-field precedence, result provenance, or acc_anon sentinel behavior."
+      ]
     }
   },
   "contexts": {
@@ -1312,6 +1329,109 @@
       "caveats": [
         "The profile remains internal V2; the paired image metadata is the most current internal V1c artifact and covers the complete EMBEDv1 exam and patient set."
       ]
+    },
+    "internal-v2.patient-history-context": {
+      "title": "Internal V2 reported patient history",
+      "kind": "data_representation",
+      "scope": "profile_specific",
+      "profiles": [
+        "internal-v2"
+      ],
+      "summary": "HormoneHist represents reported hormone, treatment, and contraceptive exposures, while ProcHist represents reported prior gynecological and breast procedures; both belong to the patient and carry an imaging-accession recording context that is not the historical event accession or event time.",
+      "domains": [
+        "identity",
+        "procedure",
+        "temporal",
+        "workflow"
+      ],
+      "search_terms": [
+        "HormoneHist",
+        "ProcHist",
+        "patient history",
+        "hormone therapy history",
+        "contraceptive history",
+        "prior breast procedure",
+        "prior gynecological procedure"
+      ],
+      "related_concepts": [
+        "internal-v2.hormone_history.exposure_category",
+        "internal-v2.hormone_history.hormone_code",
+        "internal-v2.hormone_history.therapy_code",
+        "internal-v2.hormone_history.contraceptive_code",
+        "internal-v2.procedure_history.procedure_category",
+        "internal-v2.procedure_history.gynecological_procedure_code",
+        "internal-v2.procedure_history.breast_procedure_code",
+        "internal-v2.procedure_history.reported_result"
+      ],
+      "related_tables": [],
+      "related_relationships": [],
+      "claims": [
+        {
+          "id": "patient-and-accession-context",
+          "statement": "empi_anon identifies the patient using the established longitudinal internal V2 namespace, and a valid acc_anon identifies the associated imaging accession using the established exam namespace; the accession is recording context and does not identify when the historical exposure or procedure occurred.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.patient-history-maintainer-confirmation",
+            "internal-v2.magview-maintainer-clarifications"
+          ],
+          "caveats": [
+            "The meaning of candidate sentinel value 999 is not established and is not encoded as a missing value.",
+            "A history record must not be attributed across patients; each valid accession belongs to exactly one patient."
+          ]
+        },
+        {
+          "id": "reported-history-not-current-care",
+          "statement": "HormoneHist and ProcHist record reported or previously documented patient history rather than a treatment, procedure, or pathology event performed during the associated imaging exam.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.patient-history-maintainer-confirmation"
+          ],
+          "caveats": [
+            "A historical breast procedure or result is not automatically attributable to a current imaging finding or equivalent to verified procedure-associated pathology."
+          ]
+        },
+        {
+          "id": "hormone-history-timing",
+          "statement": "HormoneHist can represent reported exposure start and end through age and partial calendar components, along with current, continuous, and duration fields, but the duration unit and any precedence or consistency rule among those representations are not established.",
+          "status": "reconciled",
+          "sources": [
+            "internal-v2.patient-history-maintainer-confirmation"
+          ],
+          "caveats": [
+            "Month and year components are not exact dates.",
+            "Current and continuous status are reported states in the recording context and do not supply exact interval endpoints."
+          ]
+        },
+        {
+          "id": "procedure-history-result",
+          "statement": "ProcHist result codes are reported historical results spanning broad assessments, malignant diagnoses, high-risk lesions, and benign histologies or conditions; they are not uniformly a verified pathology diagnosis or severity scale.",
+          "status": "verified",
+          "sources": [
+            "internal-v2.patient-history-maintainer-confirmation"
+          ],
+          "caveats": [
+            "The available evidence does not establish result provenance or unconditional attribution of a result to the procedure subtype carried by the same history entry.",
+            "NONE means no reported result, not a negative pathology result."
+          ]
+        },
+        {
+          "id": "history-identity-and-physical-scope",
+          "statement": "The supported history semantics do not establish a stable history-entry identifier, a semantic deduplication rule, or a complete physical schema for either source table.",
+          "status": "unresolved",
+          "sources": [
+            "internal-v2.patient-history-maintainer-confirmation"
+          ],
+          "caveats": [
+            "Repeated entries may be separate reports, corrections, or duplicates.",
+            "HormoneHist and ProcHist remain intentionally absent from the physical profile binding until complete columns, types, and schema nullability are available."
+          ]
+        }
+      ],
+      "workflow_steps": [],
+      "caveats": [
+        "The controlled code meanings are supported, but vocabulary completeness is unknown without source artifacts.",
+        "This context supplies semantic coverage only and does not imply that either table is physically queryable through the current profile binding."
+      ]
     }
   },
   "qualifications": {
@@ -1644,6 +1764,199 @@
     }
   },
   "vocabularies": {
+    "internal-v2.vocabulary.hormone_history.exposure_category": {
+      "label": "Reported exposure-history categories",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "The category determines which code vocabulary applies; the same source token can have different meanings in different categories.",
+        "The confirmed codes are not asserted to exhaust every represented source value."
+      ],
+      "codes": {
+        "H": "Hormone",
+        "T": "Therapy",
+        "O": "Contraceptive"
+      }
+    },
+    "internal-v2.vocabulary.hormone_history.hormone": {
+      "label": "Reported hormone-history codes",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "These meanings apply only when exposure category is H.",
+        "The confirmed codes are not asserted to exhaust every represented source value."
+      ],
+      "codes": {
+        "C": "Estrogen and progesterone; combined hormone-replacement therapy",
+        "ESTRO": "Estrogen",
+        "PH": "Premphase",
+        "PP": "Prempro",
+        "PROGES": "Progesterone",
+        "R": "Premarin",
+        "RA": "Raloxifene",
+        "TAMOX": "Tamoxifen",
+        "V": "Provera",
+        "O": "Other hormone"
+      }
+    },
+    "internal-v2.vocabulary.hormone_history.therapy": {
+      "label": "Reported therapy-history codes",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "These meanings apply only when exposure category is T.",
+        "The confirmed codes are not asserted to exhaust every represented source value."
+      ],
+      "codes": {
+        "CH": "Chemotherapy",
+        "ET": "Endocrine therapy",
+        "H": "Hormonal therapy",
+        "RT": "Radiation therapy",
+        "RTC": "Radiation therapy and chemotherapy",
+        "RTH": "Radiation therapy and hormone therapy",
+        "TAXOL": "Taxol",
+        "XRT": "XRT/radiation therapy",
+        "O": "Other therapy"
+      }
+    },
+    "internal-v2.vocabulary.hormone_history.contraceptive": {
+      "label": "Reported contraceptive-history codes",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "These meanings apply only when exposure category is O.",
+        "The confirmed codes are not asserted to exhaust every represented source value."
+      ],
+      "codes": {
+        "C": "Combined oral contraceptive",
+        "ORAL": "Oral contraceptive",
+        "O": "Other contraceptive"
+      }
+    },
+    "internal-v2.vocabulary.procedure_history.procedure_category": {
+      "label": "Reported procedure-history categories",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "The category determines which procedure-code vocabulary applies.",
+        "The confirmed codes are not asserted to exhaust every represented source value."
+      ],
+      "codes": {
+        "G": "Gynecological procedure",
+        "B": "Breast procedure"
+      }
+    },
+    "internal-v2.vocabulary.procedure_history.gynecological_procedure": {
+      "label": "Reported gynecological-procedure history codes",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "These meanings apply only when procedure category is G.",
+        "One-ovary and ovaries-removed codes retain their different reported detail."
+      ],
+      "codes": {
+        "HYST": "Hysterectomy",
+        "H": "Partial hysterectomy",
+        "O": "One ovary removed",
+        "OS": "Ovaries removed"
+      }
+    },
+    "internal-v2.vocabulary.procedure_history.breast_procedure": {
+      "label": "Reported breast-procedure history codes",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "These meanings apply only when procedure category is B.",
+        "A reported historical procedure is not a current-exam procedure or a verified pathology attachment."
+      ],
+      "codes": {
+        "1": "Core biopsy",
+        "SB": "Stereotactic core biopsy",
+        "UCB": "Ultrasound-guided core biopsy",
+        "B": "MRI-guided core biopsy",
+        "E": "Excisional biopsy",
+        "NB": "Needle biopsy",
+        "CA": "Cyst aspiration",
+        "FNA": "Fine-needle aspiration",
+        "L": "Lumpectomy",
+        "M": "Mastectomy",
+        "D": "Breast reduction",
+        "MP": "Mammoplasty",
+        "R": "Reconstruction",
+        "EXI": "Implants removed",
+        "NO": "Non-oncologic procedure"
+      }
+    },
+    "internal-v2.vocabulary.procedure_history.result": {
+      "label": "Reported historical-procedure result codes",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "The codes mix broad assessments, specific malignant diagnoses, high-risk lesions, and benign histologies or conditions; they do not form one pathology-severity scale.",
+        "A matching clinical label does not make a history result equivalent to verified procedure-associated pathology."
+      ],
+      "codes": {
+        "ADH": "Atypical ductal hyperplasia",
+        "ALH": "Atypical lobular hyperplasia",
+        "BEN": "Benign",
+        "BOT": "Invasive ductal carcinoma and ductal carcinoma in situ",
+        "DE": "Duct ectasia",
+        "DS": "Ductal carcinoma in situ",
+        "FA": "Fibroadenoma",
+        "FN": "Fat necrosis",
+        "ID": "Invasive ductal carcinoma",
+        "IF": "Chronic inflammatory changes",
+        "IL": "Invasive lobular carcinoma",
+        "LS": "Lobular carcinoma in situ",
+        "LY": "Lymphoma",
+        "MAL": "Malignant",
+        "PA": "Papilloma",
+        "SA": "Sclerosing adenosis",
+        "SF": "Stromal fibrosis",
+        "NONE": "No reported result"
+      }
+    },
+    "internal-v2.vocabulary.procedure_history.breast_side": {
+      "label": "Reported historical breast-procedure laterality",
+      "completeness": "unknown",
+      "parsing": "atomic",
+      "evidence": [
+        "maintainer_confirmed"
+      ],
+      "caveats": [
+        "Blank is represented as an unspecified or unknown missing state on the concept rather than as a vocabulary code.",
+        "Laterality is breast-specific and is not required for a gynecological procedure."
+      ],
+      "codes": {
+        "L": "Left",
+        "R": "Right",
+        "B": "Bilateral"
+      }
+    },
     "internal-v2.breast.depth": {
       "label": "Breast depth and grid codes",
       "completeness": "unknown",
@@ -9705,6 +10018,73 @@
   },
   "contributions": {
     "clinical_objects": {
+      "internal-v2.hormone_history_entry": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Reported hormone and treatment history entry",
+        "definition": "One represented report of a patient's hormone, treatment, or contraceptive exposure history.",
+        "grain": "one represented exposure-history entry for one patient",
+        "domains": [
+          "demographics",
+          "procedure",
+          "temporal",
+          "workflow"
+        ],
+        "search_terms": [
+          "HormoneHist",
+          "hormone history",
+          "therapy history",
+          "contraceptive history",
+          "tamoxifen history",
+          "raloxifene history"
+        ],
+        "claim_refs": [
+          "internal-v2.patient-history-context#reported-history-not-current-care",
+          "internal-v2.patient-history-context#hormone-history-timing"
+        ],
+        "caveats": [
+          "The entry is reported or previously documented history, not proof that treatment occurred during the associated imaging exam.",
+          "No stable entry identifier or semantic deduplication rule is established."
+        ]
+      },
+      "internal-v2.procedure_history_entry": {
+        "availability": {
+          "scope": "profiles",
+          "profiles": [
+            "internal-v2"
+          ]
+        },
+        "label": "Reported prior-procedure history entry",
+        "definition": "One represented report of a patient's prior gynecological or breast procedure.",
+        "grain": "one represented prior-procedure history entry for one patient",
+        "domains": [
+          "breast_side",
+          "pathology",
+          "procedure",
+          "temporal",
+          "workflow"
+        ],
+        "search_terms": [
+          "ProcHist",
+          "procedure history",
+          "prior breast biopsy",
+          "prior breast surgery",
+          "hysterectomy history",
+          "oophorectomy history"
+        ],
+        "claim_refs": [
+          "internal-v2.patient-history-context#reported-history-not-current-care",
+          "internal-v2.patient-history-context#procedure-history-result"
+        ],
+        "caveats": [
+          "The entry is not the shared current procedure object and is not automatically attributable to a current imaging finding.",
+          "No stable entry identifier or semantic deduplication rule is established."
+        ]
+      },
       "region_of_interest": {
         "availability": {
           "scope": "profiles",
@@ -9769,6 +10149,297 @@
       }
     },
     "concepts": {
+      "internal-v2.hormone_history.exposure_category": {
+        "label": "Reported exposure-history category",
+        "definition": "Category identifying a reported hormone, therapy, or contraceptive history entry.",
+        "feature_kind": "coded",
+        "domains": ["procedure", "workflow"],
+        "search_terms": ["HormoneHist type", "hormone history category", "therapy history category", "contraceptive history category"],
+        "caveats": ["The category selects the applicable category-specific code meaning."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.hormone_history.exposure_category",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.hormone_code": {
+        "label": "Reported hormone-history code",
+        "definition": "Hormone or hormone-regimen code for an exposure-history entry whose category is hormone.",
+        "feature_kind": "coded",
+        "domains": ["procedure"],
+        "search_terms": ["HormoneHist hormone code", "estrogen history", "progesterone history", "tamoxifen history", "raloxifene history"],
+        "caveats": ["This meaning is conditional on exposure category H."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.hormone_history.hormone",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.therapy_code": {
+        "label": "Reported therapy-history code",
+        "definition": "Treatment code for an exposure-history entry whose category is therapy.",
+        "feature_kind": "coded",
+        "domains": ["procedure"],
+        "search_terms": ["HormoneHist therapy code", "chemotherapy history", "radiation therapy history", "endocrine therapy history", "Taxol history"],
+        "caveats": ["This meaning is conditional on exposure category T."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.hormone_history.therapy",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.contraceptive_code": {
+        "label": "Reported contraceptive-history code",
+        "definition": "Contraceptive code for an exposure-history entry whose category is contraceptive.",
+        "feature_kind": "coded",
+        "domains": ["procedure"],
+        "search_terms": ["HormoneHist contraceptive code", "oral contraceptive history", "birth control history"],
+        "caveats": ["This meaning is conditional on exposure category O; code C therefore means combined oral contraceptive here rather than combined hormone-replacement therapy."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.hormone_history.contraceptive",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.continuous_status": {
+        "label": "Reported continuous-exposure status",
+        "definition": "Reported indication of whether the historical exposure was continuous.",
+        "feature_kind": "flag",
+        "domains": ["procedure", "temporal"],
+        "search_terms": ["continuous hormone use", "continuous therapy", "HormoneHist continuous"],
+        "caveats": ["No precedence or consistency rule with duration, current status, or interval fields is established."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.current_status": {
+        "label": "Reported current-exposure status",
+        "definition": "Reported indication of whether the exposure was current in its recording context.",
+        "feature_kind": "flag",
+        "domains": ["procedure", "temporal", "workflow"],
+        "search_terms": ["current hormone use", "current therapy", "current contraceptive", "HormoneHist current"],
+        "caveats": ["Current is relative to the history record's recording context, whose exact documentation time is unsupported."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.reported_duration": {
+        "label": "Reported exposure duration",
+        "definition": "Reported duration value for a historical exposure, with no established unit.",
+        "feature_kind": "numeric",
+        "domains": ["procedure", "temporal"],
+        "search_terms": ["HormoneHist duration", "hormone duration", "therapy duration", "contraceptive duration"],
+        "caveats": ["Do not interpret the value as days, months, or years; no consistency rule with interval fields is established."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.reported_start_age": {
+        "label": "Reported exposure-start age",
+        "definition": "Reported patient age when the historical exposure began.",
+        "feature_kind": "numeric",
+        "domains": ["demographics", "procedure", "temporal"],
+        "search_terms": ["HormoneHist first_age", "age started hormone", "exposure start age"],
+        "caveats": ["The age is a reported temporal representation and is not subordinate to or preferred over partial calendar components."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-start"],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.reported_start_month": {
+        "label": "Reported exposure-start month",
+        "definition": "Reported calendar month component for the beginning of a historical exposure.",
+        "feature_kind": "numeric",
+        "domains": ["procedure", "temporal"],
+        "search_terms": ["HormoneHist mfirst", "exposure start month"],
+        "caveats": ["A month component is not an exact date and has no established precedence over reported start age."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-start"],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.reported_start_year": {
+        "label": "Reported exposure-start year",
+        "definition": "Reported calendar year component for the beginning of a historical exposure.",
+        "feature_kind": "numeric",
+        "domains": ["procedure", "temporal"],
+        "search_terms": ["HormoneHist yfirst", "exposure start year"],
+        "caveats": ["A year component is not an exact date and has no established precedence over reported start age."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-start"],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.reported_end_age": {
+        "label": "Reported exposure-end age",
+        "definition": "Reported patient age when the historical exposure ended.",
+        "feature_kind": "numeric",
+        "domains": ["demographics", "procedure", "temporal"],
+        "search_terms": ["HormoneHist last_age", "age stopped hormone", "exposure end age"],
+        "caveats": ["The age is a reported temporal representation and is not subordinate to or preferred over partial calendar components."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-end"],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.reported_end_month": {
+        "label": "Reported exposure-end month",
+        "definition": "Reported calendar month component for the end of a historical exposure.",
+        "feature_kind": "numeric",
+        "domains": ["procedure", "temporal"],
+        "search_terms": ["HormoneHist mlast", "exposure end month"],
+        "caveats": ["A month component is not an exact date and has no established precedence over reported end age."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-end"],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.reported_end_year": {
+        "label": "Reported exposure-end year",
+        "definition": "Reported calendar year component for the end of a historical exposure.",
+        "feature_kind": "numeric",
+        "domains": ["procedure", "temporal"],
+        "search_terms": ["HormoneHist ylast", "exposure end year"],
+        "caveats": ["A year component is not an exact date and has no established precedence over reported end age."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "missing_states": [],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-end"],
+        "aggregations": []
+      },
+      "internal-v2.hormone_history.comment": {
+        "label": "Reported exposure-history comment",
+        "definition": "Free-text information recorded with a hormone, therapy, or contraceptive history entry.",
+        "feature_kind": "text",
+        "domains": ["procedure", "workflow"],
+        "search_terms": ["HormoneHist comment", "hormone history free text"],
+        "caveats": ["The catalogue describes the field but contains and exposes no source text."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.procedure_history.procedure_category": {
+        "label": "Reported procedure-history category",
+        "definition": "Category identifying a reported prior gynecological or breast procedure.",
+        "feature_kind": "coded",
+        "domains": ["procedure"],
+        "search_terms": ["ProcHist type", "procedure history category", "gynecological procedure history", "breast procedure history"],
+        "caveats": ["The category selects the applicable category-specific procedure-code meaning."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.procedure_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.procedure_history.procedure_category",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.procedure_history.gynecological_procedure_code": {
+        "label": "Reported gynecological-procedure history code",
+        "definition": "Gynecological procedure code for a prior-procedure history entry whose category is gynecological.",
+        "feature_kind": "coded",
+        "domains": ["procedure"],
+        "search_terms": ["ProcHist gynecological code", "hysterectomy history", "oophorectomy history", "ovary removed"],
+        "caveats": ["This meaning is conditional on procedure category G; breast laterality does not apply."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.procedure_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.procedure_history.gynecological_procedure",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.procedure_history.breast_procedure_code": {
+        "label": "Reported breast-procedure history code",
+        "definition": "Breast procedure code for a prior-procedure history entry whose category is breast.",
+        "feature_kind": "coded",
+        "domains": ["procedure"],
+        "search_terms": ["ProcHist breast code", "prior core biopsy", "prior lumpectomy", "prior mastectomy", "breast reconstruction history"],
+        "caveats": ["This meaning is conditional on procedure category B and does not establish a current-exam procedure."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.procedure_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.procedure_history.breast_procedure",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.procedure_history.reported_result": {
+        "label": "Reported historical-procedure result",
+        "definition": "Reported result carried by a prior-procedure history entry, spanning broad assessments, diagnoses, high-risk lesions, and benign histologies or conditions.",
+        "feature_kind": "coded",
+        "domains": ["pathology", "procedure", "workflow"],
+        "search_terms": ["ProcHist result", "historical biopsy result", "prior pathology result", "historical benign result", "historical malignant result"],
+        "caveats": ["This is not uniformly a verified pathology diagnosis or severity and is not automatically attributable to the represented procedure subtype or a current finding."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.procedure_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.procedure_history.result",
+        "claim_refs": ["internal-v2.patient-history-context#procedure-history-result"],
+        "missing_states": [
+          {
+            "id": "no-reported-result",
+            "representation": "NONE",
+            "meaning": "No result was reported for the history entry; this is not a negative pathology result.",
+            "claim_refs": ["internal-v2.patient-history-context#procedure-history-result"],
+            "caveats": []
+          }
+        ],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
+      "internal-v2.procedure_history.reported_breast_side": {
+        "label": "Reported historical breast-procedure side",
+        "definition": "Reported breast laterality for a prior breast-procedure history entry.",
+        "feature_kind": "coded",
+        "domains": ["breast_side", "procedure"],
+        "search_terms": ["ProcHist side", "prior procedure laterality", "historical breast side"],
+        "caveats": ["The concept is breast-specific and should not be forced onto gynecological procedure entries."],
+        "evidence": ["maintainer_confirmed"],
+        "objects": ["internal-v2.procedure_history_entry"],
+        "vocabulary": "internal-v2.vocabulary.procedure_history.breast_side",
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+        "missing_states": [
+          {
+            "id": "unspecified-or-unknown",
+            "representation": "blank",
+            "meaning": "Breast laterality is unspecified or unknown; blank is expected for a gynecological procedure and does not by itself make the entry malformed.",
+            "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care"],
+            "caveats": []
+          }
+        ],
+        "temporal_semantics": [],
+        "aggregations": []
+      },
       "internal-v2.technical.cancer_registry_record_identifier": {
         "availability": {
           "scope": "profiles",
@@ -12588,6 +13259,104 @@
       }
     },
     "semantic_relationships": {
+      "internal-v2.clinical.patient-hormone-history": {
+        "label": "Patient has reported hormone or treatment history entry",
+        "kind": "hierarchy",
+        "source_object": "patient",
+        "target_object": "internal-v2.hormone_history_entry",
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "exactly_one"
+        },
+        "optionality": {
+          "source": "optional",
+          "target": "required"
+        },
+        "attribution": "Patient ownership of each represented hormone, treatment, or contraceptive history entry through the established longitudinal patient identity.",
+        "attribution_limitations": [
+          "No stable history-entry identity or semantic deduplication rule is established."
+        ],
+        "temporal_qualification": "The relationship is longitudinal patient ownership and does not date the exposure.",
+        "temporal_semantics": [],
+        "domains": ["identity", "procedure", "temporal"],
+        "search_terms": ["patient hormone history", "patient therapy history", "patient contraceptive history"],
+        "claim_refs": ["internal-v2.patient-history-context#patient-and-accession-context"],
+        "caveats": ["Repeated reports must not be silently treated as either distinct exposures or duplicates."]
+      },
+      "internal-v2.clinical.patient-procedure-history": {
+        "label": "Patient has reported prior-procedure history entry",
+        "kind": "hierarchy",
+        "source_object": "patient",
+        "target_object": "internal-v2.procedure_history_entry",
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "exactly_one"
+        },
+        "optionality": {
+          "source": "optional",
+          "target": "required"
+        },
+        "attribution": "Patient ownership of each represented prior gynecological or breast procedure history entry through the established longitudinal patient identity.",
+        "attribution_limitations": [
+          "No stable history-entry identity or semantic deduplication rule is established."
+        ],
+        "temporal_qualification": "The relationship is longitudinal patient ownership and does not date the historical procedure.",
+        "temporal_semantics": [],
+        "domains": ["identity", "procedure", "temporal"],
+        "search_terms": ["patient procedure history", "patient breast surgery history", "patient gynecological history"],
+        "claim_refs": ["internal-v2.patient-history-context#patient-and-accession-context"],
+        "caveats": ["Repeated reports must not be silently treated as either distinct procedures or duplicates."]
+      },
+      "internal-v2.clinical.exam-hormone-history-recording-context": {
+        "label": "Imaging exam provides hormone-history recording context",
+        "kind": "documentation",
+        "source_object": "imaging_exam",
+        "target_object": "internal-v2.hormone_history_entry",
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "zero_or_one"
+        },
+        "optionality": {
+          "source": "optional",
+          "target": "optional"
+        },
+        "attribution": "A valid associated accession supplies the imaging-exam context in which the exposure history entry is represented.",
+        "attribution_limitations": [
+          "The accession is not the accession on which the exposure began or ended and does not supply the exposure event time.",
+          "Candidate sentinel value 999 is not interpreted."
+        ],
+        "temporal_qualification": "The exam event date is contextual and must not be substituted for exposure start, exposure end, or exact history-documentation time.",
+        "temporal_semantics": [],
+        "domains": ["exam", "procedure", "temporal", "workflow"],
+        "search_terms": ["HormoneHist accession", "hormone history recording context", "history collection exam"],
+        "claim_refs": ["internal-v2.patient-history-context#patient-and-accession-context"],
+        "caveats": ["No physical relationship binding is supplied until the complete table schema is cataloged."]
+      },
+      "internal-v2.clinical.exam-procedure-history-recording-context": {
+        "label": "Imaging exam provides procedure-history recording context",
+        "kind": "documentation",
+        "source_object": "imaging_exam",
+        "target_object": "internal-v2.procedure_history_entry",
+        "cardinality": {
+          "targets_per_source": "zero_or_more",
+          "sources_per_target": "zero_or_one"
+        },
+        "optionality": {
+          "source": "optional",
+          "target": "optional"
+        },
+        "attribution": "A valid associated accession supplies the imaging-exam context in which the prior-procedure history entry is represented.",
+        "attribution_limitations": [
+          "The accession is not the accession on which the historical procedure occurred and does not supply the procedure event time.",
+          "Candidate sentinel value 999 is not interpreted."
+        ],
+        "temporal_qualification": "The exam event date is contextual and must not be substituted for historical procedure time or exact history-documentation time.",
+        "temporal_semantics": [],
+        "domains": ["exam", "procedure", "temporal", "workflow"],
+        "search_terms": ["ProcHist accession", "procedure history recording context", "history collection exam"],
+        "claim_refs": ["internal-v2.patient-history-context#patient-and-accession-context"],
+        "caveats": ["No physical relationship binding is supplied until the complete table schema is cataloged."]
+      },
       "clinical.image-region-of-interest": {
         "availability": {
           "scope": "profiles",
@@ -12777,9 +13546,131 @@
         ]
       }
     },
-    "temporal_semantics": {},
+    "temporal_semantics": {
+      "internal-v2.time.reported-exposure-start": {
+        "label": "Reported historical exposure start",
+        "kind": "event_time",
+        "meaning": "Reported beginning of a hormone, treatment, or contraceptive exposure, represented through an age and/or partial calendar month and year rather than a supported exact date.",
+        "objects": [
+          "internal-v2.hormone_history_entry"
+        ],
+        "feature_refs": [
+          "internal-v2.hormone_history.reported_start_age",
+          "internal-v2.hormone_history.reported_start_month",
+          "internal-v2.hormone_history.reported_start_year"
+        ],
+        "relative_to": [],
+        "domains": [
+          "procedure",
+          "temporal"
+        ],
+        "search_terms": [
+          "hormone start date",
+          "therapy start age",
+          "contraceptive start year",
+          "HormoneHist first"
+        ],
+        "claim_refs": [
+          "internal-v2.patient-history-context#hormone-history-timing"
+        ],
+        "caveats": [
+          "Age and calendar components may be alternative or complementary representations; no precedence or consistency rule is established.",
+          "Do not construct an exact date from partial components or substitute the associated exam date."
+        ]
+      },
+      "internal-v2.time.reported-exposure-end": {
+        "label": "Reported historical exposure end",
+        "kind": "event_time",
+        "meaning": "Reported end of a hormone, treatment, or contraceptive exposure, represented through an age and/or partial calendar month and year rather than a supported exact date.",
+        "objects": [
+          "internal-v2.hormone_history_entry"
+        ],
+        "feature_refs": [
+          "internal-v2.hormone_history.reported_end_age",
+          "internal-v2.hormone_history.reported_end_month",
+          "internal-v2.hormone_history.reported_end_year"
+        ],
+        "relative_to": [
+          "internal-v2.time.reported-exposure-start"
+        ],
+        "domains": [
+          "procedure",
+          "temporal"
+        ],
+        "search_terms": [
+          "hormone stop date",
+          "therapy end age",
+          "contraceptive end year",
+          "HormoneHist last"
+        ],
+        "claim_refs": [
+          "internal-v2.patient-history-context#hormone-history-timing"
+        ],
+        "caveats": [
+          "Age and calendar components may be alternative or complementary representations; no precedence or consistency rule is established.",
+          "Do not construct an exact date from partial components or substitute the associated exam date."
+        ]
+      }
+    },
     "aggregations": {},
     "guardrails": {
+      "internal-v2.guardrail.patient-history-is-not-verified-current-care": {
+        "title": "Reported patient history is not verified current care",
+        "statement": "Do not merge HormoneHist or ProcHist entries with current-exam procedures, verified procedure-associated pathology, or imaging findings solely because their clinical labels, accession context, or laterality agree.",
+        "rationale": "The history tables represent reported or previously documented history. ProcHist results mix several clinical levels and have no unconditional attribution to the represented procedure subtype or a current finding.",
+        "category": "interpretation_limit",
+        "priority": "high",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "objects": ["internal-v2.hormone_history_entry", "internal-v2.procedure_history_entry", "imaging_finding", "procedure", "pathology_diagnosis"],
+        "concepts": ["internal-v2.procedure_history.reported_result"],
+        "semantic_relationships": ["internal-v2.clinical.patient-hormone-history", "internal-v2.clinical.patient-procedure-history"],
+        "temporal_semantics": [],
+        "aggregations": [],
+        "coverage": ["coverage.internal-v2.patient-history-row-identity"],
+        "domains": ["imaging", "pathology", "procedure", "workflow"],
+        "search_terms": ["historical result verified pathology", "prior biopsy current finding", "merge ProcHist pathology", "patient history attribution"],
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care", "internal-v2.patient-history-context#procedure-history-result"],
+        "caveats": ["NONE means no reported historical result and must not be normalized to negative pathology."]
+      },
+      "internal-v2.guardrail.history-accession-is-recording-context": {
+        "title": "History accession is recording context, not historical event time",
+        "statement": "Use a valid HormoneHist or ProcHist acc_anon only as the associated imaging-accession context; do not use that accession or its exam date as the exposure start, exposure end, or historical procedure event.",
+        "rationale": "The established accession namespace identifies an imaging exam, but the history association does not make that exam the occurrence of the historical exposure or procedure and does not supply exact documentation time.",
+        "category": "prohibition",
+        "priority": "high",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "objects": ["imaging_exam", "internal-v2.hormone_history_entry", "internal-v2.procedure_history_entry"],
+        "concepts": [],
+        "semantic_relationships": ["internal-v2.clinical.exam-hormone-history-recording-context", "internal-v2.clinical.exam-procedure-history-recording-context"],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-start", "internal-v2.time.reported-exposure-end"],
+        "aggregations": [],
+        "coverage": ["coverage.internal-v2.history-recording-time", "coverage.internal-v2.historical-procedure-event-time"],
+        "domains": ["exam", "procedure", "temporal", "workflow"],
+        "search_terms": ["HormoneHist accession date", "ProcHist procedure date", "history recording time", "historical event accession"],
+        "claim_refs": ["internal-v2.patient-history-context#patient-and-accession-context"],
+        "caveats": ["Candidate sentinel value 999 remains uninterpreted and must not be treated as a valid accession or a governed missing sentinel without further evidence."]
+      },
+      "internal-v2.guardrail.hormone-history-timing-needs-explicit-reconciliation": {
+        "title": "Hormone-history timing fields have no supplied reconciliation rule",
+        "statement": "Do not silently choose or reconcile HormoneHist duration, current or continuous status, reported start or end ages, and partial month or year components when they disagree.",
+        "rationale": "The fields provide distinct reported representations, the duration unit is unknown, partial calendar components are not exact dates, and no source precedence or consistency rule is established.",
+        "category": "analyst_choice",
+        "priority": "high",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "objects": ["internal-v2.hormone_history_entry"],
+        "concepts": ["internal-v2.hormone_history.continuous_status", "internal-v2.hormone_history.current_status", "internal-v2.hormone_history.reported_duration", "internal-v2.hormone_history.reported_start_age", "internal-v2.hormone_history.reported_start_month", "internal-v2.hormone_history.reported_start_year", "internal-v2.hormone_history.reported_end_age", "internal-v2.hormone_history.reported_end_month", "internal-v2.hormone_history.reported_end_year"],
+        "semantic_relationships": [],
+        "temporal_semantics": ["internal-v2.time.reported-exposure-start", "internal-v2.time.reported-exposure-end"],
+        "aggregations": [],
+        "coverage": [],
+        "domains": ["procedure", "temporal", "workflow"],
+        "search_terms": ["HormoneHist timing conflict", "hormone duration unit", "partial hormone dates", "current continuous disagreement"],
+        "claim_refs": ["internal-v2.patient-history-context#hormone-history-timing"],
+        "caveats": ["Any downstream reconciliation must be declared for the task and must preserve the distinction between reported age and partial calendar components."]
+      },
       "internal-v2.guardrail.absent-image-metadata-is-not-image-absence": {
         "availability": {
           "scope": "profiles",
@@ -12922,6 +13813,66 @@
       }
     },
     "coverage": {
+      "coverage.internal-v2.patient-history-semantics": {
+        "subject_kind": "topic",
+        "subject": "internal-v2.patient-history-context",
+        "status": "supported",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "summary": "Internal V2 supplies governed semantic objects, concepts, conditional code meanings, relationships, and interpretation limits for HormoneHist and ProcHist.",
+        "domains": ["identity", "pathology", "procedure", "temporal", "workflow"],
+        "search_terms": ["HormoneHist semantics", "ProcHist semantics", "patient history vocabulary", "internal patient history"],
+        "claim_refs": ["internal-v2.patient-history-context#reported-history-not-current-care", "internal-v2.patient-history-context#procedure-history-result"],
+        "caveats": ["The confirmed code meanings are supported, while vocabulary completeness remains unknown without source artifacts."]
+      },
+      "coverage.internal-v2.patient-history-row-identity": {
+        "subject_kind": "topic",
+        "subject": "internal-v2.patient-history-context",
+        "status": "unresolved",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "summary": "No stable HormoneHist or ProcHist row identifier, clinical-entry identity, or semantic deduplication rule is established.",
+        "domains": ["identity", "procedure", "workflow"],
+        "search_terms": ["HormoneHist row key", "ProcHist duplicate", "patient history identity", "history deduplication"],
+        "claim_refs": ["internal-v2.patient-history-context#history-identity-and-physical-scope"],
+        "caveats": ["Repeated rows may represent distinct reports, corrections, or duplicates and must not be silently collapsed."]
+      },
+      "coverage.internal-v2.patient-history-physical-binding": {
+        "subject_kind": "topic",
+        "subject": "internal-v2.patient-history-context",
+        "status": "not_cataloged",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "summary": "HormoneHist and ProcHist are not present in the internal-V2 physical profile binding because complete column inventories, physical types, and schema nullability are unavailable.",
+        "domains": ["procedure", "technical", "workflow"],
+        "search_terms": ["HormoneHist table", "ProcHist table", "patient history columns", "patient history physical binding"],
+        "claim_refs": ["internal-v2.patient-history-context#history-identity-and-physical-scope"],
+        "caveats": ["The current profile binding continues to contain only magview_all_cohorts_PACS_v2_anon and metadata_all_cohorts_v1c.", "Do not infer physical types, nullability, additional columns, or executable joins from the semantic records."]
+      },
+      "coverage.internal-v2.history-recording-time": {
+        "subject_kind": "topic",
+        "subject": "internal-v2.patient-history-context",
+        "status": "unsupported",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "summary": "No exact HormoneHist or ProcHist documentation or collection timestamp is supported.",
+        "domains": ["exam", "temporal", "workflow"],
+        "search_terms": ["history recording date", "HormoneHist collection time", "ProcHist documentation time"],
+        "claim_refs": ["internal-v2.patient-history-context#patient-and-accession-context"],
+        "caveats": ["The associated imaging exam date is context and must not be silently substituted as exact history-recording time."]
+      },
+      "coverage.internal-v2.historical-procedure-event-time": {
+        "subject_kind": "clinical_object",
+        "subject": "internal-v2.procedure_history_entry",
+        "status": "unsupported",
+        "scope": "profile_specific",
+        "profiles": ["internal-v2"],
+        "summary": "No supported event date is represented for the historical procedure entry.",
+        "domains": ["procedure", "temporal"],
+        "search_terms": ["ProcHist procedure date", "prior biopsy date", "historical surgery time"],
+        "claim_refs": ["internal-v2.patient-history-context#patient-and-accession-context"],
+        "caveats": ["Do not substitute the associated imaging accession date or a current procedure date."]
+      },
       "coverage.internal-v2.specimen-collection-time": {
         "availability": {
           "scope": "profiles",

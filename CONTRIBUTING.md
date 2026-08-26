@@ -37,7 +37,13 @@ This setup and the baseline test suite need no EMBED data. Read
   procedure, pathology, and registry-reference meanings, and contributes
   internal-only specimen, staging, biomarker, nodal, and source-workflow
   semantics. Procedure information is supported; specimen-level reliability,
-  identity, completeness, and cardinality are unresolved. It also inventories
+  identity, completeness, and cardinality are unresolved. It also contributes
+  semantic-only `HormoneHist` and `ProcHist` patient-history objects,
+  category-dependent vocabularies, partial exposure timing, relationships, and
+  guardrails. A valid history accession is recording context rather than event
+  time, and historical results are not verified current pathology. The two
+  history tables remain outside the physical binding until complete schemas,
+  types, and nullability are available. The profile also inventories
   the internal V1c `metadata_all_cohorts_v1c` image-metadata table at one row
   per extracted DICOM image instance and binds the image object, co-located
   patient, exam, and image-derived side projections, image metadata concepts,

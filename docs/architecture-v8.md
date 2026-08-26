@@ -53,6 +53,18 @@ remain unresolved. Profile-owned specimen, staging, biomarker,
 nodal, registry-reference, and source-workflow semantics remain available only
 to `internal-v2`.
 
+The profile also contributes semantic-only patient-history meaning for
+`HormoneHist` and `ProcHist`. Separate history-entry objects prevent reported
+prior exposures, procedures, and mixed-level historical results from being
+collapsed into current procedure or verified pathology objects. Patient
+ownership reuses the confirmed longitudinal identity, while a valid accession
+is modeled only as optional recording context. Category-specific vocabularies
+disambiguate reused source tokens, and partial exposure timing is represented
+without constructing exact dates or choosing a precedence rule. Complete table
+schemas are unavailable, so the physical binding remains unchanged and coverage
+records the missing schemas, row identity, deduplication, exact recording time,
+and historical procedure event time explicitly.
+
 The same profile adds a second, independent physical schema:
 the internal V1c `metadata_all_cohorts_v1c` image-metadata table at one row per
 extracted DICOM image instance. It binds the `image` object, the profile's
